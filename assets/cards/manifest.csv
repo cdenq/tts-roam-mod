@@ -1,0 +1,13 @@
+name,card,side,gem,file
+emerald_front,emerald,front,emerald_emerald1,emerald_front.png
+emerald_back,emerald,back,emerald_emerald1,emerald_back.png
+ruby_front,ruby,front,ruby_heart1,ruby_front.png
+ruby_back,ruby,back,ruby_heart1,ruby_back.png
+sapphire_front,sapphire,front,sapphire_pear1,sapphire_front.png
+sapphire_back,sapphire,back,sapphire_pear1,sapphire_back.png
+topaz_front,topaz,front,topaz_trillion1,topaz_front.png
+topaz_back,topaz,back,topaz_trillion1,topaz_back.png
+amethyst_front,amethyst,front,amethyst_marquise1,amethyst_front.png
+amethyst_back,amethyst,back,amethyst_marquise1,amethyst_back.png
+diamond_front,diamond,front,diamond_cabochon1,diamond_front.png
+diamond_back,diamond,back,diamond_cabochon1,diamond_back.png

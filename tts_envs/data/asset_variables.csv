@@ -1,0 +1,574 @@
+group,key,value,notes
+global,out_size,1024,px of each output PNG (square)
+global,supersample,2,render at out_size x this then shrink -- smooth ink lines. 1 = fast + jaggy
+global,seed,1,change to reroll EVERY tile; per-region seed_offset rerolls one region
+global,ink,#2b1f19,outline colour of every shape
+global,frame,#3b2b20,outer border
+global,frame_width,22,border thickness (design units; a tile is 1024 units wide)
+global,paper,#efe3c6,warm tint blended over everything + frame hairline
+global,paper_tint,0.10,0-1: how much the paper colour is blended in
+global,paper_grain,0.09,0-1: strength of fine grain
+global,vignette,0.18,0-1: darkening towards the corners
+global,path,#e4cf98,path fill
+global,path_pebble,#b9a370,dots along paths
+global,path_width,46,design units
+global,path_wobble,45,how far a path curves off the straight line (design units)
+global,clearing,#ecdcae,centre clearing fill
+global,cobble,#d4c3a0,clearing fill when clearing_style = cobble
+global,cobble_line,#a8957a,cobble stone outlines
+global,grass,#6e6236,grass tick strokes
+global,trunk,#7a5132,
+global,leaf,#6f8f3d,round tree canopy
+global,leaf_dk,#4f6b2c,canopy shade
+global,leaf_lt,#9bb456,canopy highlight
+global,pine,#4d6e3a,
+global,pine_dk,#365230,
+global,bush,#87a24a,
+global,rock_lt,#bdb7aa,mountain lit face
+global,rock_dk,#6a6870,mountain shadow face
+global,snow,#f6efdc,mountain caps
+global,wall,#eadbb6,house walls
+global,wall_dk,#cdb98f,house wall shade
+global,roofs,#b5523b|#9a4a3c|#c27a3c|#7d5a8a,one picked per house
+global,window,#e9c45a,
+global,fields,#d9b65a|#b9a24d|#9fae55,one picked per field
+global,field_lt,#ead27a,field stripes
+global,palisade,#9a6a40,town wall stakes
+global,palisade_dk,#6e4a2c,stake shade
+global,guild_roof,#4c5d70,guildhall slate roof
+global,guild_roof_dk,#36434f,guildhall roof shade
+global,stone,#a89f8c,foundations + chimneys
+global,stone_dk,#7d7566,stone shade + mortar
+global,timber,#5e3f28,timber framing beams
+global,banner,#2f6b6e,Guild colour: banners + tent stripes + pennants
+global,banner_lt,#e0b046,Guild emblem gold
+global,water,#7aa6b0,rivers + pools
+global,water_dk,#557f8e,water shade
+global,water_lt,#b4d3d6,ripples + water highlight
+global,reed,#7e8a3e,reed stems
+global,cattail,#6b4a2e,reed heads
+global,blossom,#e5a7b8,blossom canopy
+global,blossom_dk,#c47f94,
+global,blossom_lt,#f5d2dc,
+global,oak,#4c6632,deepwood canopy
+global,oak_dk,#374b25,
+global,oak_lt,#6b8644,
+global,fruit,#c8402e,orchard fruit
+global,heather,#9a6f9c,heather bushes
+global,heather_dk,#765279,
+global,heather_lt,#c79fc6,
+global,deadwood,#76695a,dead marsh trees
+global,charred,#3d3632,burnt trees
+global,stump_top,#d0ae7a,cut wood (stumps + log ends)
+global,cap,#b8463a,mushroom caps
+global,cap_dk,#8e3329,
+global,stem,#ece0c4,mushroom stems + windmill sails
+global,hill,#9aab5f,hill mounds
+global,hill_dk,#7a8b48,
+global,hill_lt,#b9c77a,
+global,hay,#dcbc63,haystacks
+global,hay_dk,#b8973f,
+global,statue,#8fb0a0,weathered bronze (verdigris) statue
+global,statue_dk,#62887a,
+global,statue_lt,#bcd4c8,
+global,gnarl_bark,#5e4b3d,ancient deepwood trunks
+global,gnarl_bark_dk,#3f3229,
+global,gnarl_leaf,#3f6a58,ancient canopy (blue-green)
+global,gnarl_leaf_dk,#2b4b3e,
+global,gnarl_leaf_lt,#62917a,
+global,moss,#93a85c,hanging moss
+global,glow,#eef6b8,magic motes
+global,chasm,#2f2824,canyon depths
+global,chasm_wall,#9a7c62,canyon walls
+global,spring,#7cc8bc,hot spring water
+global,spring_dk,#4f9a8f,
+global,mud,#7a6450,battlefield mud
+global,mud_dk,#56463a,
+global,briar,#56653a,bramble mounds
+global,briar_dk,#3b4626,
+global,berry,#a3243a,bramble berries
+global,cat_banner,#d9823a,Marquisate war banners
+global,bird_banner,#4a6fa5,Eyrie war banners
+global,foam,#f4f1e6,waterfall foam + steam
+global,flower_colours,#e8c547|#f2f0e6|#e59ab0|#a98bd0|#e07a4f,one picked per flower clump
+global,back_font,Luminari-Regular.ttf,font for the region name on tile backs (path from repo root)
+global,back_gem_size,400,longest side of the gem on tile backs (design units)
+global,river_anchor,256,feature river: x where it crosses the N and S edges (canyon mirrors it from the east). Fixed so stacked tiles join
+global,river_width,110,feature river: width (design units; a tile is 1024 wide)
+global,canyon_width,125,feature canyon: width
+global,lake_size,150-420,feature lake: radius range -- grows to the largest that clears the roads
+global,falls_size,130-240,feature falls: cliff radius range (same fitting as the lake)
+global,pit_size,125-160,feature pit: tries the larger radius first then the smaller
+global,pool_count,4,feature pools (marsh): max number of pools
+global,pool_size,60-130,feature pools: radius range
+global,mud_count,6,feature mud (battlefield): max number of patches
+global,mud_size,50-115,feature mud: radius range
+global,spring_count,3,feature springs: max number of pools
+global,spring_size,55-95,feature springs: radius range
+global,reed_size,45-65,reeds placed along river banks and lake shores
+global,field_width,170-260,crop field width range
+global,field_height,120-190,crop field height range
+global,menhir_spacing,85,wall menhirs: gap between stones round the ring
+global,menhir_size,115-150,wall menhirs: stone height range
+global,stake_spacing,24,wall palisade: gap between stakes
+global,stake_size,52-62,wall palisade: stake height range (gate posts are 1.35x)
+global,density_scale,1.7|1.35|1|0.85|0.72,spacing multiplier per density stage d1..d5 -- lower = more trees. d3 = region spacing as-is
+forest,variants,1,looks per orientation (every rotation of every pattern is always drawn)
+forest,patterns,deadend|corner|straight|tee|cross,which path layouts to make: none deadend corner straight tee cross
+forest,seed_offset,0,change to reroll just this region
+forest,ground,#bdb173,
+forest,deck,woodland,event deck: its back + events (deck_<id> groups below; plans/taxonomy.md)
+forest,densities,1-3,density stages to draw (of 5): 1-3 / 3 / 1|3|5. Appended to names as _d<stage>
+forest,clearing,95,clearing radius (design units)
+forest,clearing_style,plain,plain or cobble
+forest,spacing,92,min distance between icons -- lower = denser
+forest,fields,0,number of crop fields
+forest,grass,30,number of grass tufts
+forest,icons,tree:6:85-115|pine:3:90-120|bush:1:70-90,painter:weight:size range. painters: tree pine bush mountain house
+plains,variants,1,
+plains,patterns,deadend|corner|straight|tee|cross,
+plains,seed_offset,0,
+plains,ground,#d3c387,
+plains,deck,opencountry,
+plains,densities,1-3,
+plains,clearing,95,
+plains,clearing_style,plain,
+plains,spacing,150,
+plains,fields,3,
+plains,grass,70,
+plains,icons,bush:1:60-85,
+city,variants,1,
+city,patterns,deadend|corner|straight|tee|cross,
+city,seed_offset,0,
+city,ground,#cbb894,
+city,deck,settlement,
+city,densities,1-3,
+city,clearing,130,
+city,clearing_style,cobble,
+city,spacing,98,
+city,fields,0,
+city,grass,30,
+city,icons,house:8:85-115|tree:1:70-85,inside the wall when town_radius > 0
+city,town_radius,350,optional. houses (icons) stay inside this circle; 0 = no town layout
+city,wall,palisade,optional. none or palisade (ring of stakes at town_radius; roads leave gates)
+city,outer_icons,tree:5:80-105|pine:3:85-110|bush:2:60-80,optional. scattered outside the wall
+city,outer_spacing,85,optional. spacing for outer_icons (default = spacing)
+mountain,variants,1,
+mountain,patterns,deadend|corner|straight|tee|cross,
+mountain,seed_offset,0,
+mountain,ground,#b1aa90,
+mountain,deck,opencountry,
+mountain,densities,1-3,
+mountain,clearing,85,
+mountain,clearing_style,plain,
+mountain,spacing,120,
+mountain,fields,0,
+mountain,grass,30,
+mountain,icons,mountain:6:140-200|pine:3:80-105,
+gem,out_size,512,px of each gem PNG (square; transparent background). Uses global supersample/seed/ink/paper
+gem,variants,1,images per colour x cut
+gem,cuts,round|oval|cushion|emerald|pear|marquise|heart|trillion|cabochon,which shapes to make: round oval cushion emerald pear marquise heart trillion cabochon
+gem,size,62-88,% of the canvas the gem's longer side fills; each image rolls one value in this range
+gem,seed_offset,0,change to reroll every gem
+gem,wobble,1.6,outline hand wobble (design units; a gem canvas is 512 units wide)
+gem,facet_jitter,2,how far table corners drift so facets look hand-cut (design units)
+gem,facet_line,3,ink width of facet lines (design units)
+gem,glint,#fff8e4,highlight blob on the table + light tone mixed into facets
+gem_colour,ruby,#b22e34,one row per colour; key = colour name used in filenames
+gem_colour,topaz,#d1862c,
+gem_colour,citrine,#dcb840,
+gem_colour,emerald,#368a54,
+gem_colour,aquamarine,#4f9ea3,
+gem_colour,sapphire,#34569f,
+gem_colour,amethyst,#7a4e94,
+gem_colour,diamond,#dcdcd2,
+guildhall,variants,1,
+guildhall,patterns,deadend|corner|straight|tee|cross,
+guildhall,seed_offset,0,
+guildhall,ground,#c2b688,
+guildhall,deck,settlement,
+guildhall,densities,1-3,
+guildhall,clearing,140,
+guildhall,clearing_style,cobble,
+guildhall,spacing,115,
+guildhall,fields,0,
+guildhall,grass,30,
+guildhall,icons,house:5:75-100|tent:3:70-90|bush:1:55-70,outbuildings round the hall
+guildhall,town_radius,390,
+guildhall,wall,none,
+guildhall,outer_icons,tree:5:80-105|pine:3:85-110|bush:2:60-80,
+guildhall,outer_spacing,90,
+guildhall,centerpiece,statue,optional. one feature just behind the plaza: none guildhall windmill statue
+guildhall,centerpiece_size,280,optional. centerpiece size (design units; width for buildings, height for the statue)
+landmark,out_size,1024,px of each landmark PNG (square; transparent background). Same design units as a tile
+landmark,seed_offset,0,change to reroll every landmark
+landmark,margin,40,gap between the landmark's base and the bottom edge (design units)
+landmark_size,guildhall,380|500|620|720,width at size 1|2|3|4 (design units of the 1024 canvas). Size 3 = the tile centerpiece drawing
+riverside,variants,1,
+riverside,patterns,deadend|corner|straight|tee|cross,
+riverside,seed_offset,0,
+riverside,ground,#bdb67a,
+riverside,deck,waterside,
+riverside,densities,1-3,
+riverside,clearing,95,
+riverside,clearing_style,plain,
+riverside,spacing,110,
+riverside,fields,0,
+riverside,grass,30,
+riverside,icons,tree:3:80-105|bush:3:60-80|pine:1:85-105,
+riverside,feature,river,
+marsh,variants,1,
+marsh,patterns,deadend|corner|straight|tee|cross,
+marsh,seed_offset,0,
+marsh,ground,#959871,
+marsh,deck,waterside,
+marsh,densities,1-3,
+marsh,clearing,95,
+marsh,clearing_style,plain,
+marsh,spacing,95,
+marsh,fields,0,
+marsh,grass,45,
+marsh,icons,deadtree:2:90-120|reeds:5:50-70|bush:2:55-75,
+marsh,feature,pools,
+hills,variants,1,
+hills,patterns,deadend|corner|straight|tee|cross,
+hills,seed_offset,0,
+hills,ground,#bcb87e,
+hills,deck,opencountry,
+hills,densities,1-3,
+hills,clearing,95,
+hills,clearing_style,plain,
+hills,spacing,125,
+hills,fields,0,
+hills,grass,30,
+hills,icons,hill:5:150-220|rock:2:50-80|bush:2:55-75|tree:1:75-95,
+blossomgrove,variants,1,
+blossomgrove,patterns,deadend|corner|straight|tee|cross,
+blossomgrove,seed_offset,0,
+blossomgrove,ground,#cbc08e,
+blossomgrove,deck,woodland,
+blossomgrove,densities,1-3,
+blossomgrove,clearing,95,
+blossomgrove,clearing_style,plain,
+blossomgrove,spacing,100,
+blossomgrove,fields,0,
+blossomgrove,grass,30,
+blossomgrove,icons,blossom:6:85-115|bush:1:60-80,
+blossomgrove,speckle,#f1c3cf:260|#e5a7b8:120,
+mushroomhollow,variants,1,
+mushroomhollow,patterns,deadend|corner|straight|tee|cross,
+mushroomhollow,seed_offset,0,
+mushroomhollow,ground,#8e8a62,
+mushroomhollow,deck,woodland,
+mushroomhollow,densities,1-3,
+mushroomhollow,clearing,95,
+mushroomhollow,clearing_style,plain,
+mushroomhollow,spacing,100,
+mushroomhollow,fields,0,
+mushroomhollow,grass,15,
+mushroomhollow,icons,mushroom:5:90-150|mushroom:3:40-60|bush:1:55-70,
+mushroomhollow,speckle,#efe6a0:110,
+deepwood,variants,1,
+deepwood,patterns,deadend|corner|straight|tee|cross,
+deepwood,seed_offset,0,
+deepwood,ground,#7d7a54,
+deepwood,deck,woodland,
+deepwood,densities,1-3,
+deepwood,clearing,95,
+deepwood,clearing_style,plain,
+deepwood,spacing,120,
+deepwood,fields,0,
+deepwood,grass,12,
+deepwood,icons,gnarled:6:150-200|oak:2:120-150|pine:2:110-140|mushroom:1:40-55|bush:1:60-80,
+heath,variants,1,
+heath,patterns,deadend|corner|straight|tee|cross,
+heath,seed_offset,0,
+heath,ground,#b9a281,
+heath,deck,opencountry,
+heath,densities,1-3,
+heath,clearing,95,
+heath,clearing_style,plain,
+heath,spacing,92,
+heath,fields,0,
+heath,grass,40,
+heath,icons,heather:6:55-80|rock:3:45-85|bush:1:55-70,
+ashland,variants,1,
+ashland,patterns,deadend|corner|straight|tee|cross,
+ashland,seed_offset,0,
+ashland,ground,#9e978b,
+ashland,deck,scarred,
+ashland,densities,1-3,
+ashland,clearing,95,
+ashland,clearing_style,plain,
+ashland,spacing,105,
+ashland,fields,0,
+ashland,grass,4,
+ashland,icons,charred:4:90-130|stump:4:40-60|rock:1:45-70,
+ashland,speckle,#5a524c:220|#d9733a:35,
+ruins,variants,1,
+ruins,patterns,deadend|corner|straight|tee|cross,
+ruins,seed_offset,0,
+ruins,ground,#b7af8d,
+ruins,deck,scarred,
+ruins,densities,1-3,
+ruins,clearing,95,
+ruins,clearing_style,cobble,
+ruins,spacing,110,
+ruins,fields,0,
+ruins,grass,30,
+ruins,icons,ruinwall:4:90-130|column:3:90-130|rock:2:40-60|bush:2:55-75|tree:1:80-100,
+quarry,variants,1,
+quarry,patterns,deadend|corner|straight|tee|cross,
+quarry,seed_offset,0,
+quarry,ground,#bbb196,
+quarry,deck,settlement,
+quarry,densities,1-3,
+quarry,clearing,95,
+quarry,clearing_style,plain,
+quarry,spacing,115,
+quarry,fields,0,
+quarry,grass,15,
+quarry,icons,rock:5:45-90|crane:1:150-180|pine:2:85-105,
+quarry,required,house:1:90-110,optional. painter:COUNT:lo-hi -- always placed (first) whatever the density
+quarry,feature,pit,
+lumbercamp,variants,1,
+lumbercamp,patterns,deadend|corner|straight|tee|cross,
+lumbercamp,seed_offset,0,
+lumbercamp,ground,#b8aa7d,
+lumbercamp,deck,settlement,
+lumbercamp,densities,1-3,
+lumbercamp,clearing,95,
+lumbercamp,clearing_style,plain,
+lumbercamp,spacing,85,
+lumbercamp,fields,0,
+lumbercamp,grass,30,
+lumbercamp,icons,stump:5:40-60|logpile:3:60-80,
+lumbercamp,required,house:1:90-110,
+lumbercamp,town_radius,330,
+lumbercamp,outer_icons,pine:5:90-120|tree:3:85-105,
+lumbercamp,outer_spacing,80,
+farmstead,variants,1,
+farmstead,patterns,deadend|corner|straight|tee|cross,
+farmstead,seed_offset,0,
+farmstead,ground,#cdbd84,
+farmstead,deck,settlement,
+farmstead,densities,1-3,
+farmstead,clearing,95,
+farmstead,clearing_style,plain,
+farmstead,spacing,140,
+farmstead,fields,4,
+farmstead,grass,30,
+farmstead,icons,house:1:95-115|haystack:3:50-70|bush:2:55-75,
+farmstead,centerpiece,windmill,
+farmstead,centerpiece_size,300,
+orchard,variants,1,
+orchard,patterns,deadend|corner|straight|tee|cross,
+orchard,seed_offset,0,
+orchard,ground,#c3ba7e,
+orchard,deck,settlement,
+orchard,densities,1-3,
+orchard,clearing,95,
+orchard,clearing_style,plain,
+orchard,spacing,105,
+orchard,fields,0,
+orchard,grass,40,
+orchard,icons,fruit:1:75-95,
+orchard,required,house:1:90-110,
+orchard,layout,rows,
+village,variants,1,
+village,patterns,deadend|corner|straight|tee|cross,
+village,seed_offset,0,
+village,ground,#c8b98c,
+village,deck,settlement,
+village,densities,1-3,
+village,clearing,95,
+village,clearing_style,plain,
+village,spacing,95,
+village,fields,0,
+village,grass,30,
+village,icons,house:8:85-110|tree:1:75-95|bush:1:55-70,
+village,town_radius,330,
+village,outer_icons,tree:4:80-105|bush:2:60-80|pine:2:85-105,
+village,outer_spacing,95,
+landmark_size,building,340|400|460|740,1 straw hut | 2 log cabin (wood) | 3 town house (stone) | 4 capital hall (stone + brick)
+landmark_size,cave,420|560|700|860,1 burrow | 2 outcrop | 3 crag with fangs | 4 cliff with torches
+landmark_size,tree,800,gathering node: forestry. One width = size 1 only
+landmark_size,mineral_node,700,gathering node: mining
+landmark_size,fishing_spot,800,gathering node: fishing
+landmark_size,herb,620,gathering node: herbalism
+landmark_size,tracks,720,gathering node: hunting (insects -> meat skin chitin)
+landmark_colour,brick,#a5543c,city house brick
+landmark_colour,brick_dk,#7f3f2d,
+landmark_colour,brick_line,#6a3426,mortar lines between bricks
+landmark_colour,marble,#ece4d2,capital manor stone
+landmark_colour,marble_dk,#c9bea6,
+landmark_colour,cave,#3a2a22,cave mouths + burrow holes
+landmark_colour,ore,#86bccb,ore crystals
+landmark_colour,ore_dk,#4f8794,
+landmark_colour,ore_lt,#c3e0e6,
+landmark_colour,vein,#c8823c,copper flecks on rock
+landmark_colour,fish,#d38b4a,
+landmark_colour,fish_dk,#a2652f,
+landmark_colour,earth,#9c7650,burrow mounds
+landmark_colour,earth_dk,#74553a,
+landmark_colour,flame,#e39a35,torches
+landmark_colour,flame_lt,#f6d36b,torch cores + eyes glinting in the dark
+lakeshore,variants,1,
+lakeshore,patterns,deadend|corner|straight|tee|cross,
+lakeshore,seed_offset,0,
+lakeshore,ground,#bdb67a,
+lakeshore,deck,waterside,
+lakeshore,densities,1-3,
+lakeshore,clearing,95,
+lakeshore,clearing_style,plain,
+lakeshore,spacing,110,
+lakeshore,fields,0,
+lakeshore,grass,30,
+lakeshore,icons,tree:3:80-105|bush:3:60-80|pine:2:85-105,
+lakeshore,feature,lake,
+briarthicket,variants,1,
+briarthicket,patterns,deadend|corner|straight|tee|cross,
+briarthicket,seed_offset,0,
+briarthicket,ground,#a39a68,
+briarthicket,deck,woodland,
+briarthicket,densities,1-3,
+briarthicket,clearing,95,
+briarthicket,clearing_style,plain,
+briarthicket,spacing,88,
+briarthicket,fields,0,
+briarthicket,grass,30,
+briarthicket,icons,briar:7:70-110|tree:1:80-100|deadtree:1:80-100,
+wildflowermeadow,variants,1,
+wildflowermeadow,patterns,deadend|corner|straight|tee|cross,
+wildflowermeadow,seed_offset,0,
+wildflowermeadow,ground,#b9c07a,
+wildflowermeadow,deck,opencountry,
+wildflowermeadow,densities,1-3,
+wildflowermeadow,clearing,95,
+wildflowermeadow,clearing_style,plain,
+wildflowermeadow,spacing,82,
+wildflowermeadow,fields,0,
+wildflowermeadow,grass,50,
+wildflowermeadow,icons,flowers:6:50-75|bush:2:55-70|tree:1:80-100,
+wildflowermeadow,speckle,#e8c547:170|#f2f0e6:150|#e59ab0:130|#a98bd0:100,
+canyon,variants,1,
+canyon,patterns,deadend|corner|straight|tee|cross,
+canyon,seed_offset,0,
+canyon,ground,#c4a882,
+canyon,deck,opencountry,
+canyon,densities,1-3,
+canyon,clearing,95,
+canyon,clearing_style,plain,
+canyon,spacing,115,
+canyon,fields,0,
+canyon,grass,15,
+canyon,icons,rock:4:45-85|pine:2:85-105|bush:2:55-70,
+canyon,feature,canyon,
+waterfallcliffs,variants,1,
+waterfallcliffs,patterns,deadend|corner|straight|tee|cross,
+waterfallcliffs,seed_offset,0,
+waterfallcliffs,ground,#aab08a,
+waterfallcliffs,deck,waterside,
+waterfallcliffs,densities,1-3,
+waterfallcliffs,clearing,95,
+waterfallcliffs,clearing_style,plain,
+waterfallcliffs,spacing,105,
+waterfallcliffs,fields,0,
+waterfallcliffs,grass,30,
+waterfallcliffs,icons,pine:4:85-115|rock:3:45-80|bush:2:55-70|tree:1:80-100,
+waterfallcliffs,feature,falls,
+standingstones,variants,1,
+standingstones,patterns,deadend|corner|straight|tee|cross,
+standingstones,seed_offset,0,
+standingstones,ground,#a9ac80,
+standingstones,deck,scarred,
+standingstones,densities,1-3,
+standingstones,clearing,95,
+standingstones,clearing_style,plain,
+standingstones,spacing,90,
+standingstones,fields,0,
+standingstones,grass,40,
+standingstones,icons,rock:1:30-40,
+standingstones,town_radius,200,
+standingstones,wall,menhirs,
+standingstones,outer_icons,heather:4:55-75|rock:1:40-70|bush:2:55-70|tree:1:80-100,
+standingstones,outer_spacing,95,
+battlefield,variants,1,
+battlefield,patterns,deadend|corner|straight|tee|cross,
+battlefield,seed_offset,0,
+battlefield,ground,#a8977a,
+battlefield,deck,scarred,
+battlefield,densities,1-3,
+battlefield,clearing,95,
+battlefield,clearing_style,plain,
+battlefield,spacing,105,
+battlefield,fields,0,
+battlefield,grass,8,
+battlefield,icons,cart:2:90-120|spears:4:60-90|warbanner:3:110-150|stump:2:40-60|charred:1:90-120,
+battlefield,feature,mud,
+battlefield,speckle,#5a4636:160,
+hotsprings,variants,1,
+hotsprings,patterns,deadend|corner|straight|tee|cross,
+hotsprings,seed_offset,0,
+hotsprings,ground,#9fa58a,
+hotsprings,deck,waterside,
+hotsprings,densities,1-3,
+hotsprings,clearing,95,
+hotsprings,clearing_style,plain,
+hotsprings,spacing,105,
+hotsprings,fields,0,
+hotsprings,grass,30,
+hotsprings,icons,rock:4:45-80|pine:3:85-110|bush:2:55-70,
+hotsprings,feature,springs,
+landmark_colour,fey,#4f8f86,magic foliage: fey tree canopy + herb leaves
+landmark_colour,fey_dk,#386a64,
+landmark_colour,fey_lt,#79b5a6,
+landmark_colour,wisp,#b9ece2,cool magic light: herb bulbs + toadstools + pollen
+landmark_colour,shadow,#4d5249,the dark hollow the hunted insect lurks in
+card,out_w,750,px width of each card PNG. Lengths below are design units of a 750-wide card
+card,out_h,1050,px height (750 x 1050 = poker 5:7)
+card,seed_offset,0,change to reroll every card's grunge
+card,gems,emerald_emerald1|ruby_heart1|sapphire_pear1|topaz_trillion1|amethyst_marquise1|diamond_cabochon1,one front + back per gem (names from assets/gems/manifest.csv); files are named <colour>_front/back
+card,bg,#0a0a0a,ground colour around the panel + whole back
+card,bg_grunge,0.8,0-1: blotchy stains + grain on the ground
+card,vignette,0.45,0-1: darkening towards the card edges
+card,panel,#1f1f1f,front text panel
+card,panel_grunge,0.25,0-1: stains on the panel
+card,panel_box,21|134|728|1027,front panel x0|y0|x1|y1
+card,band_edge,#1e0b0d,band colour at the card's left/right edges
+card,band_mid,#dcae7c,band colour at the centre (smoothstep between)
+card,front_band,42|90,front band y0|y1
+card,back_band,499|550,back band y0|y1
+card,front_gem_y,64,front gem centre y
+card,front_gem_long,150,front gem longer side (wide gems)
+card,front_gem_max_h,96,front gem height cap: centre y +- half this must stay inside the card top (and above the panel)
+card,back_gem_y,525,back gem centre y
+card,back_gem_long,285,back gem longer side
+card,back_gem_max_h,285,back gem height cap
+landmark_size,marquise_keep,|||760,Marquisate keep. Blank slots skip a size: size 4 only
+landmark_size,eyrie_roost,|||760,Eyrie castle-roost. Size 4 only
+landmark_size,otter_tradepost,620,Riverfolk trading post. Size 1 only
+landmark_size,knave_camp,480|700,Knaves of the Deepwood bandit camp. 1 one tent | 2 two tents + fence + strongbox
+landmark_size,alliance_burrow,620,Woodland Alliance burrow (hill with a round door). Size 1 only
+landmark_size,lizard_garden,640,Lizard Cult garden shrine. Size 1 only
+landmark_size,stone_tower,300|340|380|420,1 lookout | 2 crenellated | 3 slate spire + balcony | 4 + side turret
+landmark_colour,otter_banner,#4fa3b3,Riverfolk Company
+landmark_colour,knave_banner,#7a3b4a,Knaves of the Deepwood
+landmark_colour,alliance_banner,#5f8f3a,Woodland Alliance
+landmark_colour,lizard_banner,#d8b23a,Lizard Cult
+landmark_colour,smoke,#cfc8bb,chimney + brazier smoke
+deck_settlement,name,Settlement,tile back for this event deck: the text on the ribbon (as typed)
+deck_settlement,gem,diamond_cabochon1,gem image from assets/gems/ (.png optional)
+deck_settlement,colour,#8c5a44,back colour
+deck_woodland,name,Woodland,
+deck_woodland,gem,emerald_cushion1,
+deck_woodland,colour,#55703a,
+deck_opencountry,name,Open Country,
+deck_opencountry,gem,emerald_cabochon1,
+deck_opencountry,colour,#a8913f,
+deck_waterside,name,Waterside,
+deck_waterside,gem,emerald_pear1,
+deck_waterside,colour,#3f6f86,
+deck_scarred,name,Scarred,
+deck_scarred,gem,emerald_trillion1,
+deck_scarred,colour,#4a4440,
