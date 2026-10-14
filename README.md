@@ -389,18 +389,26 @@ Panel:
 ```
 [ Draw ]  [ Draw specific ]  [ Spawn guildhall ]
              [ Advanced ]
-[ Deck ]     [ Biome ]          (Advanced toggles this grid; open/closed is saved)
+[ Region ]   [ Biome ]          (Advanced toggles this grid; open/closed is saved)
 [ Pattern ]  [ Orientation ]
-[ Density ]
+[ Density ]  [ Force Connection ]
 ```
 
 - panel geometry (`PANEL`) is in world units; buttons cancel the bag's uneven scale, so text is
   never stretched, and sit just above the bag's base
 
-- left-click a setting = next, right-click = back; every setting starts `Random`
+- left-click a setting = next, right-click = back; every setting starts `Random` (Force Connection: `None`)
 - Biome only offers the chosen deck's biomes (locked to Random while Deck is
   Random); Orientation only the chosen pattern's rotations (locked while
   Pattern is Random). Changing Deck/Pattern resets the dependent one
+- Orientation label shows a box-drawing glyph of the roads (`┼`, `├`, ...)
+- Force Connection (`None` N E S W) overrides Pattern + Orientation (greyed, clicks ignored):
+  Draw specific picks evenly among every pattern+rotation with a road on that edge (8 for any
+  edge, 3 of them tees), then rolls deck/biome/density as usual. Draw ignores it
+- Force Connection labels say where the new tile goes next to the one it joins, so they are
+  the opposite edge: `N` = goes north = needs a road on its S edge (E <-> W likewise)
+- the Deck setting is labelled `Region`. Each setting's tooltip lists its options, or says
+  what unlocks / overrides it
 - Draw = everything Random. Draw specific = rolls only what is still Random
 - roll order deck -> biome -> pattern -> orientation -> density, each from its
   `weights` pool, so a deck with more biomes is not drawn more. Free rolls:
@@ -418,15 +426,15 @@ A drawn tile is a copy of the bag's template (Custom Tile, GMNotes
 
 | field | value |
 | --- | --- |
-| name | `<Biome> <Pattern> Tile` (biome name from `biome_descriptions`) |
+| name | the biome name from `biome_descriptions`, e.g. `Deepwood` |
 | description | `[effect]`, blank line, `"flavor"` from `biome_descriptions` |
 | GMNotes | biome id, e.g. `forest` -- every lookup keys on it |
 | memo | `d=<density>\|explore=<left>\|rendered=<0/1>` |
-| images | front = rolled image url, back = its deck's back url |
-| tags | `MapTile`, `Region:<deck>`, `Biome:<biome>` (ids, e.g. `Region:woodland`, `Biome:forest`; a tiered city is tagged by its GMNotes, `Biome:town`) |
+| images | front = rolled image url, back = its deck's back url. Spawns face down (`SPAWN.ROTATION` z = 180) |
+| tags | `Maptile`, `Region:<deck>`, `Biome:<biome>` (ids, e.g. `Region:woodland`, `Biome:forest`; a tiered city is tagged by its GMNotes, `Biome:town`) |
 
 Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + memo):
-- `Explore: N` -- N from the `density` sheet; click = N-1. The exploration itself is a stub
+- `Explore: N` -- N from the `density` sheet; click = N-1; the button is removed at 0. The exploration itself is a stub
 - `?` -- toggles the tile's hover tooltip (name + description). Tiles spawn with it off; grey text =
   off, black = on. State is the object's own `tooltip`, saved by TTS, not the memo
 - `Render` -- once; spawns the biome's `maptile_table` row onto the tile through Global

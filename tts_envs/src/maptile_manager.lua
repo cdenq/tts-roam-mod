@@ -8,12 +8,15 @@ THE PANEL
 
   [ Draw ]  [ Draw specific ]  [ Spawn guildhall ]
                [ Advanced ]                         toggles the grid below
-  [ Deck: Random     ]  [ Biome: Random       ]     left-click = next, right-click = back
+  [ Region: Random   ]  [ Biome: Random       ]     left-click = next, right-click = back
   [ Pattern: Random  ]  [ Orientation: Random ]     Biome / Orientation depend on the left one
-  [ Density: Random  ]
+  [ Density: Random  ]  [ Force Connection: None ]
 
 Draw ignores the settings and rolls everything; Draw specific rolls only what
-is still Random. The guildhall is the starter tile: neither Draw offers it.
+is still Random. Force Connection N/E/S/W overrides Pattern and Orientation:
+Draw specific picks evenly among every pattern+rotation with a road on that
+edge (so the three tees with one outweigh the single cross), then rolls the
+rest as usual. The guildhall is the starter tile: neither Draw offers it.
 Spawn guildhall rolls one from the guildhall:* pools in MAPTILE.weights. Every
 roll goes deck -> biome -> pattern -> orientation -> density, each from its
 pool in MAPTILE.weights, so a deck with more biomes is not drawn more often.
@@ -24,16 +27,16 @@ A DRAWN TILE
 A copy of the bag's template tile (GMNotes "maptile_template", tagged
 Template), stamped with:
 
-  name         "<Biome> <Pattern> Tile"
+  name         the biome name, e.g. "Deepwood"
   description  biome_descriptions sheet
   GMNotes      the biome id -- the key everything else reads
   memo         "d=<density>|explore=<left>|rendered=<0/1>"
   images       front = the rolled image, back = its deck's back
-  tags         MapTile, Region:<deck>, Biome:<biome>  (ids: Region:settlement, Biome:city)
+  tags         Maptile, Region:<deck>, Biome:<biome>  (ids: Region:settlement, Biome:city)
 
 Its buttons belong to THIS script (function_owner = self), so a tile only
 works while the manager is on the table. TTS does not save buttons, so onLoad
-re-renders every MapTile from its GMNotes + memo.
+re-renders every Maptile from its GMNotes + memo.
 
 Render hands the biome's maptile_table spawn table to Global's spawnFrom, so
 landmarks, items and gold come out of the same bags as every other spawn and
@@ -47,11 +50,25 @@ MAPTILE = {decks = {}, biomes = {}, patterns = {}, orientations = {}, densities 
 
 TEMPLATE_GM = "maptile_template"
 TEMPLATE_TAG = "Template"
-TILE_TAG = "MapTile"
+TILE_TAG = "Maptile"
 RANDOM = "random"
+NONE = "none"
 MAX_REROLLS = 40
 
 PATTERN_NAMES = {deadend = "Dead End", corner = "Corner", straight = "Straight", tee = "Tee", cross = "Cross"}
+
+--[[ Box-drawing glyph per orientation: each draws a line toward every edge
+with a road. Literal characters, not escapes: "\u{...}" is Lua 5.3, and byte
+escapes would reach MoonSharp's UTF-16 strings as separate characters. If the
+button font lacks a glyph it shows an empty box -- swap that entry for text
+(e.g. "N") and nothing else changes. ]]
+ORIENTATION_GLYPHS = {
+  N = "╵", E = "╶", S = "╷", W = "╴",
+  NE = "└", ES = "┌", SW = "┐", NW = "┘",
+  NS = "│", EW = "─",
+  NES = "├", ESW = "┬", NSW = "┤", NEW = "┴",
+  NESW = "┼",
+}
 
 --[[ Manager panel in WORLD units from the bag's centre, along its own axes;
 +z is the bag's front. Buttons inherit the object's scale, and this bag is
@@ -79,31 +96,32 @@ PANEL = {
 }
 
 -- Where a drawn tile lands, in the bag's local units, and how it is turned.
-SPAWN = {OFFSET = {-5.5, 1, 0}, ROTATION = {0, 180, 0}}
+-- z = 180 lands it face down: the deck back shows until someone flips it.
+SPAWN = {OFFSET = {-5.5, 1, 0}, ROTATION = {0, 180, 180}}
 
 -- Buttons on a drawn tile, in the TILE's local units. Tune to the template's scale.
 TILE_UI = {
   SHARPNESS = 4,
   LIFT = 0.25,
-  EXPLORE_POS = {0, 0, 0.62},
-  RENDER_POS = {0, 0, -0.62},
-  HELP_POS = {0.62, 0, -0.62},
+  EXPLORE_POS = {0, 0, -0.8},
+  RENDER_POS = {0, 0, 0},
+  HELP_POS = {0.8, 0, 0.8},
   BTN_W = 520, BTN_H = 160, BTN_FONT = 95, BTN_SCALE = 0.5,
   HELP_W = 160,
   HELP_COLOR = {0.9, 0.87, 0.78},
   HELP_ON_TEXT = {0, 0, 0},
   HELP_OFF_TEXT = {0.55, 0.55, 0.55},
   EXPLORE_COLOR = {0.2, 0.42, 0.5},
-  EMPTY_COLOR = {0.35, 0.35, 0.35},
   RENDER_COLOR = {0.55, 0.38, 0.2},
   TEXT_COLOR = {1, 1, 1},
 }
 
-CONFIG_KEYS = {"deck", "biome", "pattern", "orientation", "density"}
-CONFIG_TITLES = {deck = "Deck", biome = "Biome", pattern = "Pattern", orientation = "Orientation",
-                 density = "Density"}
+CONFIG_KEYS = {"deck", "biome", "pattern", "orientation", "density", "connection"}
+CONFIG_TITLES = {deck = "Region", biome = "Biome", pattern = "Pattern", orientation = "Orientation",
+                 density = "Density", connection = "Force Connection"}
 
-SETTINGS = {deck = RANDOM, biome = RANDOM, pattern = RANDOM, orientation = RANDOM, density = RANDOM}
+SETTINGS = {deck = RANDOM, biome = RANDOM, pattern = RANDOM, orientation = RANDOM, density = RANDOM,
+            connection = NONE}
 ADVANCED = false          -- config grid shown; saved
 local configButton = {}   -- key -> button index on self; empty while the grid is hidden
 local templateData = nil  -- cached getData() of the template; refreshed each load
@@ -140,9 +158,15 @@ end
 
 -- ---------------------------------------------------------------- settings
 
---[[ The values one config button cycles through, Random first. Dependent
-buttons collapse to {Random} while what they depend on is Random. ]]
+--[[ Force Connection is labelled by where the new tile sits next to the
+one it joins, the opposite of the edge its road is on: "N" (goes north of it)
+stores S, a road on the tile's south edge. Ordered so the labels read N E S W. ]]
+CONNECTION_LABELS = {N = "S", E = "W", S = "N", W = "E"}
+
+--[[ The values one config button cycles through, its default first.
+Dependent buttons collapse to {Random} while what they depend on is Random. ]]
 local function options(key)
+  if key == "connection" then return {NONE, "S", "W", "N", "E"} end
   local list = {RANDOM}
   if key == "deck" then
     for _, d in ipairs(MAPTILE.decks) do table.insert(list, d.id) end
@@ -163,6 +187,7 @@ end
 
 local function display(key, value)
   if value == RANDOM then return "Random" end
+  if value == NONE then return "None" end
   if key == "deck" then
     local d = deckById(value)
     return d and d.name or value
@@ -171,17 +196,42 @@ local function display(key, value)
     return b and b.name or value
   elseif key == "pattern" then
     return PATTERN_NAMES[value] or value
+  elseif key == "orientation" then
+    return ORIENTATION_GLYPHS[value] or value
+  elseif key == "connection" then
+    return CONNECTION_LABELS[value] or value
   end
   return value
+end
+
+local function forcedConnection(spec)
+  return spec.connection ~= nil and spec.connection ~= NONE
+end
+
+-- Pattern and Orientation do nothing while a connection is forced.
+local function overridden(key)
+  return (key == "pattern" or key == "orientation") and forcedConnection(SETTINGS)
+end
+
+local LOCKED_HINT = {biome = "Pick a Region first", orientation = "Pick a Pattern first"}
+
+-- Hover text: every value the button can take, or why it cannot change.
+local function configTooltip(key)
+  if overridden(key) then return "Overridden by Force Connection (set it to None)" end
+  local list = options(key)
+  if #list == 1 and LOCKED_HINT[key] then return LOCKED_HINT[key] end
+  local names = {}
+  for _, v in ipairs(list) do table.insert(names, display(key, v)) end
+  return "Options: " .. table.concat(names, ", ")
 end
 
 local function refreshConfigLabels()
   for _, key in ipairs(CONFIG_KEYS) do
     local idx = configButton[key]
     if idx ~= nil then
-      local locked = #options(key) == 1
+      local locked = #options(key) == 1 or overridden(key)
       self.editButton({index = idx, label = CONFIG_TITLES[key] .. ": " .. display(key, SETTINGS[key]),
-                       color = locked and PANEL.LOCKED_COLOR or PANEL.CONFIG_COLOR})
+                       tooltip = configTooltip(key), color = locked and PANEL.LOCKED_COLOR or PANEL.CONFIG_COLOR})
     end
   end
 end
@@ -190,6 +240,7 @@ end
 left-click, back on a right-click (alt_click), wrapping round. Changing a
 deck or pattern resets the setting that depends on it. ]]
 local function cycle(key, back)
+  if overridden(key) then return end
   local list = options(key)
   local at = 1
   for i, v in ipairs(list) do
@@ -208,8 +259,9 @@ function cycleBiome(_, _, alt) cycle("biome", alt) end
 function cyclePattern(_, _, alt) cycle("pattern", alt) end
 function cycleOrientation(_, _, alt) cycle("orientation", alt) end
 function cycleDensity(_, _, alt) cycle("density", alt) end
+function cycleConnection(_, _, alt) cycle("connection", alt) end
 CYCLE_FN = {deck = "cycleDeck", biome = "cycleBiome", pattern = "cyclePattern",
-            orientation = "cycleOrientation", density = "cycleDensity"}
+            orientation = "cycleOrientation", density = "cycleDensity", connection = "cycleConnection"}
 
 -- ---------------------------------------------------------------- panel
 
@@ -251,7 +303,7 @@ local function buildPanel()
   if ADVANCED then
     for i, key in ipairs(CONFIG_KEYS) do
       local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
-      configButton[key] = addButton(CYCLE_FN[key], "", "Left-click: next   Right-click: back",
+      configButton[key] = addButton(CYCLE_FN[key], "", "",
                                     PANEL.GRID_X[col + 1], PANEL.GRID_Z + row * PANEL.ROW_STEP,
                                     PANEL.CONFIG_W, PANEL.CONFIG_COLOR)
     end
@@ -284,14 +336,32 @@ local function finish(t)
   return t
 end
 
---[[ Fill every Random in spec from the weight pools, in dependency order. ]]
+--[[ Every pattern+rotation with a road on that edge, one entry each, so the
+pick is even across shapes rather than patterns. ]]
+local function shapesWith(edge)
+  local shapes = {}
+  for _, p in ipairs(MAPTILE.patterns) do
+    for _, o in ipairs(MAPTILE.orientations[p] or {}) do
+      if o:find(edge, 1, true) then table.insert(shapes, {pattern = p, orientation = o}) end
+    end
+  end
+  return shapes
+end
+
+--[[ Fill every Random in spec from the weight pools, in dependency order. A
+forced connection replaces the pattern + orientation rolls. ]]
 local function roll(spec)
   local t = {}
   local w = MAPTILE.weights
   t.deck = spec.deck ~= RANDOM and spec.deck or pick(w.deck)
   t.biome = spec.biome ~= RANDOM and spec.biome or pick(w["biome:" .. t.deck])
-  t.pattern = spec.pattern ~= RANDOM and spec.pattern or pick(w.pattern)
-  t.orientation = spec.orientation ~= RANDOM and spec.orientation or pick(w["orientation:" .. t.pattern])
+  if forcedConnection(spec) then
+    local shape = pick(shapesWith(spec.connection))
+    t.pattern, t.orientation = shape.pattern, shape.orientation
+  else
+    t.pattern = spec.pattern ~= RANDOM and spec.pattern or pick(w.pattern)
+    t.orientation = spec.orientation ~= RANDOM and spec.orientation or pick(w["orientation:" .. t.pattern])
+  end
   t.density = spec.density ~= RANDOM and spec.density or pick(w.density)
   return finish(t)
 end
@@ -310,6 +380,7 @@ end
 
 -- Every setting chosen AND nothing left to roll (a tiered biome still rolls its tier).
 local function fullySpecified(spec)
+  if forcedConnection(spec) then return false end
   for _, key in ipairs(CONFIG_KEYS) do
     if spec[key] == RANDOM then return false end
   end
@@ -362,7 +433,7 @@ local function spawnTile(t, url)
   withTemplate(function(template)
     local data = copy(template)
     data.GUID = nil  -- let TTS assign a fresh one
-    data.Nickname = biome.name .. " " .. (PATTERN_NAMES[t.pattern] or t.pattern) .. " Tile"
+    data.Nickname = biome.name
     data.Description = biome.description or ""
     data.GMNotes = t.biome
     data.Memo = encodeMemo({d = t.density, explore = MAPTILE.explore[t.density] or 0, rendered = 0})
@@ -443,8 +514,10 @@ renderTile = function(obj)
   if isGone(obj) or MAPTILE.biomes[obj.getGMNotes()] == nil then return end
   obj.clearButtons()
   local m = parseMemo(obj.memo)
-  tileButton(obj, "tileExplore", "Explore: " .. m.explore, "Explore this tile (" .. m.explore .. " left)",
-             TILE_UI.EXPLORE_POS, m.explore > 0 and TILE_UI.EXPLORE_COLOR or TILE_UI.EMPTY_COLOR)
+  if m.explore > 0 then
+    tileButton(obj, "tileExplore", "Explore: " .. m.explore, "Explore this tile (" .. m.explore .. " left)",
+               TILE_UI.EXPLORE_POS, TILE_UI.EXPLORE_COLOR)
+  end
   if m.rendered == 0 then
     tileButton(obj, "tileRender", "Render", "Spawn what this tile holds (once)", TILE_UI.RENDER_POS,
                TILE_UI.RENDER_COLOR)
@@ -514,13 +587,13 @@ function onLoad(state)
     end
     ADVANCED = saved ~= nil and saved.advanced == "1"
   end
-  -- a saved value the data no longer has falls back to Random
+  -- a saved value the data no longer has falls back to the default (Random / None)
   for _, key in ipairs(CONFIG_KEYS) do
     local ok = false
     for _, v in ipairs(options(key)) do
       if v == SETTINGS[key] then ok = true end
     end
-    if not ok then SETTINGS[key] = RANDOM end
+    if not ok then SETTINGS[key] = options(key)[1] end
   end
   buildPanel()
   for _, obj in ipairs(getObjectsWithTag(TILE_TAG)) do

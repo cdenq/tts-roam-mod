@@ -3,7 +3,7 @@ EVENT_DATA = {
   ["EV1"] = {
     title = "The Bell Line",
     template = "wilderness_template",
-    flavor = "Where the old road narrows between two oaks, a pair of Dynasty guards have strung a line of bells. Every traveler pays to cross. Ahead of you, a cat refugee who can't afford the toll is tearfully offering them a family heirloom.",
+    flavor = "Where the old road narrows between two great trees, a pair of Dynasty guards have strung a line of bells. Every traveler pays to cross. Ahead of you, a cat refugee who can't afford the toll is tearfully offering them a family heirloom.",
     effect = "",
     options = {
       {label = "Pay your toll.", tooltip = "Lose 5 gold per hero.", outcomes = {"EV1_pay_through", "EV1_pay_through", "EV1_pay_noted"}},
@@ -84,7 +84,7 @@ EVENT_DATA = {
   ["EV2"] = {
     title = "For Winter",
     template = "wilderness_template",
-    flavor = "A beech has split open with age, and the hollow inside glistens with honeycomb. Nailed to the bark is a board in careful, shaky letters: FOR WINTER. PLEASE. There are no tracks nearby, and the moss on the sign is thick.",
+    flavor = "An old tree has split open with age, and the hollow inside glistens with honeycomb. Nailed to the bark is a board in careful, shaky letters: FOR WINTER. PLEASE. There are no tracks nearby, and the moss on the sign is thick.",
     effect = "",
     options = {
       {label = "Take some honey.", tooltip = "", outcomes = {"EV2_take_feast", "EV2_take_watched", "EV2_take_stung"}},
@@ -208,7 +208,7 @@ EVENT_DATA = {
   ["EV4"] = {
     title = "The Lantern Fen",
     template = "wilderness_template",
-    flavor = "The path sinks into an alder fen, and someone has set lanterns on posts to mark the safe way. Most are lit. One, halfway across, is lit on the wrong side of the path, and an otter on a stump is watching to see which way you go.",
+    flavor = "The path sinks onto soft, wet ground, and someone has set lanterns on posts to mark the safe way. Most are lit. One, halfway across, is lit on the wrong side of the path, and an otter on a stump is watching to see which way you go.",
     effect = "",
     options = {
       {label = "Trust the lanterns.", tooltip = "", outcomes = {"EV4_lanterns_safe", "EV4_lanterns_safe", "EV4_lanterns_sink"}},
@@ -280,7 +280,7 @@ EVENT_DATA = {
   ["EV5"] = {
     title = "A Wedding in the Clover",
     template = "wilderness_template",
-    flavor = "In a clearing of clover, two dormice are about to be married, and the officiant hasn't come. The bride's mother is eyeing your party. Someone has to speak the words, someone has to hold the rings, and someone, she says firmly, has to stop Uncle Bram from singing.",
+    flavor = "In a patch of clover by the road, two dormice are about to be married, and the officiant hasn't come. The bride's mother is eyeing your party. Someone has to speak the words, someone has to hold the rings, and someone, she says firmly, has to stop Uncle Bram from singing.",
     effect = "",
     options = {
       {label = "Officiate.", tooltip = "[CHA 1]", outcomes = {"EV5_vows_perfect", "EV5_vows_botched"}},
@@ -352,7 +352,7 @@ EVENT_DATA = {
   ["EV6"] = {
     title = "The Resin Camp",
     template = "wilderness_template",
-    flavor = "A squirrel's resin camp sits empty among the pines, buckets still hanging from the cuts. Supper is cold in the pot. Pinned under a stone by the fire is a map with one tree circled twice, and the circle is fresh.",
+    flavor = "A squirrel's resin camp sits empty under the trees, buckets still hanging from the cuts. Supper is cold in the pot. Pinned under a stone by the fire is a map with one tree circled twice, and the circle is fresh.",
     effect = "",
     options = {
       {label = "Follow the map.", tooltip = "", outcomes = {"EV6_map_cache", "EV6_map_ambush", "EV6_map_dug"}},
@@ -424,7 +424,7 @@ EVENT_DATA = {
   ["EV7"] = {
     title = "The Burned Mile",
     template = "wilderness_template",
-    flavor = "The fire was two summers ago. Fireweed has come up purple through the black, and the trunks still standing are hollow as chimneys. Halfway across, a Marquisate banner hangs from one of them, scorched but upright, and beneath it someone has built a small stone cairn.",
+    flavor = "The fire was two summers ago. Fireweed has come up purple through the black, and whatever still stands is hollow as a chimney. Halfway across, a Marquisate banner hangs from one of them, scorched but upright, and beneath it someone has built a small stone cairn.",
     effect = "",
     options = {
       {label = "Take the banner.", tooltip = "[STR 1]", outcomes = {"EV7_banner_wings", "EV7_banner_patrol", "EV7_banner_ash"}},
@@ -489,7 +489,7 @@ EVENT_DATA = {
   ["EV8"] = {
     title = "Paid Through Autumn",
     template = "wilderness_template",
-    flavor = "Under the yews, a magnificently rotund mole sleeps beneath a blanket of ferns and mushrooms. Pinned to his coat is a tag: NO WAKE. PAID THROUGH AUTUMN. His pack, just out of reach, is unbuttoned.",
+    flavor = "Beneath a low bough, a magnificently rotund mole sleeps beneath a blanket of ferns and mushrooms. Pinned to his coat is a tag: NO WAKE. PAID THROUGH AUTUMN. His pack, just out of reach, is unbuttoned.",
     effect = "",
     options = {
       {label = "Wake him.", tooltip = "", outcomes = {"EV8_wake_shortcut", "EV8_wake_shriek", "EV8_wake_notyet"}},
@@ -567,7 +567,7 @@ EVENT_DATA = {
   ["EV9"] = {
     title = "Two Ferries",
     template = "wilderness_template",
-    flavor = "Where the river widens under the willows, two ferries wait on the near bank. One flies a Marquisate pennant and charges coin. The other is a heron who'll carry you across for a story, and she has heard most of them.",
+    flavor = "Where the water is too wide to wade, two ferries wait on the near bank. One flies a Marquisate pennant and charges coin. The other is a heron who'll carry you across for a story, and she has heard most of them.",
     effect = "",
     options = {
       {label = "Pay the ferryman.", tooltip = "Lose 5 gold per hero.", outcomes = {"EV9_ferry_stamp", "EV9_ferry_raid", "EV9_ferry_knee", "EV9_ferry_knee"}},
@@ -624,9 +624,9 @@ EVENT_DATA = {
     options = {},
   },
   ["EV10"] = {
-    title = "The Fallow Orchard",
+    title = "The Lit Window",
     template = "wilderness_template",
-    flavor = "The forest gives way to apple trees in rows nobody keeps anymore. The fruit is rotting where it falls. At the center, a farmhouse has one window lit, and every few minutes a shadow crosses it, carrying something heavy.",
+    flavor = "Set back from the rest, one house has been left to go wild. Its garden has gone to seed, and the fruit is rotting where it falls. One window is lit, and every few minutes a shadow crosses it, carrying something heavy.",
     effect = "",
     options = {
       {label = "Knock.", tooltip = "", outcomes = {"EV10_knock_badger", "EV10_knock_door", "EV10_knock_dark"}},
@@ -691,7 +691,7 @@ EVENT_DATA = {
   ["EV11"] = {
     title = "The Painted Paw",
     template = "wilderness_template",
-    flavor = "In a hazel coppice, a young mouse is painting a sign on a tree: a paw inside a circle. She freezes when she sees you. Her brush is still dripping. Down the path, you can hear Marquisate boots.",
+    flavor = "Among the trees, a young mouse is painting a sign on a tree: a paw inside a circle. She freezes when she sees you. Her brush is still dripping. Down the path, you can hear Marquisate boots.",
     effect = "",
     options = {
       {label = "Everyone hides.", tooltip = "[All AGI 1]", outcomes = {"EV11_hide_acorn", "EV11_hide_slip"}},
@@ -750,7 +750,7 @@ EVENT_DATA = {
   ["EV12"] = {
     title = "The Floating Market",
     template = "wilderness_template",
-    flavor = "Six otter barges are lashed together across the creek, making a market and a bridge at once. Everything is for sale, including passage. A sign at the gangplank lists prices for crossing, for news, and, in smaller letters, for not mentioning that you crossed.",
+    flavor = "Six otter barges are lashed together across the water, making a market and a bridge at once. Everything is for sale, including passage. A sign at the gangplank lists prices for crossing, for news, and, in smaller letters, for not mentioning that you crossed.",
     effect = "",
     options = {
       {label = "Pay for passage.", tooltip = "Lose 5 gold per hero.", outcomes = {"EV12_pass_receipt", "EV12_pass_tariff", "EV12_pass_done"}},
@@ -834,7 +834,7 @@ EVENT_DATA = {
   ["EV13"] = {
     title = "The Garden of Let-Go Things",
     template = "wilderness_template",
-    flavor = "Behind a screen of ferns, someone has made a garden out of things the woods threw away: broken lanterns, a cracked shield, a child's shoe, all planted in neat rows. A lizard in a gray hood is watering them. She asks if you have anything you'd like to let go of.",
+    flavor = "Among the rubble, someone has made a garden out of things the war left behind: broken lanterns, a cracked shield, a child's shoe, all planted in neat rows. A lizard in a gray hood is watering them. She asks if you have anything you'd like to let go of.",
     effect = "",
     options = {
       {label = "Plant something.", tooltip = "Lose an item of your choice.", outcomes = {"EV13_plant_lighter", "EV13_plant_regret", "EV13_plant_ledger"}},
@@ -918,7 +918,7 @@ EVENT_DATA = {
   ["EV14"] = {
     title = "Four Cards on a Stump",
     template = "wilderness_template",
-    flavor = "At a crossroads in the birches, a crow is laying four cards face down on a stump. He says one is a gift, one a debt, one a warning, and one is none of your business. He'll let you turn one over. He doesn't say what happens if you don't.",
+    flavor = "At a crossroads under the trees, a crow is laying four cards face down on a stump. He says one is a gift, one a debt, one a warning, and one is none of your business. He'll let you turn one over. He doesn't say what happens if you don't.",
     effect = "",
     options = {
       {label = "Turn one over.", tooltip = "", outcomes = {"EV14_turn_gift", "EV14_turn_debt", "EV14_turn_warning", "EV14_turn_none"}},
@@ -996,7 +996,7 @@ EVENT_DATA = {
   ["EV15"] = {
     title = "The Hundred Pass By",
     template = "wilderness_template",
-    flavor = "The thicket ahead has been cut flat in a line a hundred paws wide. Rats are marching through it under a banner of stitched-together flags, singing. At the back, a small rat with a large sack collects anything the marchers drop. He has spotted your packs.",
+    flavor = "The undergrowth ahead has been trampled flat in a line a hundred paws wide. Rats are marching through it under a banner of stitched-together flags, singing. At the back, a small rat with a large sack collects anything the marchers drop. He has spotted your packs.",
     effect = "",
     options = {
       {label = "Join the march.", tooltip = "[All STA 1]", outcomes = {"EV15_march_crowd", "EV15_march_crowd", "EV15_march_song", "EV15_march_count"}},
@@ -1080,7 +1080,7 @@ EVENT_DATA = {
   ["EV16"] = {
     title = "Cliffracers",
     template = "wilderness_template",
-    flavor = "The path swings wide, and you realize you've been climbing a tall hill all morning. To your left, the hillside drops away so steeply it's nearly a cliff. To your right, a battered but eager mouse is dragging two wooden sleds toward you. \"Last one down is a rotten egg!\"",
+    flavor = "The path swings wide, and you realize the road has been climbing all morning. To your left, the ground drops away so steeply it's nearly a cliff. To your right, a battered but eager mouse is dragging two wooden sleds toward you. \"Last one down is a rotten egg!\"",
     effect = "",
     options = {
       {label = "Race him down.", tooltip = "[AGI 1]", outcomes = {"EV16_race_win", "EV16_race_tie", "EV16_race_fly"}},
@@ -1164,7 +1164,7 @@ EVENT_DATA = {
   ["EV17"] = {
     title = "The Survey Stakes",
     template = "wilderness_template",
-    flavor = "Little flags on stakes run across the meadow in a perfect line, each stamped with the Duchy's seal. Where they cross your path, the ground is soft and freshly turned. A mole in spectacles surfaces beside a stake, looks at you, and asks you not to step there.",
+    flavor = "Little flags on stakes run across the open ground in a perfect line, each stamped with the Duchy's seal. Where they cross your path, the ground is soft and freshly turned. A mole in spectacles surfaces beside a stake, looks at you, and asks you not to step there.",
     effect = "",
     options = {
       {label = "Step around.", tooltip = "", outcomes = {"EV17_around_fine", "EV17_around_fine", "EV17_around_noted"}},
@@ -1230,7 +1230,7 @@ EVENT_DATA = {
   ["EV18"] = {
     title = "The Keepers' Dig",
     template = "wilderness_template",
-    flavor = "At the bottom of a mossy ravine, three badgers in iron caps are digging around something huge and green with age. Their leader leans on her shovel and looks you over. \"It's a relic,\" she says, \"and it's stuck, and you look like you've got arms.\"",
+    flavor = "At the bottom of a fresh pit among old stones, three badgers in iron caps are digging around something huge and green with age. Their leader leans on her shovel and looks you over. \"It's a relic,\" she says, \"and it's stuck, and you look like you've got arms.\"",
     effect = "",
     options = {
       {label = "Lift it free.", tooltip = "[STR 3]", outcomes = {"EV18_lift_piece", "EV18_lift_escort"}},
@@ -1296,7 +1296,7 @@ EVENT_DATA = {
   ["EV19"] = {
     title = "The Lily Town",
     template = "wilderness_template",
-    flavor = "The trail ends at a pond, and the pond is full of frogs. They've built a town on the lilypads, rope bridges and all, and the only way across is through it. A frog in a reed hat is collecting names at the first pad. He looks very tired of collecting names.",
+    flavor = "The trail ends at still water, and the water is full of frogs. They've built a town on the lilypads, rope bridges and all, and the only way across is through it. A frog in a reed hat is collecting names at the first pad. He looks very tired of collecting names.",
     effect = "",
     options = {
       {label = "Give your names.", tooltip = "", outcomes = {"EV19_names_stamped", "EV19_names_plain", "EV19_names_plain", "EV19_names_listed"}},
@@ -1360,9 +1360,9 @@ EVENT_DATA = {
     options = {},
   },
   ["EV20"] = {
-    title = "Storm in the Aspens",
+    title = "Sideways Rain",
     template = "wilderness_template",
-    flavor = "The aspens start shaking before the wind reaches you. Then the rain comes sideways. There's a hollow under a fallen trunk big enough for maybe half of you, and somewhere downhill, a light that might be a window.",
+    flavor = "The horizon goes gray before the wind reaches you. Then the rain comes sideways. There's a cut in the bank big enough for maybe half of you, and somewhere off the road, a light that might be a window.",
     effect = "",
     options = {
       {label = "Run for the light.", tooltip = "", outcomes = {"EV20_light_inn", "EV20_light_moving", "EV20_light_strike"}},
@@ -1421,7 +1421,7 @@ EVENT_DATA = {
   ["EV21"] = {
     title = "The Lightning Oak",
     template = "wilderness_template",
-    flavor = "An old oak has been split by lightning and is burning slowly from the inside, hissing in the rain. In the hollow at its heart, past the flames, something metal is catching the light.",
+    flavor = "The oldest tree in sight has been split by lightning and is burning slowly from the inside, hissing in the rain. In the hollow at its heart, past the flames, something metal is catching the light.",
     effect = "",
     options = {
       {label = "Reach past the fire.", tooltip = "[STA 1]", outcomes = {"EV21_reach_hilt", "EV21_reach_tin"}},
@@ -1565,7 +1565,7 @@ EVENT_DATA = {
   ["EV23"] = {
     title = "The Beaver Dam",
     template = "wilderness_template",
-    flavor = "A beaver dam has backed the creek up over the road. On top of it, an old beaver is shouting instructions at a young one, who is shouting back. Neither of them is fixing the leak spraying out of the middle.",
+    flavor = "A beaver dam has backed the stream up over the road. On top of it, an old beaver is shouting instructions at a young one, who is shouting back. Neither of them is fixing the leak spraying out of the middle.",
     effect = "",
     options = {
       {label = "Haul timber.", tooltip = "[STR 1]", outcomes = {"EV23_haul_fish", "EV23_haul_road"}},
@@ -1637,7 +1637,7 @@ EVENT_DATA = {
   ["EV24"] = {
     title = "Moss Helmets",
     template = "wilderness_template",
-    flavor = "The glade is quiet and green. It takes a moment to see that the mounds under the moss are helmets, hundreds of them, cat and bird alike. Someone has been here recently. A path is worn between the mounds, and a few have been pried open.",
+    flavor = "The ground here is quiet and overgrown. It takes a moment to see that the mounds under the moss are helmets, hundreds of them, cat and bird alike. Someone has been here recently. A path is worn between the mounds, and a few have been pried open.",
     effect = "",
     options = {
       {label = "Search the field.", tooltip = "", outcomes = {"EV24_search_blade", "EV24_search_taken", "EV24_search_scav", "EV24_search_rust"}},
@@ -1702,7 +1702,7 @@ EVENT_DATA = {
   ["EV25"] = {
     title = "The Harvest Tug",
     template = "wilderness_template",
-    flavor = "Two villages are holding their harvest fair in the same clearing, which nobody planned. Now there's a rope across the stubble, both sides are short a few haulers, and both mayors are looking at you. The prize is a wheel of cheese the size of a cart.",
+    flavor = "Two villages are holding their harvest fair in the same field, which nobody planned. Now there's a rope across the stubble, both sides are short a few haulers, and both mayors are looking at you. The prize is a wheel of cheese the size of a cart.",
     effect = "",
     options = {
       {label = "Pull for one side.", tooltip = "[All STR 1]", outcomes = {"EV25_tug_cheese", "EV25_tug_cheese", "EV25_tug_snap"}},
@@ -1846,7 +1846,7 @@ EVENT_DATA = {
   ["EV27"] = {
     title = "The Deserter",
     template = "wilderness_template",
-    flavor = "A young Marquisate soldier is hiding in a hollow log, armor half off, shaking. He begs you not to call out. Up the hill, his old company is breaking camp, and they're counting heads.",
+    flavor = "A young Marquisate soldier is hiding in a ditch, armor half off, shaking. He begs you not to call out. Up the hill, his old company is breaking camp, and they're counting heads.",
     effect = "",
     options = {
       {label = "Hide him.", tooltip = "", outcomes = {"EV27_hide_tin", "EV27_hide_found", "EV27_hide_follows"}},
@@ -2223,7 +2223,7 @@ EVENT_DATA = {
   ["EV33"] = {
     title = "Frost Morning",
     template = "wilderness_template",
-    flavor = "You wake to frost on everything: blankets, packs, the fire's last coals. The waterskins have frozen solid. Across the clearing, another traveler's camp is just as white, and the traveler in it hasn't moved.",
+    flavor = "You wake to frost on everything: blankets, packs, the fire's last coals. The waterskins have frozen solid. A little way off, another traveler's camp is just as white, and the traveler in it hasn't moved.",
     effect = "",
     options = {
       {label = "Check on them.", tooltip = "", outcomes = {"EV33_check_alive", "EV33_check_note", "EV33_check_decoy"}},
@@ -2287,9 +2287,9 @@ EVENT_DATA = {
     options = {},
   },
   ["EV34"] = {
-    title = "The Wishing Falls",
+    title = "The Wishing Pool",
     template = "wilderness_template",
-    flavor = "A waterfall drops into a pool at the bottom of a fern ravine. The pool's floor glitters with coins. A painted sign on the rock reads FOR WISHES ONLY, and someone has added a line underneath: WE ARE WATCHING.",
+    flavor = "Where the water stills into a clear, deep pool, the bottom glitters with coins. A painted sign on a rock reads FOR WISHES ONLY, and someone has added a line underneath: WE ARE WATCHING.",
     effect = "",
     options = {
       {label = "Make a wish.", tooltip = "Lose 5 gold.", outcomes = {"EV34_wish_bless", "EV34_wish_bless", "EV34_wish_nothing"}},
@@ -2414,7 +2414,7 @@ EVENT_DATA = {
   ["EV36"] = {
     title = "The Crossroads Stone",
     template = "wilderness_template",
-    flavor = "Where the crossroads meet stands a waystone older than you can determine. Four animal faces are carved from the rock, and three seem to have been claimed recently: a cat's paw scratched into one, a feather tied to another, and a paw-and-circle painted on the third. The fourth face is still bare.",
+    flavor = "Where the crossroads meet stands a waystone older than anyone can say. Four animal faces are carved into the rock, and three seem to have been claimed recently: a cat's paw scratched into one, a feather tied to another, and a paw-and-circle painted on the third. The fourth face is still bare.",
     effect = "",
     options = {
       {label = "Carve your own mark.", tooltip = "", outcomes = {"EV36_mark_talk", "EV36_mark_scratched"}},
@@ -2480,7 +2480,7 @@ EVENT_DATA = {
   ["EV37"] = {
     title = "A Traveling Caravan",
     template = "wilderness_template",
-    flavor = "As you walk along the road, the faded imprints before you quickly transform into a chaotic assortment of fresh wagon tracks and boots. Sure enough, you see two wagons downwind as you crest the hill--out of ear-shot but not unreachable. You count only one guard among them surprisingly.",
+    flavor = "The old ruts in the road turn fresh: new wagon tracks, a scatter of bootprints. From the top of the rise you see them, two wagons not far ahead, too far to hail but not too far to catch. Only one guard walks beside them.",
     effect = "",
     options = {
       {label = "Join them.", tooltip = "", outcomes = {"EV37_join_success", "EV37_join_fail"}},
@@ -2524,32 +2524,16 @@ EVENT_DATA = {
     effect = "No effect.",
     options = {},
   },
-  ["EV38"] = {
-    title = "Test",
-    template = "civilization_template",
-    flavor = "sdfsdf",
-    effect = "",
-    options = {
-      {label = "Continue.", tooltip = "", outcomes = {"EV38_test_done"}},
-    },
-  },
-  ["EV38_test_done"] = {
-    title = "Test Outcome",
-    flavor = "Placeholder outcome for the test scenario.",
-    effect = "No effect.",
-    options = {},
-  },
 }
 
 -- Intro nodes that get a physical card, grouped by region (sheet order).
 CARD_SETS = {
-  ["woodland"] = {"EV1", "EV2", "EV6", "EV8", "EV11", "EV14", "EV15", "EV20", "EV21", "EV22", "EV28", "EV29", "EV31"},
-  ["settlement"] = {"EV3", "EV10", "EV25", "EV32"},
+  ["woodland"] = {"EV1", "EV2", "EV3", "EV6", "EV8", "EV11", "EV14", "EV15", "EV21", "EV22", "EV28", "EV29", "EV31"},
   ["waterside"] = {"EV4", "EV9", "EV12", "EV19", "EV23", "EV34"},
-  ["opencountry"] = {"EV5", "EV16", "EV17", "EV30", "EV33", "EV35", "EV37"},
+  ["opencountry"] = {"EV5", "EV16", "EV17", "EV20", "EV30", "EV33", "EV35", "EV37"},
   ["scarred"] = {"EV7", "EV13", "EV18", "EV24", "EV26", "EV27", "EV36"},
-  ["city"] = {"EV38"},
+  ["settlement"] = {"EV10", "EV25", "EV32"},
 }
 
 -- Region names in sheet order -- drives the importer's button grid.
-CARD_SET_ORDER = {"woodland", "settlement", "waterside", "opencountry", "scarred", "city"}
+CARD_SET_ORDER = {"woodland", "waterside", "opencountry", "scarred", "settlement"}

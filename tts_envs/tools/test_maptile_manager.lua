@@ -90,9 +90,12 @@ local sc = self.buttons[1].scale
 check(math.abs(sc[1] * 3.7 - sc[3] * 2.23) < 1e-9, "button scale cancels the bag's uneven scale")
 check(math.abs(self.buttons[1].position[2] * 4.95 - (-0.9)) < 1e-9, "buttons sit LIFT above the bag's base")
 toggleAdvanced()
-check(#self.buttons == 9, "Advanced adds the 5 settings")
+check(#self.buttons == 10, "Advanced adds the 6 settings")
 local function label(i) return self.buttons[i + 1].label end
-check(label(4) == "Deck: Random" and label(5) == "Biome: Random", "everything starts Random")
+check(label(4) == "Region: Random" and label(5) == "Biome: Random", "everything starts Random; Deck shows as Region")
+local function tip(i) return self.buttons[i + 1].tooltip end
+check(tip(4):find("^Options: Random, " .. MAPTILE.decks[1].name), "Region tooltip lists its options")
+check(tip(5) == "Pick a Region first" and tip(7) == "Pick a Pattern first", "locked buttons say what unlocks them")
 check(self.buttons[5].position[3] == self.buttons[6].position[3], "Deck and Biome share a row")
 
 print("== cycling ==")
@@ -107,6 +110,7 @@ check(SETTINGS.deck == MAPTILE.decks[#MAPTILE.decks].id, "right-click wraps to t
 cycleBiome(nil, "White", false)
 local firstBiome = MAPTILE.decks[#MAPTILE.decks].biomes[1]
 check(SETTINGS.biome == firstBiome, "biome now cycles that deck's biomes")
+check(tip(5):find(MAPTILE.biomes[firstBiome].name, 1, true), "Biome tooltip lists that region's biomes")
 cycleDeck(nil, "White", false)
 check(SETTINGS.biome == "random", "changing deck resets biome")
 cycleOrientation(nil, "White", false)
@@ -115,6 +119,7 @@ cyclePattern(nil, "White", false); cyclePattern(nil, "White", false)
 check(SETTINGS.pattern == MAPTILE.patterns[2], "pattern cycles")
 cycleOrientation(nil, "White", false)
 check(SETTINGS.orientation == MAPTILE.orientations[SETTINGS.pattern][1], "orientation cycles that pattern's rotations")
+check(label(7) == "Orientation: " .. ORIENTATION_GLYPHS[SETTINGS.orientation], "orientation label shows the glyph")
 cyclePattern(nil, "White", false)
 check(SETTINGS.orientation == "random", "changing pattern resets orientation")
 cycleDensity(nil, "White", false)
@@ -127,18 +132,55 @@ check(SETTINGS.density == "2", "settings still cycle while hidden")
 toggleAdvanced()
 check(label(8) == "Density: 2", "and show the current value when reopened")
 
+print("== force connection ==")
+check(label(9) == "Force Connection: None", "Force Connection starts None")
+SETTINGS.pattern = "tee"; SETTINGS.orientation = "NES"
+check(tip(9):find("^Options: None, N, E, S, W"), "Force Connection tooltip lists N E S W")
+cycleConnection(nil, "White", false)
+check(SETTINGS.connection == "S" and label(9) == "Force Connection: N", "label N = a road on the S edge")
+cycleConnection(nil, "White", false)
+check(SETTINGS.connection == "W" and label(9) == "Force Connection: E", "label E = a road on the W edge")
+check(tip(7):find("Overridden"), "overridden buttons say so")
+local prev = {SETTINGS.pattern, SETTINGS.orientation}
+cyclePattern(nil, "White", false); cycleOrientation(nil, "White", false)
+check(SETTINGS.pattern == prev[1] and SETTINGS.orientation == prev[2], "pattern + orientation ignore clicks while forced")
+check(self.buttons[7].color == PANEL.LOCKED_COLOR and self.buttons[8].color == PANEL.LOCKED_COLOR,
+      "pattern + orientation shown locked while forced")
+cycleConnection(nil, "White", true); cycleConnection(nil, "White", true); cycleConnection(nil, "White", true)
+check(SETTINGS.connection == "E" and label(9) == "Force Connection: W", "right-click wraps None -> W (an E road)")
+local shapes = {}
+local n1 = #spawned
+SETTINGS = {deck = "woodland", biome = "forest", pattern = "cross", orientation = "NESW", density = "2", connection = "N"}
+for _ = 1, 800 do drawSpecific(nil, "White") end
+check(#spawned - n1 == 800, "forced draws all spawn")
+local allHaveN = true
+for i = n1 + 1, #spawned do
+  local key = spawned[i].data.CustomImage.ImageURL:match("^url:forest|(%w+|%w+)|2$")
+  if key == nil or not key:match("|%w*N") then allHaveN = false end
+  shapes[key or "?"] = (shapes[key or "?"] or 0) + 1
+end
+check(allHaveN, "every forced tile has a road to N, deck/biome/density kept")
+local kinds, tees = 0, 0
+for k, c in pairs(shapes) do
+  kinds = kinds + 1
+  if k:find("^tee") then tees = tees + c end
+end
+check(kinds == 8, "all 8 shapes with an N road come up (got " .. kinds .. ")")
+check(tees > 800 * 3 / 8 * 0.75 and tees < 800 * 3 / 8 * 1.25, "even per shape: tees ~3/8 (got " .. tees .. ")")
+SETTINGS.connection = "none"
+
 print("== draw specific ==")
 SETTINGS = {deck = "woodland", biome = "forest", pattern = "corner", orientation = "ES", density = "2"}
 drawSpecific(nil, "White")
 local t = spawned[#spawned]
 check(t ~= nil and t.data.CustomImage.ImageURL == "url:forest|corner|ES|2", "spawns the exact image")
 check(t.data.CustomImage.ImageSecondaryURL == "back_woodland", "back = the deck's back")
-check(t.data.Nickname == "Forest Corner Tile", "name: <Biome> <Pattern> Tile")
+check(t.data.Nickname == "Forest", "name: the biome name only")
 check(t.data.GMNotes == "forest", "GMNotes = biome")
 check(t.data.Memo == "d=2|explore=2|rendered=0", "memo from density table")
 check(t.data.GUID == nil, "GUID cleared for TTS to assign")
-check(t.data.Tags[1] == "MapTile" and t.data.Tags[2] == "Region:woodland" and t.data.Tags[3] == "Biome:forest"
-      and #t.data.Tags == 3, "tagged MapTile + Region + Biome, Template tag stripped")
+check(t.data.Tags[1] == TILE_TAG and t.data.Tags[2] == "Region:woodland" and t.data.Tags[3] == "Biome:forest"
+      and #t.data.Tags == 3, "tagged Maptile + Region + Biome, Template tag stripped")
 check(#t.buttons == 3 and t.buttons[1].label == "Explore: 2" and t.buttons[2].label == "Render" and
       t.buttons[3].label == "?", "tile shows Explore + Render + ?")
 check(t.data.Tooltip == false and t.buttons[3].font_color[1] > 0.3, "tooltip starts off, ? is grey")
@@ -153,9 +195,10 @@ tileExplore(t, "Red")
 check(t.memo == "d=2|explore=1|rendered=0" and t.buttons[1].label == "Explore: 1", "explore decrements memo + label")
 tileExplore(t, "Red"); tileExplore(t, "Red")
 check(t.memo:find("explore=0") and messages[#messages]:find("Nothing left"), "explore stops at 0")
+check(#t.buttons == 2 and t.buttons[1].label == "Render", "Explore button is gone at 0")
 MAPTILE.table.forest = {meeple = {{"Cave"}}, gold = {1, 3}}
 tileRender(t)
-check(t.memo:find("rendered=1") and #t.buttons == 2, "render runs once, then its button goes")
+check(t.memo:find("rendered=1") and #t.buttons == 1 and t.buttons[1].label == "?", "render runs once, then its button goes")
 local call = globalCalls[#globalCalls]
 check(call and call.fn == "spawnFromFor" and call.args.guid == t.guid and call.args.spawn.meeple[1][1] == "Cave",
       "render hands the biome's spawn table to Global by tile GUID")
@@ -201,7 +244,7 @@ SETTINGS = {deck = "settlement", biome = "city", pattern = "corner", orientation
 drawSpecific(nil, "White")
 local town = spawned[#spawned]
 check(town.data.CustomImage.ImageURL == "url:settlement|corner|ES|2", "tier 1 city uses the settlement images")
-check(town.data.GMNotes == "settlement" and town.data.Nickname == "Settlement Corner Tile", "tier 1 becomes a settlement")
+check(town.data.GMNotes == "settlement" and town.data.Nickname == "Settlement", "tier 1 becomes a settlement")
 check(town.data.Memo == "d=2|explore=2|rendered=0", "tier never reaches the memo")
 check(town.data.Tags[2] == "Region:settlement" and town.data.Tags[3] == "Biome:settlement", "tagged by its gmnotes biome")
 MAPTILE.weights["tier:city"] = {"2"}
@@ -249,12 +292,13 @@ check(#spawned == count and messages[#messages]:find("No image URL"), "missing u
 print("== reload ==")
 tagged = {t}
 t.buttons = {}
-onLoad("deck=woodland;biome=forest;pattern=tee;orientation=NES;density=3;advanced=1")
-check(SETTINGS.biome == "forest" and SETTINGS.orientation == "NES", "settings restored from save")
-check(ADVANCED and #self.buttons == 9, "Advanced open state restored")
-check(#t.buttons == 2, "onLoad re-renders tagged tiles from memo")
-onLoad("deck=nope;biome=forest;pattern=tee;orientation=XX;density=3")
-check(SETTINGS.deck == "random" and SETTINGS.orientation == "random", "unknown saved values fall back to Random")
+onLoad("deck=woodland;biome=forest;pattern=tee;orientation=NES;density=3;connection=E;advanced=1")
+check(SETTINGS.biome == "forest" and SETTINGS.orientation == "NES" and SETTINGS.connection == "E", "settings restored from save")
+check(ADVANCED and #self.buttons == 10, "Advanced open state restored")
+check(#t.buttons == 1, "onLoad re-renders tagged tiles from memo")
+onLoad("deck=nope;biome=forest;pattern=tee;orientation=XX;density=3;connection=Q")
+check(SETTINGS.deck == "random" and SETTINGS.orientation == "random" and SETTINGS.connection == "none",
+      "unknown saved values fall back to Random / None")
 
 print(string.format("\n%d/%d checks passed", pass, pass + fail))
 os.exit(fail == 0 and 0 or 1)
