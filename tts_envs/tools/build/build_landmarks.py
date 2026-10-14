@@ -44,11 +44,22 @@ from PIL import Image, ImageChops, ImageDraw
 OUT_DIR = os.path.join(os.path.dirname(ROOT), "assets", "landmarks")
 MANIFEST = os.path.join(OUT_DIR, "manifest.csv")
 LANDMARK_KEYS = ("out_size", "seed_offset", "margin")
-LANDMARK_COLOURS = ("brick", "brick_dk", "brick_line", "marble", "marble_dk", "cave", "ore", "ore_dk",
+LANDMARK_COLOURS = ("brick", "brick_dk", "brick_line", "marble", "marble_dk", "lm_cave", "ore", "ore_dk",
                     "ore_lt", "vein", "fish", "fish_dk", "earth", "earth_dk", "flame", "flame_lt", "fey", "fey_dk", "fey_lt",
                     "wisp", "shadow", "otter_banner", "knave_banner",
-                    "alliance_banner", "lizard_banner", "smoke")
+                    "alliance_banner", "lizard_banner", "lm_smoke")
 SIZES = 4
+# A landmark is a TTS stand-up token, extruded from its alpha outline: anything
+# thinner than this (design units = px at 1024) becomes a sliver or breaks off.
+# Every part that stands on its own and shapes the outline (poles, stems,
+# stalks, ropes, handles, smoke) is drawn at least this wide via Sketch.pole().
+MIN_STAND = 16
+# Detached pieces smaller than this (px at out_size 1024, ~30 x 30) are dropped
+# by solid_alpha: stray specks and floating motes would each become a sliver.
+MIN_PIECE = 900
+# Enclosed holes smaller than this are filled with ink (a narrow slot triangulates
+# into stray walls); bigger ones stay open, which TTS cuts cleanly.
+MAX_HOLE = 2000
 
 
 # ---------------------------------------------------------------- drawing kit
@@ -116,6 +127,11 @@ class Sketch:
   def line(self, pts, colour=None, width=4):
     self.d.line([self.at(x, y) for x, y in pts], fill=colour or bm.G["ink"], width=max(1, int(bm.u(width))),
                 joint="curve")
+
+  def pole(self, pts, colour=None, width=MIN_STAND):
+    """A standing stick (pole, stem, stalk, rope, handle) thick enough to survive
+    token extrusion: `colour` core with the house ink edge, `width` overall."""
+    bm._ink_line(self.c, [self.at(x, y) for x, y in pts], colour or bm.G["timber"], bm.u(width - 6))
 
   def window(self, x0, y0, x1, y1, arched=False):
     m = self.arch(x0, x1, y0, y1) if arched else self.box(x0, y0, x1, y1, amp=0.8)
@@ -224,7 +240,7 @@ def _straw_hut(canvas, ax, ay, s, rng):
   bundles = [[(x, 0.0), (x + 0.008, 0.3)] for x in [-0.27 + i * 0.06 for i in range(10)]]
   k.fill(clip(k.lines(bundles, 3), body), g["hay_dk"])
   k.fill(clip(k.lines([[(-0.4, 0.15), (0.4, 0.15)]], 6), body), g["palisade_dk"])  # binding cord
-  k.put(k.arch(-0.085, 0.085, 0, 0.24), g["cave"])
+  k.put(k.arch(-0.085, 0.085, 0, 0.24), g["lm_cave"])
   k.put(k.poly([(-0.085, 0.17), (-0.01, 0.17), (-0.03, 0.08), (-0.085, 0.02)], amp=0.6, sub=1), g["banner"])  # curtain
   roof = k.poly([(-0.43, 0.25), (-0.3, 0.42), (-0.13, 0.57), (0, 0.63), (0.13, 0.57), (0.3, 0.42), (0.43, 0.25)], amp=3)
   k.put(roof, g["hay"], g["hay_dk"], lighten(g["hay"], 0.3))
@@ -332,8 +348,8 @@ def paint_cave(canvas, ax, ay, s, rng, tier):
   rocky(k, pts)
   mw, mh = CAVE_MOUTHS[tier - 1]
   dx = 0.04
-  k.put(k.arch(dx - mw, dx + mw, 0, mh), g["cave"])
-  k.fill(k.arch(dx - mw * 0.6, dx + mw * 0.6, 0, mh * 0.72, amp=0.5), bm.shade_of(g["cave"], 0.6))
+  k.put(k.arch(dx - mw, dx + mw, 0, mh), g["lm_cave"])
+  k.fill(k.arch(dx - mw * 0.6, dx + mw * 0.6, 0, mh * 0.72, amp=0.5), bm.shade_of(g["lm_cave"], 0.6))
   if tier >= 3:  # fangs hanging from the mouth, two rising from the floor
     for f in (-0.6, -0.25, 0.1, 0.45):
       x = f * mw
@@ -455,7 +471,7 @@ def paint_treenode(canvas, ax, ay, s, rng, tier):
   motes(k, rng, tx - 0.4, tx + 0.45, 0.15, 0.95, g["glow"])
   bm.paint_stump(canvas, *k.at(0.17, 0), s * 0.24, rng)
   hx, hy = 0.17, 0.1
-  bm._ink_line(canvas, [k.at(hx, hy), k.at(hx + 0.15, hy + 0.22)], g["palisade"], bm.u(8))
+  k.pole([(hx, hy), (hx + 0.15, hy + 0.22)], g["palisade"])
   k.put(k.poly([(hx - 0.07, hy + 0.035), (hx + 0.02, hy + 0.06), (hx + 0.035, hy - 0.005), (hx - 0.06, hy - 0.035)],
                amp=0.6), g["rock_lt"], g["rock_dk"])
 
@@ -468,11 +484,11 @@ def paint_herb(canvas, ax, ay, s, rng, tier):
             ((0.01, 0.05), (0.03, 0.62), (0.1, 0.74), (0.17, 0.68)),
             ((0.03, 0.05), (0.16, 0.4), (0.26, 0.47), (0.31, 0.4)))
   for st in stalks:
-    k.line(list(st), g["fey_dk"], 5)
+    k.pole(list(st), g["fey_dk"])
   for side in (-1, 1):  # fiddlehead curls
     cx0, cy0 = side * 0.2, 0.3
     spiral = [(cx0 + side * math.cos(t) * 0.012 * t, cy0 + math.sin(t) * 0.012 * t) for t in [i * 0.5 for i in range(14)]]
-    k.line([(side * 0.06, 0.03), (side * 0.16, 0.18), (cx0 + side * 0.08, cy0 - 0.02)] + spiral[::-1], g["fey_dk"], 5)
+    k.pole([(side * 0.06, 0.03), (side * 0.16, 0.18), (cx0 + side * 0.08, cy0 - 0.02)] + spiral[::-1], g["fey_dk"])
   for i in range(7):
     deg = -66 + i * 22 + rng.uniform(-6, 6)
     ln, w = rng.uniform(0.3, 0.4) * (1 - abs(deg) / 200), 0.075
@@ -512,12 +528,12 @@ def paint_tracks(canvas, ax, ay, s, rng, tier):
     k.line([(x0, 0.44), (x0 + side * 0.03, 0.55), (x0 + side * 0.09, 0.62), (x0 + side * 0.13, 0.6)], width=5)
   k.put(bush, g["oak"], g["oak_dk"], g["oak_lt"])
   peek = k.oval(-0.27, 0.42, 0.06, 0.035, amp=0.6)  # a gap in the leaves, watching
-  k.put(peek, g["cave"])
+  k.put(peek, g["lm_cave"])
   for x in (-0.29, -0.25):
     glow(k, x, 0.42, 0.009, g["flame_lt"], halo=2.2, ink=False)
   hollow = k.poly([(-0.36, 0.04), (-0.33, 0.2), (-0.2, 0.33), (-0.02, 0.35), (0.14, 0.29), (0.22, 0.15),
                    (0.24, 0.04)], amp=2)
-  k.put(hollow, g["cave"])
+  k.put(hollow, g["lm_cave"])
   for x, y, r, deg in ((-0.04, 0.25, 0.026, 12), (0.1, 0.21, 0.018, 8), (-0.21, 0.22, 0.015, -10)):
     for side in (-1, 1):
       ex = x + side * r * 1.6
@@ -615,7 +631,7 @@ def paint_marquise_keep(canvas, ax, ay, s, rng, tier):
   k.put(keep, stone, stone_dk)
   masonry(k, keep, -0.15, 0.15, 0.3, 0.84, stone_dk)
   merlons(k, -0.15, 0.15, 0.84, stone, stone_dk)
-  k.line([(0.1, 0.89), (0.1, 1.0)], width=5)
+  k.pole([(0.1, 0.89), (0.1, 1.0)])
   k.put(k.poly([(0.1, 1.0), (0.21, 0.97), (0.1, 0.94)], amp=0.4, sub=1), orange)
   for x in (-0.07, 0.07):
     k.window(x - 0.018, 0.73, x + 0.018, 0.81, arched=True)
@@ -627,10 +643,10 @@ def paint_marquise_keep(canvas, ax, ay, s, rng, tier):
     masonry(k, tower, -0.44 if side < 0 else 0.29, -0.29 if side < 0 else 0.44, 0, 0.6, stone_dk)
     xm = side * 0.365
     k.put(k.poly([(xm - 0.095, 0.585), (xm, 0.83), (xm + 0.095, 0.585)], amp=1), roof, roof_dk)
-    k.line([(xm, 0.83), (xm, 0.92)], width=5)
+    k.pole([(xm, 0.83), (xm, 0.92)])
     k.put(k.poly([(xm, 0.92), (xm + 0.09, 0.895), (xm, 0.87)], amp=0.4, sub=1), orange)
     for y in (0.2, 0.4):  # arrow slits
-      k.put(k.box(xm - 0.012, y, xm + 0.012, y + 0.07, amp=0.3), g["cave"])
+      k.put(k.box(xm - 0.012, y, xm + 0.012, y + 0.07, amp=0.3), g["lm_cave"])
   wall = k.box(-0.29, 0, 0.29, 0.38)
   k.put(wall, stone, stone_dk)
   masonry(k, wall, -0.29, 0.29, 0, 0.38, stone_dk)
@@ -643,7 +659,7 @@ def paint_marquise_keep(canvas, ax, ay, s, rng, tier):
   masonry(k, gate, -0.11, 0.11, 0, 0.47, stone_dk)
   merlons(k, -0.11, 0.11, 0.47, stone, stone_dk, w=0.04, gap=0.02)
   door = k.arch(-0.07, 0.07, 0, 0.27)
-  k.put(door, g["cave"])
+  k.put(door, g["lm_cave"])
   grid = [[(x, 0), (x, 0.3)] for x in (-0.045, -0.015, 0.015, 0.045)] + [[(-0.08, y), (0.08, y)] for y in (0.15, 0.2, 0.25)]
   k.fill(clip(k.lines(grid, 4), door), g["rock_dk"])
   k.put(k.box(-0.12, 0.33, 0.12, 0.36, amp=0.4), orange, roof_dk)  # gate lintel stripe
@@ -666,7 +682,7 @@ def paint_eyrie_roost(canvas, ax, ay, s, rng, tier):
   k.put(trunk, bark, bark_dk)
   k.fill(clip(k.lines([[(-0.05, 0.05), (-0.03, 0.45)], [(0.03, 0.1), (0.05, 0.44)], [(-0.01, 0.2), (0.0, 0.35)]], 3),
               trunk), bark_dk)
-  k.put(k.oval(0.0, 0.16, 0.04, 0.05, amp=0.5), g["cave"])  # knot hole
+  k.put(k.oval(0.0, 0.16, 0.04, 0.05, amp=0.5), g["lm_cave"])  # knot hole
   for side in (-1, 1):  # braces under the deck
     bm._ink_line(canvas, [k.at(side * 0.08, 0.3), k.at(side * 0.38, 0.47)], g["timber"], bm.u(7))
   deck = k.box(-0.44, 0.46, 0.44, 0.52, amp=1)
@@ -719,7 +735,7 @@ def flame(k, x, y, r):
 
 
 def pennant(k, x, y0, y1, colour, side=1):
-  k.line([(x, y0), (x, y1)], width=5)
+  k.pole([(x, y0), (x, y1)])
   k.put(k.poly([(x, y1), (x + side * 0.09, y1 - 0.025), (x, y1 - 0.05)], amp=0.4, sub=1), colour)
 
 
@@ -748,7 +764,7 @@ def paint_otter_tradepost(canvas, ax, ay, s, rng, tier):
   hut = k.box(-0.3, 0.23, 0.1, 0.5)
   k.put(hut, g["palisade"], g["palisade_dk"])
   k.fill(clip(k.lines([[(x, 0.23), (x, 0.5)] for x in [-0.25 + 0.05 * i for i in range(7)]], 3), hut), g["palisade_dk"])
-  k.put(k.box(-0.24, 0.3, 0.04, 0.42, amp=0.6), g["cave"])  # serving hatch
+  k.put(k.box(-0.24, 0.3, 0.04, 0.42, amp=0.6), g["lm_cave"])  # serving hatch
   k.line([(-0.24, 0.39), (0.04, 0.39)], g["timber"], 4)  # shelf with jars
   for i, x in enumerate((-0.2, -0.13, -0.06, 0.0)):
     c = g["roofs"][i % len(g["roofs"])]
@@ -780,10 +796,10 @@ def tent(k, x, w, h, patches):
   k.put(body, g["wall"], g["wall_dk"])
   for px, py, pw, c in patches:
     k.put(clip(k.box(x + px * w, py * h, x + (px + pw) * w, py * h + pw * w, amp=0.6), body), c)
-  k.put(k.poly([(x - w * 0.28, 0), (x, h * 0.55), (x + w * 0.28, 0)], amp=0.8, sub=2), g["cave"])
-  k.line([(x, h), (x, h + 0.05)], width=5)
+  k.put(k.poly([(x - w * 0.28, 0), (x, h * 0.55), (x + w * 0.28, 0)], amp=0.8, sub=2), g["lm_cave"])
+  k.pole([(x, h - 0.02), (x, h + 0.05)])
   for side in (-1, 1):
-    k.line([(x + side * w * 0.55, h * 0.45), (x + side * w * 1.25, 0)], g["hay_dk"], 2)
+    k.pole([(x + side * w * 0.55, h * 0.45), (x + side * w * 1.25, 0)], g["hay_dk"])
 
 
 def campfire(k, x):
@@ -815,7 +831,7 @@ def paint_knave_camp(canvas, ax, ay, s, rng, tier):
       bm.paint_stake(canvas, *k.at(x, 0), s * rng.uniform(0.2, 0.25), rng)
     tent(k, 0.38, 0.17, 0.32, [(-0.5, 0.25, 0.4, g["hay"])])
   flag_x = -0.22 if tier == 1 else -0.1
-  k.line([(flag_x, 0.3), (flag_x, 0.72)], g["timber"], 6)
+  k.pole([(flag_x, 0.3), (flag_x, 0.72)])
   rag = k.poly([(flag_x, 0.72), (flag_x + 0.16, 0.7), (flag_x + 0.13, 0.66), (flag_x + 0.17, 0.62),
                 (flag_x + 0.11, 0.6), (flag_x + 0.12, 0.56), (flag_x, 0.58)], amp=0.8, sub=1)
   k.put(rag, knave, bm.shade_of(knave, 0.75))
@@ -825,7 +841,7 @@ def paint_knave_camp(canvas, ax, ay, s, rng, tier):
   if tier >= 2:  # roasting spit over the fire
     fx = 0.12
     for x in (fx - 0.08, fx + 0.08):
-      k.line([(x, 0), (x, 0.13)], g["timber"], 5)
+      k.pole([(x, 0), (x, 0.13)])
     k.line([(fx - 0.1, 0.125), (fx + 0.1, 0.125)], width=4)
     campfire(k, fx)
     k.put(k.oval(fx, 0.125, 0.05, 0.025, amp=0.4), g["fish"], g["fish_dk"])
@@ -847,7 +863,7 @@ def paint_alliance_burrow(canvas, ax, ay, s, rng, tier):
   green = g["alliance_banner"]
   k.put(k.box(0.15, 0.3, 0.21, 0.5, amp=0.6), g["stone"], g["stone_dk"])  # chimney
   for i, (x, y, r) in enumerate(((0.19, 0.56, 0.035), (0.23, 0.63, 0.045), (0.2, 0.72, 0.055))):
-    k.put(k.oval(x, y, r, r * 0.85, amp=0.8), g["smoke"], bm.shade_of(g["smoke"], 0.85))
+    k.put(k.oval(x, y, r, r * 0.85, amp=0.8), g["lm_smoke"], bm.shade_of(g["lm_smoke"], 0.85))
   hill = k.oval(0, 0, 0.47, 0.4, amp=2.5, a1=math.pi, n=18)
   k.put(hill, g["hill"], g["hill_dk"], g["hill_lt"])
   for x, y in ((-0.33, 0.27), (-0.12, 0.36), (0.32, 0.25), (0.05, 0.37), (-0.38, 0.12)):
@@ -877,7 +893,7 @@ def paint_alliance_burrow(canvas, ax, ay, s, rng, tier):
 
 def sunflower(k, x, h, r):
   g = bm.G
-  k.line([(x, 0.05), (x + 0.01, h)], g["leaf_dk"], 5)
+  k.pole([(x, 0.05), (x + 0.01, h)], g["leaf_dk"])
   k.put(k.oval(x + 0.025, h * 0.5, 0.03, 0.014, amp=0.3), g["leaf"])
   m = k.mask()
   for a in range(10):
@@ -909,15 +925,15 @@ def paint_lizard_garden(canvas, ax, ay, s, rng, tier):
   k.put(k.oval(0, 0.4, 0.008, 0.012, amp=0), g["ink"])
   for side in (-1, 1):  # braziers
     x = side * 0.11
-    k.line([(x, 0.13), (x, 0.24)], width=5)
+    k.pole([(x, 0.13), (x, 0.24)], g["rock_dk"])
     k.put(k.oval(x, 0.25, 0.04, 0.025, amp=0.4, a0=math.pi, a1=2 * math.pi), g["rock_dk"])
     flame(k, x, 0.25, 0.018)
-    k.line([(x, 0.33), (x + side * 0.02, 0.38), (x - side * 0.01, 0.43), (x + side * 0.015, 0.48)], g["smoke"], 4)
+    k.pole([(x, 0.3), (x + side * 0.02, 0.36), (x - side * 0.01, 0.42), (x + side * 0.015, 0.47)], g["lm_smoke"])
   wall = k.box(-0.47, 0, 0.47, 0.085, amp=1)
   k.put(wall, g["stone"], g["stone_dk"])
   masonry(k, wall, -0.47, 0.47, 0, 0.085, g["stone_dk"], course=0.042)
   k.put(k.arch(-0.07, 0.07, 0, 0.12, amp=0.6), g["stone"], g["stone_dk"])  # gate gap in the wall
-  k.put(k.arch(-0.045, 0.045, 0, 0.09, amp=0.4), g["cave"])
+  k.put(k.arch(-0.045, 0.045, 0, 0.09, amp=0.4), g["lm_cave"])
   for x, c in ((-0.33, g["cat_banner"]), (0.36, g["hay"])):  # gourds by the wall
     k.put(k.oval(x, 0.12, 0.04, 0.032, amp=0.6), c, bm.shade_of(c, 0.75))
     k.line([(x, 0.15), (x + 0.01, 0.17)], g["leaf_dk"], 4)
@@ -965,7 +981,7 @@ def paint_stone_tower(canvas, ax, ay, s, rng, tier):
     if tier >= 3:
       k.window(-0.04, y, 0.04, y + 0.12, arched=True)
     else:
-      k.put(k.box(-0.016, y, 0.016, y + 0.09, amp=0.3), g["cave"])
+      k.put(k.box(-0.016, y, 0.016, y + 0.09, amp=0.3), g["lm_cave"])
   if tier == 1:
     k.put(k.box(-w - 0.02, H - 0.02, w + 0.02, H + 0.03, amp=0.6), g["timber"])
     cone(0, w + 0.06, H + 0.02, 0.36, g["roofs"][2])
@@ -1055,6 +1071,53 @@ def landmark_seed(lm, name, size):
   return (zlib.crc32(key.encode()) + bm.G["seed"] * 7919 + lm["seed_offset"] * 104729) % (2 ** 31)
 
 
+def label_pieces(mask):
+  """[(bool array, pixel count)] for each 4-connected True region of `mask`."""
+  lab = Image.fromarray(np.where(mask, 255, 0).astype(np.uint8)).copy()
+  pieces = []
+  for k in range(1, 255):
+    left = np.argwhere(np.asarray(lab) == 255)
+    if len(left) == 0:
+      break
+    y, x = left[0]
+    ImageDraw.floodfill(lab, (int(x), int(y)), k)
+    piece = np.asarray(lab) == k
+    pieces.append((piece, int(piece.sum())))
+  return pieces
+
+
+def solid_alpha(img, min_piece, max_hole):
+  """Make the standee's alpha a clean cut-out for a TTS Custom Token.
+
+  TTS extrudes the token from the alpha outline. The downscale leaves a soft
+  fringe that breaks into hundreds of near-transparent specks and pinholes,
+  and each one is traced into a stray wall (dark slabs sticking out of the
+  outline in game). So: cut at 50% alpha, fill enclosed holes smaller than
+  `max_hole` pixels with ink, and drop detached pieces smaller than
+  `min_piece` -- real separate parts and big openings stay. Works on flood
+  fills, so it needs nothing beyond Pillow."""
+  w, h = img.size
+  solid = (np.asarray(img.getchannel("A")) >= 128).astype(np.uint8) * 255
+  # outside = transparent and reachable from the border; anything else is shape or a hole
+  # .copy(): an image made by fromarray shares numpy's read-only buffer, and floodfill
+  # on it silently changes nothing
+  pad = Image.fromarray(np.pad(solid, 1)).copy()
+  ImageDraw.floodfill(pad, (0, 0), 100)
+  outside = np.asarray(pad)[1:-1, 1:-1] == 100
+  holes = np.zeros((h, w), bool)
+  for hole, size in label_pieces(~outside & (solid == 0)):
+    if size < max_hole:
+      holes |= hole
+  keep = np.zeros((h, w), bool)
+  for piece, size in label_pieces((solid > 0) | holes):
+    if size >= min_piece:
+      keep |= piece
+  rgba = np.array(img)
+  rgba[holes] = (*bm.G["ink"], 255)
+  rgba[..., 3] = np.where(keep, 255, 0)
+  return Image.fromarray(rgba, "RGBA")
+
+
 def draw_landmark(lm, name, size, width):
   img = Image.new("RGBA", (bm.R, bm.R), (0, 0, 0, 0))
   rng = np.random.default_rng(landmark_seed(lm, name, size))
@@ -1096,7 +1159,9 @@ def main():
     for size in sizes:
       file = "%s_s%d.png" % (name, size)
       img = draw_landmark(lm, name, size, widths[name][size - 1])
-      img.resize((lm["out_size"], lm["out_size"]), Image.LANCZOS).save(os.path.join(OUT_DIR, file))
+      img = img.resize((lm["out_size"], lm["out_size"]), Image.LANCZOS)
+      area = (lm["out_size"] / 1024) ** 2
+      solid_alpha(img, MIN_PIECE * area, MAX_HOLE * area).save(os.path.join(OUT_DIR, file))
       rows.append({"name": file[:-4], "landmark": name, "size": size,
                    "seed": landmark_seed(lm, name, size), "file": file})
       print("  " + file[:-4])

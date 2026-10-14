@@ -452,7 +452,7 @@ landmark_colour,brick_dk,#7f3f2d,
 landmark_colour,brick_line,#6a3426,mortar lines between bricks
 landmark_colour,marble,#ece4d2,capital manor stone
 landmark_colour,marble_dk,#c9bea6,
-landmark_colour,cave,#3a2a22,cave mouths + burrow holes
+landmark_colour,lm_cave,#3a2a22,cave mouths + burrow holes
 landmark_colour,ore,#86bccb,ore crystals
 landmark_colour,ore_dk,#4f8794,
 landmark_colour,ore_lt,#c3e0e6,
@@ -606,7 +606,7 @@ landmark_colour,otter_banner,#4fa3b3,Riverfolk Company
 landmark_colour,knave_banner,#7a3b4a,Knaves of the Deepwood
 landmark_colour,alliance_banner,#5f8f3a,Woodland Alliance
 landmark_colour,lizard_banner,#d8b23a,Lizard Cult
-landmark_colour,smoke,#cfc8bb,chimney + brazier smoke
+landmark_colour,lm_smoke,#cfc8bb,chimney + brazier smoke
 lilypond,variants,1,
 lilypond,patterns,deadend|corner|straight|tee|cross,
 lilypond,seed_offset,0,
