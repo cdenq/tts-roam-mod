@@ -112,6 +112,10 @@ global,menhir_spacing,85,wall menhirs: gap between stones round the ring
 global,menhir_size,115-150,wall menhirs: stone height range
 global,stake_spacing,24,wall palisade: gap between stakes
 global,stake_size,52-62,wall palisade: stake height range (gate posts are 1.35x)
+global,rampart_spacing,34,wall stone: gap between rampart blocks round the ring
+global,rampart_size,64-70,wall stone: rampart block height range
+global,tower_size,82-90,wall stone: tower size range (gate towers + the ones between)
+global,tower_gap_count,10,wall stone: rampart blocks between towers away from the gates
 global,density_scale,1.7|1.35|1|0.85|0.72,spacing multiplier per density stage d1..d5 -- lower = more trees. d3 = region spacing as-is
 forest,variants,1,looks per orientation (every rotation of every pattern is always drawn)
 forest,patterns,deadend|corner|straight|tee|cross,which path layouts to make: none deadend corner straight tee cross
@@ -137,22 +141,38 @@ plains,spacing,150,
 plains,fields,3,
 plains,grass,70,
 plains,icons,bush:1:60-85,
+town,variants,1,
+town,patterns,deadend|corner|straight|tee|cross,
+town,seed_offset,0,
+town,ground,#cbb894,
+town,deck,settlement,
+town,densities,1-3,
+town,clearing,130,
+town,clearing_style,cobble,
+town,spacing,98,
+town,fields,0,
+town,grass,30,
+town,icons,house:8:85-115|tree:1:70-85,inside the wall when town_radius > 0
+town,town_radius,350,optional. houses (icons) stay inside this circle; 0 = no town layout
+town,wall,palisade,optional. none palisade menhirs or stone (ring at town_radius; roads leave gates)
+town,outer_icons,tree:5:80-105|pine:3:85-110|bush:2:60-80,optional. scattered outside the wall
+town,outer_spacing,85,optional. spacing for outer_icons (default = spacing)
 city,variants,1,
 city,patterns,deadend|corner|straight|tee|cross,
 city,seed_offset,0,
-city,ground,#cbb894,
+city,ground,#c4b796,
 city,deck,settlement,
 city,densities,1-3,
-city,clearing,130,
+city,clearing,120,
 city,clearing_style,cobble,
-city,spacing,98,
+city,spacing,86,
 city,fields,0,
-city,grass,30,
-city,icons,house:8:85-115|tree:1:70-85,inside the wall when town_radius > 0
-city,town_radius,350,optional. houses (icons) stay inside this circle; 0 = no town layout
-city,wall,palisade,optional. none or palisade (ring of stakes at town_radius; roads leave gates)
-city,outer_icons,tree:5:80-105|pine:3:85-110|bush:2:60-80,optional. scattered outside the wall
-city,outer_spacing,85,optional. spacing for outer_icons (default = spacing)
+city,grass,20,
+city,icons,townhouse:10:82-100|tree:1:65-80,two-storey stone + timber houses
+city,town_radius,350,
+city,wall,stone,stone rampart; towers flank every gate
+city,outer_icons,tree:5:80-105|pine:2:85-110|bush:3:60-80,
+city,outer_spacing,90,
 mountain,variants,1,
 mountain,patterns,deadend|corner|straight|tee|cross,
 mountain,seed_offset,0,
@@ -375,21 +395,21 @@ orchard,grass,40,
 orchard,icons,fruit:1:75-95,
 orchard,required,house:1:90-110,
 orchard,layout,rows,
-village,variants,1,
-village,patterns,deadend|corner|straight|tee|cross,
-village,seed_offset,0,
-village,ground,#c8b98c,
-village,deck,settlement,
-village,densities,1-3,
-village,clearing,95,
-village,clearing_style,plain,
-village,spacing,95,
-village,fields,0,
-village,grass,30,
-village,icons,house:8:85-110|tree:1:75-95|bush:1:55-70,
-village,town_radius,330,
-village,outer_icons,tree:4:80-105|bush:2:60-80|pine:2:85-105,
-village,outer_spacing,95,
+settlement,variants,1,
+settlement,patterns,deadend|corner|straight|tee|cross,
+settlement,seed_offset,0,
+settlement,ground,#c8b98c,
+settlement,deck,settlement,
+settlement,densities,1-3,
+settlement,clearing,95,
+settlement,clearing_style,plain,
+settlement,spacing,95,
+settlement,fields,0,
+settlement,grass,30,
+settlement,icons,house:8:85-110|tree:1:75-95|bush:1:55-70,
+settlement,town_radius,330,
+settlement,outer_icons,tree:4:80-105|bush:2:60-80|pine:2:85-105,
+settlement,outer_spacing,95,
 landmark_size,building,340|400|460|740,1 straw hut | 2 log cabin (wood) | 3 town house (stone) | 4 capital hall (stone + brick)
 landmark_size,cave,420|560|700|860,1 burrow | 2 outcrop | 3 crag with fangs | 4 cliff with torches
 landmark_size,tree,800,gathering node: forestry. One width = size 1 only

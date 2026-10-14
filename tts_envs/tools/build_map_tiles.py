@@ -109,7 +109,7 @@ GLOBAL_LISTS = ("roofs", "fields", "flower_colours")
 OPTIONAL_REGION_KEYS = {"town_radius": "0", "wall": "none", "outer_icons": "", "outer_spacing": "",
                         "centerpiece": "none", "centerpiece_size": "0",
                         "feature": "none", "speckle": "", "layout": "scatter", "required": ""}
-WALLS = ("none", "palisade", "menhirs")
+WALLS = ("none", "palisade", "menhirs", "stone")
 CENTERPIECES = ("none", "guildhall", "windmill", "statue")
 # how far north of the plaza centre a centerpiece's base sits, as a fraction of
 # the clearing radius -- the statue stands back so tokens fit in front of it
@@ -122,10 +122,10 @@ GLOBAL_STRINGS = ("back_font",)
 GLOBAL_NUMBER_LISTS = ("density_scale",)
 # Feature + wall tuning. Numbers are design units unless named *_count.
 GLOBAL_FEATURE_NUMBERS = ("river_anchor", "river_width", "canyon_width", "pool_count", "mud_count", "spring_count",
-                          "menhir_spacing", "stake_spacing")
+                          "menhir_spacing", "stake_spacing", "rampart_spacing", "tower_gap_count")
 # "lo-hi" pairs
 GLOBAL_RANGES = ("lake_size", "falls_size", "pit_size", "pool_size", "mud_size", "spring_size",
-                 "menhir_size", "stake_size", "field_width", "field_height", "reed_size")
+                 "menhir_size", "stake_size", "rampart_size", "tower_size", "field_width", "field_height", "reed_size")
 # Groups in asset_variables.csv that belong to other generators, not regions.
 OTHER_GROUPS = ("gem", "gem_colour", "landmark", "landmark_size", "landmark_colour", "card")
 GLOBAL_NUMBERS = ("out_size", "supersample", "seed", "frame_width", "paper_tint", "back_gem_size",
@@ -1072,6 +1072,116 @@ def paint_stake(canvas, ax, ay, s, rng):
   canvas.paste(G["palisade_dk"], (ox, oy, ox + m.size[0], oy + m.size[1]), ImageChops.multiply(dark, m))
 
 
+def paint_townhouse(canvas, ax, ay, s, rng):
+  """Two-storey city house: stone ground floor, jettied timber-framed upper
+  storey, steep roof with a chimney. Some get a lower side wing."""
+  w, h = s * 1.8, s * 1.8
+  cx, by = PAD + w / 2, PAD + h
+  ww = s * rng.uniform(0.72, 0.9)
+  gh, uh = s * 0.34, s * rng.uniform(0.34, 0.42)
+  jet = u(5)
+  rh = s * rng.uniform(0.5, 0.62)
+  wing = rng.random() < 0.4
+  side = 1 if rng.random() < 0.5 else -1
+  ox, oy = ax - cx, ay - by
+  roofc = G["roofs"][int(rng.integers(0, len(G["roofs"])))]
+
+  def rect(x0, y0, x1, y1, amp=1.2):
+    m = blank(w, h)
+    ImageDraw.Draw(m).polygon(wobble([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], rng, amp, sub=2), fill=255)
+    return m
+
+  top = by - gh - uh
+  if wing:  # lower wing with a lean-to roof, behind the main block
+    inner, outer = cx + side * ww * 0.3, cx + side * (ww * 0.5 + s * 0.3)
+    lo, hi = min(inner, outer), max(inner, outer)
+    wt = by - gh * 1.15
+    stamp(canvas, rect(lo, wt, hi, by), ox, oy, G["wall"], G["wall_dk"])
+    m = blank(w, h)
+    ImageDraw.Draw(m).polygon(wobble([(inner, wt - s * 0.24), (outer + side * u(8), wt + u(4)),
+                                      (inner, wt + u(4))], rng, 1.5), fill=255)
+    stamp(canvas, m, ox, oy, roofc, shade_of(roofc, 0.78))
+  chx = cx - side * ww * rng.uniform(0.18, 0.28)
+  stamp(canvas, rect(chx - u(9), top - rh * 0.8, chx + u(9), top), ox, oy, G["stone"], G["stone_dk"])
+  stamp(canvas, rect(cx - ww / 2, by - gh, cx + ww / 2, by), ox, oy, G["stone"], G["stone_dk"])
+  stamp(canvas, rect(cx - ww / 2 - jet, top, cx + ww / 2 + jet, by - gh + u(2)), ox, oy, G["wall"], G["wall_dk"])
+  roof = blank(w, h)
+  ImageDraw.Draw(roof).polygon(wobble([(cx - ww / 2 - u(14), top + u(5)), (cx, top - rh),
+                                       (cx + ww / 2 + u(14), top + u(5))], rng, 2), fill=255)
+  stamp(canvas, roof, ox, oy, roofc, shade_of(roofc, 0.78))
+  dc = ImageDraw.Draw(canvas)
+  lw = max(1, int(u(3.5)))
+  X, Y = cx + ox, by + oy
+  y0, y1 = top + oy, Y - gh
+  for f in (-0.5, -0.17, 0.17, 0.5):  # timber framing on the upper storey
+    x = X + f * ww * 0.94
+    dc.line([(x, y0 + u(3)), (x, y1)], fill=G["timber"], width=lw)
+  dc.line([(X - ww * 0.47, y1), (X - ww * 0.16, y0 + u(4))], fill=G["timber"], width=lw)
+  dc.line([(X + ww * 0.47, y1), (X + ww * 0.16, y0 + u(4))], fill=G["timber"], width=lw)
+  dc.line([(X - ww / 2 - jet, y1), (X + ww / 2 + jet, y1)], fill=G["timber"], width=int(u(6)))
+  for f in (-0.33, 0.33):
+    wx, wy = X + f * ww * 0.94, (y0 + y1) / 2
+    dc.rectangle([wx - u(8), wy - u(10), wx + u(8), wy + u(8)], fill=G["window"], outline=G["ink"], width=lw)
+  for _ in range(4):  # mortar ticks on the ground floor
+    mx, my = X + rng.uniform(-ww * 0.4, ww * 0.4), Y - rng.uniform(gh * 0.2, gh * 0.8)
+    dc.line([(mx - u(7), my), (mx + u(7), my)], fill=G["stone_dk"], width=max(1, int(u(2.5))))
+  dx = X + rng.uniform(-ww * 0.2, ww * 0.2)
+  dc.rounded_rectangle([dx - u(12), Y - u(38), dx + u(12), Y], int(u(11)), fill=G["timber"], outline=G["ink"], width=lw)
+  gx = dx + (ww * 0.27 if dx < X else -ww * 0.27)
+  dc.rectangle([gx - u(8), Y - gh * 0.72, gx + u(8), Y - gh * 0.72 + u(16)], fill=G["window"], outline=G["ink"], width=lw)
+
+
+def paint_wallblock(canvas, ax, ay, s, rng):
+  """One length of stone city wall with a merlon. Neighbours overlap into a
+  continuous rampart; shaded by a flat strip like the palisade stakes."""
+  w, h = s * 0.62, s
+  cx, by = PAD + w / 2, PAD + h
+  merl = h * 0.12
+  body = blank(w, h)
+  ImageDraw.Draw(body).polygon(wobble([(cx - w / 2, by), (cx - w / 2, by - h), (cx - w * 0.08, by - h),
+                                       (cx - w * 0.08, by - h + merl), (cx + w * 0.4, by - h + merl),
+                                       (cx + w * 0.4, by - h), (cx + w / 2, by - h), (cx + w / 2, by)],
+                                      rng, 0.8, sub=2), fill=255)
+  dark = blank(w, h)
+  ImageDraw.Draw(dark).rectangle([cx + w * 0.25, 0, cx + w, by], fill=255)
+  ox, oy = int(ax - cx), int(ay - by)
+  stamp(canvas, body, ox, oy, G["stone"])
+  canvas.paste(G["stone_dk"], (ox, oy, ox + body.size[0], oy + body.size[1]), ImageChops.multiply(dark, body))
+  dc = ImageDraw.Draw(canvas)
+  lw = max(1, int(u(2.5)))
+  for k, f in enumerate((0.3, 0.55, 0.8)):
+    y = ay - h * f
+    dc.line([(ax - w / 2 + u(3), y), (ax + w / 2 - u(3), y)], fill=G["stone_dk"], width=lw)
+    x = ax + (w * 0.15 if k % 2 else -w * 0.15)
+    dc.line([(x, y), (x, y + h * 0.25)], fill=G["stone_dk"], width=lw)
+
+
+def paint_tower(canvas, ax, ay, s, rng):
+  """Round stone wall tower with a slate cone and a Guild pennant."""
+  w, h = s * 0.8, s * 1.6
+  cx, by = PAD + w / 2, PAD + h
+  tw, body_h, cone = s * 0.46, s * 0.82, s * 0.5
+  ox, oy = ax - cx, ay - by
+  m = blank(w, h)
+  d = ImageDraw.Draw(m)
+  d.rectangle([cx - tw / 2, by - body_h, cx + tw / 2, by - u(8)], fill=255)
+  d.ellipse([cx - tw / 2, by - u(18), cx + tw / 2, by + u(2)], fill=255)
+  stamp(canvas, m, ox, oy, G["stone"], G["stone_dk"])
+  roof = blank(w, h)
+  ImageDraw.Draw(roof).polygon(wobble([(cx - tw / 2 - u(10), by - body_h + u(4)), (cx, by - body_h - cone),
+                                       (cx + tw / 2 + u(10), by - body_h + u(4))], rng, 1.5), fill=255)
+  stamp(canvas, roof, ox, oy, G["guild_roof"], G["guild_roof_dk"])
+  dc = ImageDraw.Draw(canvas)
+  lw = max(1, int(u(3)))
+  X, Y = cx + ox, by + oy
+  for f in (0.3, 0.58):
+    dc.arc([X - tw / 2, Y - body_h * f - u(10), X + tw / 2, Y - body_h * f + u(10)], 15, 165, fill=G["stone_dk"], width=lw)
+  dc.rounded_rectangle([X - u(5), Y - body_h * 0.82, X + u(5), Y - body_h * 0.82 + u(20)], int(u(4)), fill=G["ink"])
+  tip = Y - body_h - cone
+  dc.line([(X, tip), (X, tip - u(26))], fill=G["ink"], width=lw)
+  dc.polygon([(X, tip - u(26)), (X + u(22), tip - u(20)), (X, tip - u(13))], fill=G["banner"], outline=G["ink"])
+
+
 def paint_tent(canvas, ax, ay, s, rng):
   """Guild campaign tent: canvas A-frame, guild-colour stripes, pennant."""
   w, h = s * 1.1, s * 0.8
@@ -1258,7 +1368,8 @@ PAINTERS = {"tree": paint_tree, "pine": paint_pine, "bush": paint_bush,
             "column": paint_column, "crane": paint_crane, "logpile": paint_logpile,
             "haystack": paint_haystack, "windmill": paint_windmill, "statue": paint_statue,
             "gnarled": paint_gnarled, "briar": paint_briar, "flowers": paint_flowers,
-            "menhir": paint_menhir, "cart": paint_cart, "spears": paint_spears, "warbanner": paint_warbanner}
+            "menhir": paint_menhir, "cart": paint_cart, "spears": paint_spears, "warbanner": paint_warbanner,
+            "townhouse": paint_townhouse, "wallblock": paint_wallblock, "tower": paint_tower}
 
 
 # ---------------------------------------------------------------- tile
@@ -1347,11 +1458,11 @@ def frame(img, edges=(), cuts=()):
 
 # half-width of a painter's body (x size) for scatter collision, and its ground shadow width
 WIDE_BASE = ("hill", "ruinwall", "gnarled", "briar", "cart")
-BODY_HALF = {"gnarled": 0.5, "briar": 0.6, "cart": 0.6, "mountain": 0.7, "hill": 0.9, "ruinwall": 0.62, "crane": 0.45, "logpile": 0.35}
+BODY_HALF = {"gnarled": 0.5, "briar": 0.6, "cart": 0.6, "mountain": 0.7, "hill": 0.9, "ruinwall": 0.62, "crane": 0.45, "logpile": 0.35, "townhouse": 0.5}
 SHADOW_WIDTH = {"gnarled": 0.6, "briar": 0.62, "flowers": 0.3, "menhir": 0.22, "cart": 0.6, "spears": 0.25,
                 "warbanner": 0.15, "statue": 0.3, "mountain": 0.8, "stake": 0.3, "guildhall": 0.52, "windmill": 0.3, "hill": 0.85,
                 "rock": 0.55, "crane": 0.3, "reeds": 0.25, "ruinwall": 0.62, "column": 0.25,
-                "logpile": 0.45, "stump": 0.45}
+                "logpile": 0.45, "stump": 0.45, "townhouse": 0.55, "wallblock": 0.4, "tower": 0.35}
 
 
 def river_points(rng):
@@ -1812,6 +1923,30 @@ def draw_tile(region, seed, edges, density):
         continue
       post = ring[i - 1][1] or ring[(i + 1) % count][1]
       spots.append((p[0], p[1], "stake", u(rng.uniform(*G["stake_size"])) * (1.35 if post else 1)))
+
+  if region["wall"] == "stone":
+    # merloned blocks round the ring; a road leaves through a gate flanked by
+    # towers, and more towers break up the long stretches
+    phase = rng.uniform(0, 2 * math.pi)
+    count = int(2 * math.pi * town_r / u(G["rampart_spacing"]))
+    ring = []
+    for i in range(count):
+      a = 2 * math.pi * i / count
+      rr = town_r * (1 + 0.02 * math.sin(3 * a + phase))
+      p = (R / 2 + math.cos(a) * rr, R / 2 + math.sin(a) * rr)
+      gate = any(seg_dist(p, a0, b0) < half_path + u(24) for a0, b0 in segs)
+      ring.append((p, gate))
+    since = 0
+    for i, (p, gate) in enumerate(ring):
+      if gate:
+        since = 0
+        continue
+      since += 1
+      by_gate = ring[i - 1][1] or ring[(i + 1) % count][1]
+      if by_gate or since % int(G["tower_gap_count"]) == 0:
+        spots.append((p[0], p[1] + u(4), "tower", u(rng.uniform(*G["tower_size"]))))
+      else:
+        spots.append((p[0], p[1], "wallblock", u(rng.uniform(*G["rampart_size"]))))
 
   shadow = Image.new("L", (R, R), 0)
   ds = ImageDraw.Draw(shadow)

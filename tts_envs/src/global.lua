@@ -1232,6 +1232,13 @@ function spawnCopyFromBagFor(args)
                    replyTo(args), args.unique)
 end
 
+-- spawnFrom for an object script: {guid = the object to spawn above, spawn = a spawn table}.
+function spawnFromFor(args)
+  local obj = getObjectFromGUID(args.guid)
+  if obj == nil or obj.isDestroyed() then return end
+  spawnFrom(obj, args.spawn)
+end
+
 -- Same as above, but from the meeple bag: tokens live there, not with items.
 function spawnMeepleFromBagFor(args)
   spawnCopyFromBag(args.bag or spawnSourceBag("meeple"), args.name,

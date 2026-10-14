@@ -6,17 +6,18 @@ data/maptile.xlsx.
 
 THE PANEL
 
-  [ Draw ]            [ Draw specific ]
-  [ Deck: Random                      ]   left-click = next, right-click = back
-  [ Biome: Random                     ]   only the chosen deck's biomes
-  [ Pattern: Random                   ]
-  [ Orientation: Random               ]   only the chosen pattern's rotations
-  [ Density: Random                   ]
+  [ Draw ]  [ Draw specific ]  [ Spawn guildhall ]
+               [ Advanced ]                         toggles the grid below
+  [ Deck: Random     ]  [ Biome: Random       ]     left-click = next, right-click = back
+  [ Pattern: Random  ]  [ Orientation: Random ]     Biome / Orientation depend on the left one
+  [ Density: Random  ]
 
 Draw ignores the settings and rolls everything; Draw specific rolls only what
-is still Random. Every roll goes deck -> biome -> pattern -> orientation ->
-density, each from its pool in MAPTILE.weights, so a deck with more biomes is
-not drawn more often. Rolls are free: a tile can come up twice.
+is still Random. The guildhall is the starter tile: neither Draw offers it.
+Spawn guildhall rolls one from the guildhall:* pools in MAPTILE.weights. Every
+roll goes deck -> biome -> pattern -> orientation -> density, each from its
+pool in MAPTILE.weights, so a deck with more biomes is not drawn more often.
+Rolls are free: a tile can come up twice.
 
 A DRAWN TILE
 
@@ -28,11 +29,15 @@ Template), stamped with:
   GMNotes      the biome id -- the key everything else reads
   memo         "d=<density>|explore=<left>|rendered=<0/1>"
   images       front = the rolled image, back = its deck's back
-  tag          MapTile
+  tags         MapTile, Region:<deck>, Biome:<biome>  (ids: Region:settlement, Biome:city)
 
 Its buttons belong to THIS script (function_owner = self), so a tile only
 works while the manager is on the table. TTS does not save buttons, so onLoad
 re-renders every MapTile from its GMNotes + memo.
+
+Render hands the biome's maptile_table spawn table to Global's spawnFrom, so
+landmarks, items and gold come out of the same bags as every other spawn and
+drop onto the tile's centre.
 ]]
 
 --[[ BEGIN GENERATED MAPTILE DATA -- do not edit ]]
@@ -48,19 +53,26 @@ MAX_REROLLS = 40
 
 PATTERN_NAMES = {deadend = "Dead End", corner = "Corner", straight = "Straight", tee = "Tee", cross = "Cross"}
 
---[[ Manager panel, object-local units x the bag's scale; +z is the bag's
-front. Same SHARPNESS trick as the importers: big font, small scale. ]]
+--[[ Manager panel in WORLD units from the bag's centre, along its own axes;
++z is the bag's front. Buttons inherit the object's scale, and this bag is
+scaled unevenly, so addButton divides it back out per axis: text stays
+unstretched and positions stay put whatever the bag's scale. Same SHARPNESS
+trick as the importers: big font, small scale. ]]
 PANEL = {
   SHARPNESS = 4,
-  TOP_Z = 2.2,          -- Draw / Draw specific row
-  TOP_X = {-1.9, 1.9},
-  ROW_START_Z = 3.1,    -- first config row
-  ROW_STEP = 0.8,
-  LIFT = 0.25,
-  BTN_W = 900, BTN_H = 330, BTN_FONT = 160,
-  WIDE_W = 1900,
-  BTN_SCALE = 0.75,
+  LIFT = 0.1,           -- above the bag's base, so buttons sit on the table
+  TOP_Z = 3.2,          -- Draw / Draw specific / Spawn guildhall
+  TOP_X = {-5.6, 0, 5.6},
+  ADVANCED_Z = 4.6,
+  GRID_Z = 6.0,         -- first config row
+  GRID_X = {-3.9, 3.9},
+  ROW_STEP = 1.4,
+  BTN_W = 2400, BTN_H = 540, BTN_FONT = 260,
+  CONFIG_W = 3600,
+  BTN_SCALE = 1,
   DRAW_COLOR = {0.25, 0.45, 0.3},
+  ADVANCED_COLOR = {0.25, 0.25, 0.25},
+  GUILDHALL_COLOR = {0.5, 0.36, 0.18},
   CONFIG_COLOR = {0.3, 0.34, 0.5},
   LOCKED_COLOR = {0.32, 0.32, 0.32},
   TEXT_COLOR = {1, 1, 1},
@@ -75,7 +87,12 @@ TILE_UI = {
   LIFT = 0.25,
   EXPLORE_POS = {0, 0, 0.62},
   RENDER_POS = {0, 0, -0.62},
+  HELP_POS = {0.62, 0, -0.62},
   BTN_W = 520, BTN_H = 160, BTN_FONT = 95, BTN_SCALE = 0.5,
+  HELP_W = 160,
+  HELP_COLOR = {0.9, 0.87, 0.78},
+  HELP_ON_TEXT = {0, 0, 0},
+  HELP_OFF_TEXT = {0.55, 0.55, 0.55},
   EXPLORE_COLOR = {0.2, 0.42, 0.5},
   EMPTY_COLOR = {0.35, 0.35, 0.35},
   RENDER_COLOR = {0.55, 0.38, 0.2},
@@ -87,7 +104,8 @@ CONFIG_TITLES = {deck = "Deck", biome = "Biome", pattern = "Pattern", orientatio
                  density = "Density"}
 
 SETTINGS = {deck = RANDOM, biome = RANDOM, pattern = RANDOM, orientation = RANDOM, density = RANDOM}
-local configButton = {}   -- key -> button index on self
+ADVANCED = false          -- config grid shown; saved
+local configButton = {}   -- key -> button index on self; empty while the grid is hidden
 local templateData = nil  -- cached getData() of the template; refreshed each load
 local renderTile          -- defined with the tile buttons; spawning needs it first
 
@@ -195,31 +213,76 @@ CYCLE_FN = {deck = "cycleDeck", biome = "cycleBiome", pattern = "cyclePattern",
 
 -- ---------------------------------------------------------------- panel
 
+--[[ x/z are world units along the bag's axes. Dividing by the bag's scale per
+axis undoes what createButton multiplies in, so a 3.7 x 4.9 x 2.2 bag still
+gets square text. y is measured from the bag's base, not its centre, because a
+tall bag would otherwise float the panel in mid-air. Assumes the bag stands
+upright. ]]
 local function addButton(fn, label, tooltip, x, z, width, color)
-  local f, w, h, sc = sharp(PANEL.BTN_FONT, width, PANEL.BTN_H, PANEL.BTN_SCALE, PANEL.SHARPNESS)
+  local k = PANEL.SHARPNESS
+  local sc = self.getScale()
+  local pos = self.getPosition()
+  local b = self.getBounds()
+  local baseY = b.center.y - b.size.y / 2
+  local s = PANEL.BTN_SCALE / k
   self.createButton({
     click_function = fn, function_owner = self, label = label, tooltip = tooltip,
-    position = {x, PANEL.LIFT, z}, rotation = {0, 0, 0}, scale = sc,
-    width = w, height = h, font_size = f, color = color, font_color = PANEL.TEXT_COLOR
+    position = {x / sc.x, (baseY + PANEL.LIFT - pos.y) / sc.y, z / sc.z}, rotation = {0, 0, 0},
+    scale = {s / sc.x, s / sc.y, s / sc.z},
+    width = width * k, height = PANEL.BTN_H * k, font_size = PANEL.BTN_FONT * k,
+    color = color, font_color = PANEL.TEXT_COLOR
   })
   return #self.getButtons() - 1
 end
 
+-- Advanced shows / hides the config grid by rebuilding: TTS shifts every later
+-- index on removeButton, so a full rebuild is simpler than tracking them.
 local function buildPanel()
   self.clearButtons()
+  configButton = {}
   addButton("drawRandom", "Draw", "Draw a fully random map tile", PANEL.TOP_X[1], PANEL.TOP_Z,
             PANEL.BTN_W, PANEL.DRAW_COLOR)
-  addButton("drawSpecific", "Draw specific", "Draw a tile using the settings below (Random = roll it)",
+  addButton("drawSpecific", "Draw specific", "Draw a tile using the Advanced settings (Random = roll it)",
             PANEL.TOP_X[2], PANEL.TOP_Z, PANEL.BTN_W, PANEL.DRAW_COLOR)
-  for i, key in ipairs(CONFIG_KEYS) do
-    configButton[key] = addButton(CYCLE_FN[key], "", "Left-click: next   Right-click: back",
-                                  0, PANEL.ROW_START_Z + (i - 1) * PANEL.ROW_STEP, PANEL.WIDE_W,
-                                  PANEL.CONFIG_COLOR)
+  addButton("spawnGuildhall", "Spawn guildhall", "Spawn the starter tile (random guildhall image)",
+            PANEL.TOP_X[3], PANEL.TOP_Z, PANEL.BTN_W, PANEL.GUILDHALL_COLOR)
+  addButton("toggleAdvanced", ADVANCED and "Advanced  -" or "Advanced  +", "Show / hide the Draw specific settings",
+            0, PANEL.ADVANCED_Z, PANEL.BTN_W, PANEL.ADVANCED_COLOR)
+  if ADVANCED then
+    for i, key in ipairs(CONFIG_KEYS) do
+      local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+      configButton[key] = addButton(CYCLE_FN[key], "", "Left-click: next   Right-click: back",
+                                    PANEL.GRID_X[col + 1], PANEL.GRID_Z + row * PANEL.ROW_STEP,
+                                    PANEL.CONFIG_W, PANEL.CONFIG_COLOR)
+    end
+    refreshConfigLabels()
   end
-  refreshConfigLabels()
+end
+
+function toggleAdvanced()
+  ADVANCED = not ADVANCED
+  buildPanel()
 end
 
 -- ---------------------------------------------------------------- rolling
+
+--[[ A biome on the tiers sheet rolls a tier (weights tier:<biome>). The tier
+is never stored or shown: it swaps the biome for its gmnotes biome (a drawn
+city becomes settlement / town / city) and picks the TILESET whose images the
+tile uses (today each tier has its own: settlement, town, city). Any other biome
+is its own tileset. The image key is always tileset|pattern|orientation|density. ]]
+local function finish(t)
+  local tiers = MAPTILE.tiers[t.biome]
+  if tiers ~= nil then
+    local tier = tiers[pick(MAPTILE.weights["tier:" .. t.biome])]
+    t.biome = tier.gmnotes
+    t.tileset = tier.tileset
+  else
+    t.tileset = t.biome
+  end
+  t.key = table.concat({t.tileset, t.pattern, t.orientation, t.density}, "|")
+  return t
+end
 
 --[[ Fill every Random in spec from the weight pools, in dependency order. ]]
 local function roll(spec)
@@ -230,15 +293,27 @@ local function roll(spec)
   t.pattern = spec.pattern ~= RANDOM and spec.pattern or pick(w.pattern)
   t.orientation = spec.orientation ~= RANDOM and spec.orientation or pick(w["orientation:" .. t.pattern])
   t.density = spec.density ~= RANDOM and spec.density or pick(w.density)
-  t.key = table.concat({t.biome, t.pattern, t.orientation, t.density}, "|")
-  return t
+  return finish(t)
 end
 
+--[[ The starter tile. A pattern with no guildhall:orientation:<pattern> pool
+falls back to the ordinary orientation:<pattern> one. ]]
+local function rollGuildhall()
+  local w = MAPTILE.weights
+  local t = {biome = MAPTILE.guildhall}
+  t.deck = MAPTILE.biomes[t.biome].deck
+  t.pattern = pick(w["guildhall:pattern"])
+  t.orientation = pick(w["guildhall:orientation:" .. t.pattern] or w["orientation:" .. t.pattern])
+  t.density = pick(w["guildhall:density"])
+  return finish(t)
+end
+
+-- Every setting chosen AND nothing left to roll (a tiered biome still rolls its tier).
 local function fullySpecified(spec)
   for _, key in ipairs(CONFIG_KEYS) do
     if spec[key] == RANDOM then return false end
   end
-  return true
+  return MAPTILE.tiers[spec.biome] == nil
 end
 
 -- ---------------------------------------------------------------- spawning
@@ -292,10 +367,11 @@ local function spawnTile(t, url)
     data.GMNotes = t.biome
     data.Memo = encodeMemo({d = t.density, explore = MAPTILE.explore[t.density] or 0, rendered = 0})
     data.LuaScript = ""
+    data.Tooltip = false  -- the tile's "?" button turns hover name + description on
     data.CustomImage = data.CustomImage or {}
     data.CustomImage.ImageURL = url
     if deck and deck.back ~= "" then data.CustomImage.ImageSecondaryURL = deck.back end
-    local tags = {TILE_TAG}
+    local tags = {TILE_TAG, "Region:" .. t.deck, "Biome:" .. t.biome}
     for _, tag in ipairs(data.Tags or {}) do
       if tag ~= TEMPLATE_TAG and tag ~= TILE_TAG then table.insert(tags, tag) end
     end
@@ -309,19 +385,21 @@ local function spawnTile(t, url)
   end)
 end
 
-local function draw(spec, who)
+--[[ Roll until a tile with an image URL comes up. `exact` = the roll cannot
+change, so one miss is final. ]]
+local function drawWith(rollFn, exact, who)
   if #MAPTILE.decks == 0 then
     broadcastToAll("Maptile Manager: no tile data -- run tools/sync_maptile_manager.py and push.", {1, 0.3, 0.3})
     return
   end
-  for _ = 1, (fullySpecified(spec) and 1 or MAX_REROLLS) do
-    local t = roll(spec)
+  for _ = 1, (exact and 1 or MAX_REROLLS) do
+    local t = rollFn()
     local url = MAPTILE.images[t.key]
     if url ~= nil then
       spawnTile(t, url)
       return
     end
-    if fullySpecified(spec) then
+    if exact then
       broadcastToColor("No image URL for " .. t.key .. " -- fill it in data/maptile.xlsx and sync.",
                        who, {1, 0.6, 0.3})
       return
@@ -329,6 +407,10 @@ local function draw(spec, who)
   end
   broadcastToColor("No drawable tile matches these settings yet (missing URLs in data/maptile.xlsx).",
                    who, {1, 0.6, 0.3})
+end
+
+local function draw(spec, who)
+  drawWith(function() return roll(spec) end, fullySpecified(spec), who)
 end
 
 function drawRandom(_, color)
@@ -339,14 +421,19 @@ function drawSpecific(_, color)
   draw(SETTINGS, color)
 end
 
+function spawnGuildhall(_, color)
+  drawWith(rollGuildhall, false, color)
+end
+
 -- ---------------------------------------------------------------- tile buttons
 
-local function tileButton(obj, fn, label, tooltip, pos, color)
-  local f, w, h, sc = sharp(TILE_UI.BTN_FONT, TILE_UI.BTN_W, TILE_UI.BTN_H, TILE_UI.BTN_SCALE, TILE_UI.SHARPNESS)
+local function tileButton(obj, fn, label, tooltip, pos, color, width, textColor)
+  local f, w, h, sc = sharp(TILE_UI.BTN_FONT, width or TILE_UI.BTN_W, TILE_UI.BTN_H, TILE_UI.BTN_SCALE,
+                            TILE_UI.SHARPNESS)
   obj.createButton({
     click_function = fn, function_owner = self, label = label, tooltip = tooltip,
     position = {pos[1], TILE_UI.LIFT, pos[3]}, rotation = {0, 0, 0}, scale = sc,
-    width = w, height = h, font_size = f, color = color, font_color = TILE_UI.TEXT_COLOR
+    width = w, height = h, font_size = f, color = color, font_color = textColor or TILE_UI.TEXT_COLOR
   })
 end
 
@@ -362,6 +449,9 @@ renderTile = function(obj)
     tileButton(obj, "tileRender", "Render", "Spawn what this tile holds (once)", TILE_UI.RENDER_POS,
                TILE_UI.RENDER_COLOR)
   end
+  tileButton(obj, "tileHelp", "?", "Toggle show-effects; hover over the tile to see its effects.",
+             TILE_UI.HELP_POS, TILE_UI.HELP_COLOR, TILE_UI.HELP_W,
+             obj.tooltip and TILE_UI.HELP_ON_TEXT or TILE_UI.HELP_OFF_TEXT)
 end
 
 -- TODO(plans/auto_TODO.md "Maptile Explore action"): the exploration itself.
@@ -370,16 +460,15 @@ local function exploreEffect(obj, color, left)
                  {0.7, 0.9, 1})
 end
 
--- TODO(plans/auto_TODO.md "Maptile Render table"): spawn what maptile_table lists.
-local function renderEffect(obj, color)
-  local row = MAPTILE.table[obj.getGMNotes()] or {}
-  local parts = {}
-  for k, v in pairs(row) do
-    if v ~= "" then table.insert(parts, k .. "=" .. v) end
+--[[ Global owns the spawn pipeline (bags, unique takes, gold). Global.call
+passes one table, and the tile goes by GUID because spawnFrom needs the object. ]]
+local function renderEffect(obj)
+  local spawn = MAPTILE.table[obj.getGMNotes()]
+  if spawn == nil then
+    printToAll(obj.getName() .. ": nothing to render.", {0.8, 0.8, 0.8})
+    return
   end
-  table.sort(parts)
-  printToAll("Render " .. obj.getName() .. ": " .. (#parts > 0 and table.concat(parts, ", ") or "(nothing listed)"),
-             {1, 0.85, 0.5})
+  Global.call("spawnFromFor", {guid = obj.getGUID(), spawn = spawn})
 end
 
 function tileExplore(obj, color)
@@ -394,19 +483,27 @@ function tileExplore(obj, color)
   exploreEffect(obj, color, m.explore)
 end
 
-function tileRender(obj, color)
+-- obj.tooltip is saved with the object, so the state needs no memo field.
+function tileHelp(obj)
+  obj.tooltip = not obj.tooltip
+  renderTile(obj)
+end
+
+function tileRender(obj)
   local m = parseMemo(obj.memo)
   if m.rendered ~= 0 then return end
   m.rendered = 1
   obj.memo = encodeMemo(m)
   renderTile(obj)
-  renderEffect(obj, color)
+  renderEffect(obj)
 end
 
 -- ---------------------------------------------------------------- lifecycle
 
 function onSave()
-  return JSON.encode(SETTINGS)
+  local state = copy(SETTINGS)
+  state.advanced = ADVANCED and "1" or "0"
+  return JSON.encode(state)
 end
 
 function onLoad(state)
@@ -415,6 +512,7 @@ function onLoad(state)
     for _, key in ipairs(CONFIG_KEYS) do
       if saved and saved[key] ~= nil then SETTINGS[key] = tostring(saved[key]) end
     end
+    ADVANCED = saved ~= nil and saved.advanced == "1"
   end
   -- a saved value the data no longer has falls back to Random
   for _, key in ipairs(CONFIG_KEYS) do

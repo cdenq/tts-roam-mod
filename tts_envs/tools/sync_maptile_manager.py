@@ -7,10 +7,21 @@ Sheets read (tools/scaffold_maptile_xlsx.py creates and tops them up):
 
   <deck> x5            biome, pattern, orientation, density, image, file, url
   backs                deck, name, image, file, url
-  biome_descriptions   biome, deck, name, description
-  maptile_table        gmnotes, <whatever Render will need>
+  biome_descriptions   biome, deck, name, effect, flavor  -> [effect], blank line, "flavor"
+  maptile_table        gmnotes + spawn cells (spawnN, spawnmeepleN, spawngold)
   density              density, explorations
   weights              param, pool        ("a|b|b": b is twice as likely)
+  tiers                biome, tier, gmnotes, tileset
+
+A biome on the tiers sheet rolls a tier (weights tier:<biome>) after it is
+drawn. The tier is never shown: it only picks GMNOTES -- the biome the tile
+becomes (settlement / town / city), with its own description and render row --
+and the TILESET whose images it uses. A gmnotes biome reached only through a
+tier is never drawn on its own; a tileset that is not a biome (none today) has
+image rows and nothing else.
+
+The guildhall is the starter tile: it is never drawn, only spawned by its own
+button, so it is left out of every biome pool and rolls from guildhall:* pools.
 
 Only images WITH a url reach the game; the rest are counted and reported, so
 the manager works while the upload is still in progress. A Google Drive
@@ -22,13 +33,14 @@ import io, os, re, sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from datasets import ROOT, MAPTILES, load, read_rows
-from spawn_cells import staged_path
+from datasets import ROOT, MAPTILES, load, read_rows, item_names, token_names
+from spawn_cells import staged_path, read_spawn, referenced_names
 
 MANAGER_GUID = "b77050"
 SRC = os.path.join(ROOT, "src", "maptile_manager.lua")
 BEGIN = "--[[ BEGIN GENERATED MAPTILE DATA -- do not edit ]]"
 END = "--[[ END GENERATED MAPTILE DATA ]]"
+GUILDHALL = "guildhall"
 DRIVE_PAGE = re.compile(r"https?://drive\.google\.com/(?:file/d/([\w-]+)|open\?id=([\w-]+))")
 
 
@@ -43,6 +55,25 @@ def lua_str(s):
 
 def lua_list(items):
   return "{" + ", ".join(lua_str(i) for i in items) + "}"
+
+
+def lua_spawn(spawn):
+  """A read_spawn() table in the shape global.lua's rollSpawn() expects."""
+  parts = ["%s = {%s}" % (k, ", ".join(lua_list(slot) for slot in spawn[k]))
+           for k in ("items", "status", "meeple") if k in spawn]
+  if "gold" in spawn:
+    parts.append("gold = {%d, %d}" % spawn["gold"])
+  return "{" + ", ".join(parts) + "}"
+
+
+def describe(effect, flavor):
+  """The tile description: '[effect]', a blank line, then the quoted flavor."""
+  parts = []
+  if effect:
+    parts.append("[%s]" % effect)
+  if flavor:
+    parts.append('"%s"' % flavor)
+  return "\n\n".join(parts)
 
 
 def direct_url(url, where):
@@ -77,10 +108,41 @@ def main():
     if r.get("deck") not in deck_ids:
       sys.exit("%s: deck %r is not on the backs sheet" % (r["_where"], r.get("deck")))
     biomes[r["biome"]] = {"deck": r["deck"], "name": r.get("name") or r["biome"].title(),
-                          "description": r.get("description", "")}
-    deck_ids[r["deck"]]["biomes"].append(r["biome"])
+                          "description": describe(r.get("effect", ""), r.get("flavor", ""))}
+    if r["biome"] != GUILDHALL:  # the cycling list Draw specific offers
+      deck_ids[r["deck"]]["biomes"].append(r["biome"])
+  if GUILDHALL not in biomes:
+    sys.exit("biome_descriptions has no %r row -- the Spawn guildhall button needs it" % GUILDHALL)
+  blank = sorted(b for b, v in biomes.items() if not v["description"])
+  if blank:
+    warn("%d biomes have no effect or flavor: %s" % (len(blank), ", ".join(blank)))
+
+  # tiers: biome -> tier -> {gmnotes, tileset}
+  tiers, tilesets, tier_only = {}, {}, set()
+  for r in read_rows(MAPTILES, "tiers", "biome", wb):
+    where = r["_where"]
+    if r["biome"] not in biomes:
+      sys.exit("%s: biome %r is not on biome_descriptions" % (where, r["biome"]))
+    if not (r.get("tier") and r.get("gmnotes") and r.get("tileset")):
+      sys.exit("%s: needs a tier, gmnotes and tileset" % where)
+    if r["tier"] in tiers.get(r["biome"], {}):
+      sys.exit("%s: %s tier %s is listed twice" % (where, r["biome"], r["tier"]))
+    deck = biomes[r["biome"]]["deck"]
+    if biomes.get(r["gmnotes"], {}).get("deck") != deck:
+      sys.exit("%s: gmnotes %r needs a %s row on biome_descriptions (its description and render row)"
+               % (where, r["gmnotes"], deck))
+    tiers.setdefault(r["biome"], {})[r["tier"]] = {"gmnotes": r["gmnotes"], "tileset": r["tileset"]}
+    if r["gmnotes"] != r["biome"]:
+      tier_only.add(r["gmnotes"])
+    if r["tileset"] not in biomes:
+      tilesets[r["tileset"]] = deck
+  tier_only -= set(tiers)
+  for d in decks:  # reached only through a tier: Draw specific cannot pick it either
+    d["biomes"] = [b for b in d["biomes"] if b not in tier_only]
 
   images, patterns, orientations, densities = {}, [], {}, set()
+  drawn = set()  # every tileset with at least one image
+  guildhall_patterns, guildhall_densities = [], set()
   total = missing = 0
   for d in decks:
     if d["id"] not in wb.sheetnames:
@@ -88,8 +150,10 @@ def main():
     for r in read_rows(MAPTILES, d["id"], "image", wb):
       where = r["_where"]
       biome, pattern, orient, dens = r.get("biome"), r.get("pattern"), r.get("orientation"), r.get("density")
-      if biomes.get(biome, {}).get("deck") != d["id"]:
-        sys.exit("%s: biome %r is not a %s biome on biome_descriptions" % (where, biome, d["id"]))
+      if biomes.get(biome, {}).get("deck", tilesets.get(biome)) != d["id"]:
+        sys.exit("%s: biome %r is not a %s biome on biome_descriptions or a tileset on tiers"
+                 % (where, biome, d["id"]))
+      drawn.add(biome)
       if not (pattern and orient and dens):
         sys.exit("%s: needs pattern, orientation and density" % where)
       if pattern not in patterns:
@@ -97,6 +161,10 @@ def main():
       if orient not in orientations.setdefault(pattern, []):
         orientations[pattern].append(orient)
       densities.add(dens)
+      if biome == GUILDHALL:
+        if pattern not in guildhall_patterns:
+          guildhall_patterns.append(pattern)
+        guildhall_densities.add(dens)
       total += 1
       url, conv = direct_url(r.get("url", ""), where)
       converted += conv
@@ -105,6 +173,11 @@ def main():
         continue
       images["|".join((biome, pattern, orient, dens))] = url
   densities = sorted(densities, key=int)
+  for b, by_tier in tiers.items():
+    for tier, v in by_tier.items():
+      if v["tileset"] not in drawn:
+        warn("%s tier %s uses tileset %r, which has no images yet -- that tier cannot be drawn"
+             % (b, tier, v["tileset"]))
 
   explore = {}
   for r in read_rows(MAPTILES, "density", "density", wb):
@@ -120,29 +193,53 @@ def main():
   allowed = {"deck": [d["id"] for d in decks], "pattern": patterns, "density": densities}
   allowed.update({"biome:" + d["id"]: d["biomes"] for d in decks})
   allowed.update({"orientation:" + p: o for p, o in orientations.items()})
+  allowed["guildhall:pattern"] = guildhall_patterns
+  allowed["guildhall:density"] = sorted(guildhall_densities, key=int)
+  # optional: a pattern without its own guildhall rotation pool uses orientation:<pattern>
+  optional = {"guildhall:orientation:" + p for p in guildhall_patterns}
+  allowed.update({"guildhall:orientation:" + p: orientations[p] for p in guildhall_patterns})
+  allowed.update({"tier:" + b: sorted(t, key=int) for b, t in tiers.items()})
   weights = {}
   for r in read_rows(MAPTILES, "weights", "param", wb):
     if r["param"] not in allowed:
       sys.exit("%s: unknown param %r (use: %s)" % (r["_where"], r["param"], ", ".join(allowed)))
     pool = [v.strip() for v in r.get("pool", "").split("|") if v.strip()]
+    if r["param"].startswith("biome:") and GUILDHALL in pool:
+      sys.exit("%s: %s is the starter tile, spawned by its own button -- take it out of %s"
+               % (r["_where"], GUILDHALL, r["param"]))
+    tiered = set(pool) & (set(tilesets) | tier_only)
+    if r["param"].startswith("biome:") and tiered:
+      sys.exit("%s: %s is only reached through a tier (tiers sheet) -- take it out of %s"
+               % (r["_where"], ", ".join(sorted(tiered)), r["param"]))
     bad = [v for v in pool if v not in allowed[r["param"]]]
     if bad or not pool:
       sys.exit("%s: pool %r has %s (allowed: %s)" % (r["_where"], r.get("pool", ""),
                "unknown " + ", ".join(bad) if bad else "nothing in it", "|".join(allowed[r["param"]])))
     weights[r["param"]] = pool
   for param, values in allowed.items():
-    if param not in weights:
+    if param not in weights and param not in optional:
       warn("weights sheet has no %r row -- rolling it evenly" % param)
       weights[param] = list(values)
 
+  # maptile_table: what Render spawns, in the shared spawn-cell grammar
+  items, meeples = item_names(), token_names()
   table = {}
   for r in read_rows(MAPTILES, "maptile_table", "gmnotes", wb):
     if r["gmnotes"] not in biomes:
       warn("%s: gmnotes %r is not a biome -- no tile will ever read it" % (r["_where"], r["gmnotes"]))
-    table[r["gmnotes"]] = {k: v for k, v in r.items() if not k.startswith("_") and k != "gmnotes"}
+    for ref in referenced_names(r, keys=("items",)):
+      if ref not in items:
+        sys.exit("%s: %r is not an item in tiles.xlsx" % (r["_where"], ref))
+    for ref in referenced_names(r, keys=("meeple",)):
+      if ref not in meeples:
+        sys.exit("%s: %r is not a token or landmark in tokens.xlsx" % (r["_where"], ref))
+    spawn = read_spawn(r)
+    if spawn:
+      table[r["gmnotes"]] = spawn
 
   # ---- Lua
-  L = [BEGIN, "-- GENERATED by tools/sync_maptile_manager.py from data/maptile.xlsx", "MAPTILE = {", "  decks = {"]
+  L = [BEGIN, "-- GENERATED by tools/sync_maptile_manager.py from data/maptile.xlsx", "MAPTILE = {",
+       "  guildhall = %s," % lua_str(GUILDHALL), "  decks = {"]
   for d in decks:
     L.append("    {id = %s, name = %s, back = %s, biomes = %s}," % (
       lua_str(d["id"]), lua_str(d["name"]), lua_str(d["back"]), lua_list(d["biomes"])))
@@ -151,6 +248,12 @@ def main():
   for b, v in biomes.items():
     L.append("    [%s] = {deck = %s, name = %s, description = %s}," % (
       lua_str(b), lua_str(v["deck"]), lua_str(v["name"]), lua_str(v["description"])))
+  L.append("  },")
+  L.append("  tiers = {")
+  for b, by_tier in tiers.items():
+    L.append("    [%s] = {%s}," % (lua_str(b), ", ".join(
+      "[%s] = {gmnotes = %s, tileset = %s}" % (lua_str(t), lua_str(v["gmnotes"]), lua_str(v["tileset"]))
+      for t, v in by_tier.items())))
   L.append("  },")
   L.append("  patterns = %s," % lua_list(patterns))
   L.append("  orientations = {%s}," % ", ".join("[%s] = %s" % (lua_str(p), lua_list(o))
@@ -163,8 +266,7 @@ def main():
   L.append("  },")
   L.append("  table = {")
   for gm, row in table.items():
-    L.append("    [%s] = {%s}," % (lua_str(gm), ", ".join("[%s] = %s" % (lua_str(k), lua_str(v))
-                                                         for k, v in row.items())))
+    L.append("    [%s] = %s," % (lua_str(gm), lua_spawn(row)))
   L.append("  },")
   L.append("  images = {")
   for key, url in images.items():
@@ -182,9 +284,9 @@ def main():
   out = staged_path(MANAGER_GUID)
   with io.open(out, "w", encoding="utf-8", newline="\n") as f:
     f.write(script)
-  print("wrote %s (%d bytes): %d decks, %d biomes, %d/%d images have a url"
+  print("wrote %s (%d bytes): %d decks, %d biomes, %d/%d images have a url, %d biomes render something"
         % (os.path.relpath(out, os.path.dirname(ROOT)), len(script), len(decks), len(biomes),
-           total - missing, total))
+           total - missing, total, len(table)))
   if missing:
     warn("%d images have no url yet -- they cannot be drawn until data/maptile.xlsx has them" % missing)
   if converted:

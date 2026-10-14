@@ -9,10 +9,17 @@ biomes, patterns or densities in asset_variables.csv just add rows.
   sheet                 one row per                       key
   settlement .. scarred map image of that deck            biome > pattern > orientation > density
   backs                 deck back image                   deck
-  biome_descriptions    biome                             biome (= tile GMNotes)
+  biome_descriptions    biome: effect + flavor            biome (= tile GMNotes)
   maptile_table         biome: what Render spawns         gmnotes
+  exploration           biome: what Explore rolls (draft) biome
   density               density stage                     density -> explorations
   weights               draw roll                         param -> pool ("a|b|b" = b twice as likely)
+  tiers                 tier of a tiered biome            biome + tier -> gmnotes, tileset (hand-filled)
+
+A tileset named on the tiers sheet that is not a biome (none today) keeps its
+deck-sheet image rows but gets no biome_descriptions / maptile_table /
+exploration row. A tier's gmnotes (settlement, town) gets those rows but stays
+out of the biome pools: it is only reached through the tier roll.
 
 Rows the generator no longer describes are reported, never deleted.
 Within each biome, deck-sheet rows are in FILE-NAME order (as a file browser
@@ -36,11 +43,14 @@ except ImportError:
 DECK_COLUMNS = ["biome", "pattern", "orientation", "density", "image", "file", "url"]
 SHEETS = {
   "backs": ["deck", "name", "image", "file", "url"],
-  "biome_descriptions": ["biome", "deck", "name", "description"],
-  # placeholder headers -- see plans/auto_TODO.md "Maptile Render table"
+  "biome_descriptions": ["biome", "deck", "name", "effect", "flavor"],
+  # spawn-cell grammar (tools/spawn_cells.py); any spawnN / spawnmeepleN column may be added
   "maptile_table": ["gmnotes", "spawnmeeple1", "spawnmeeple2", "spawn1", "spawn2", "spawngold", "notes"],
+  # draft -- see plans/auto_TODO.md "Explore action"; no sync reads it yet
+  "exploration": ["biome", "spawn1", "spawn2", "spawn3", "spawnmeeple1", "spawngold", "notes"],
   "density": ["density", "explorations", "notes"],
   "weights": ["param", "pool", "notes"],
+  "tiers": ["biome", "tier", "gmnotes", "tileset", "notes"],
 }
 # Display names that .title() would get wrong.
 BIOME_NAMES = {
@@ -50,7 +60,8 @@ BIOME_NAMES = {
 }
 HEADER_FONT = Font(bold=True, color="FFFFFF")
 HEADER_FILL = PatternFill("solid", fgColor="3B2B20")
-WIDTHS = {"url": 60, "description": 60, "file": 42, "image": 30, "pool": 70, "notes": 50}
+GUILDHALL = "guildhall"  # starter tile: kept out of the Draw pools, rolled from guildhall:* instead
+WIDTHS = {"url": 60, "effect": 45, "flavor": 90, "file": 42, "image": 30, "pool": 70, "notes": 50}
 
 
 def sheet(wb, title, headers):
@@ -111,6 +122,19 @@ def main():
 
   report = []
   deck_of = {r["name"]: r["deck"] for r in regions}
+  sheet(wb, "tiers", SHEETS["tiers"])
+  tiers = {}  # biome -> [tier]
+  gmnotes, tileset_names = {}, set()  # tier gmnotes -> deck; every tileset a tier names
+  for row in wb["tiers"].iter_rows(min_row=2, values_only=True):
+    if row[0] and row[1] is not None:
+      tiers.setdefault(row[0], []).append(str(row[1]))
+      if row[2]:
+        gmnotes[row[2]] = deck_of.get(row[0], "")
+      if row[3]:
+        tileset_names.add(row[3])
+  tier_only = set(gmnotes) - set(tiers)  # settlement, town: never in a biome pool
+  biomes = [r for r in regions if r["name"] not in tileset_names - set(gmnotes) - set(tiers)]
+  biomes += [{"name": g, "deck": d} for g, d in gmnotes.items() if g not in deck_of]
   for did in decks:
     ws = sheet(wb, did, DECK_COLUMNS)
     rows = [{"biome": t["region"], "pattern": t["pattern"], "orientation": t["edges"].replace("|", ""),
@@ -126,23 +150,34 @@ def main():
                  [{"deck": d["id"], "name": d["name"], "image": "%s_back" % d["id"],
                    "file": "backs/%s_back.png" % d["id"], "url": ""} for d in decks.values()]))
   report.append(("biome_descriptions", sheet(wb, "biome_descriptions", SHEETS["biome_descriptions"]), "biome",
-                 [{"biome": r["name"], "deck": r["deck"], "name": BIOME_NAMES.get(r["name"], r["name"].title()),
-                   "description": ""} for r in regions]))
+                 [{"biome": r["name"], "deck": r["deck"], "name": BIOME_NAMES.get(r["name"], r["name"].title())}
+                  for r in biomes]))
   report.append(("maptile_table", sheet(wb, "maptile_table", SHEETS["maptile_table"]), "gmnotes",
-                 [{"gmnotes": r["name"]} for r in regions]))
+                 [{"gmnotes": r["name"]} for r in biomes]))
+  report.append(("exploration", sheet(wb, "exploration", SHEETS["exploration"]), "biome",
+                 [{"biome": r["name"]} for r in biomes]))
   densities = sorted({d for r in regions for d in r["densities"]})
   report.append(("density", sheet(wb, "density", SHEETS["density"]), "density",
                  [{"density": d, "explorations": d, "notes": "placeholder: explorations = density"}
                   for d in densities]))
   patterns = list(dict.fromkeys(p for r in regions for p in r["patterns"]))
   pools = [{"param": "deck", "pool": "|".join(decks), "notes": "repeat an entry to make it likelier"}]
-  pools += [{"param": "biome:%s" % d, "pool": "|".join(r["name"] for r in regions if r["deck"] == d)}
+  pools += [{"param": "biome:%s" % d,
+             "pool": "|".join(r["name"] for r in biomes
+                              if r["deck"] == d and r["name"] != GUILDHALL and r["name"] not in tier_only)}
             for d in decks]
   pools.append({"param": "pattern", "pool": "|".join(patterns)})
   pools += [{"param": "orientation:%s" % p, "pool": "|".join("".join(o) for o in bm.orientations(p))}
             for p in patterns]
   pools.append({"param": "density", "pool": "|".join(str(d) for d in densities),
                 "notes": "e.g. 1|1|2|2|3 makes density 3 half as likely"})
+  guildhall = [r for r in regions if r["name"] == GUILDHALL]
+  if guildhall:
+    pools.append({"param": "guildhall:pattern", "pool": "|".join(guildhall[0]["patterns"]),
+                  "notes": "Spawn guildhall; optional guildhall:orientation:<pattern> rows, else orientation:<pattern>"})
+    pools.append({"param": "guildhall:density", "pool": "|".join(str(d) for d in guildhall[0]["densities"]),
+                  "notes": "Spawn guildhall"})
+  pools += [{"param": "tier:%s" % b, "pool": "|".join(t)} for b, t in tiers.items()]
   report.append(("weights", sheet(wb, "weights", SHEETS["weights"]), "param", pools))
 
   order = list(decks) + list(SHEETS)

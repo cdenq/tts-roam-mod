@@ -43,20 +43,35 @@ function self.getBounds() return {center = {x = 0, y = 1, z = 0}, size = {x = 2,
 function self.takeObject(p) takes = takes + 1; p.callback_function(templateObj) end
 function self.putObject() end
 function self.positionToWorld(p) return p end
+function self.getScale() return {x = 3.7, y = 4.95, z = 2.23} end
+function self.getPosition() return {x = 0, y = 1, z = 0} end
 local spawned = {}
 function spawnObjectData(p)
-  local o = newObject({Nickname = p.data.Nickname, GMNotes = p.data.GMNotes, memo = p.data.Memo, data = p.data})
+  local o = newObject({Nickname = p.data.Nickname, GMNotes = p.data.GMNotes, memo = p.data.Memo, data = p.data,
+                       tooltip = p.data.Tooltip})
+  o.guid = "t" .. (#spawned + 1)
+  function o.getGUID() return o.guid end
   table.insert(spawned, o)
   p.callback_function(o)
 end
 local tagged = {}
 function getObjectsWithTag() return tagged end
+local globalCalls = {}
+Global = {call = function(fn, args) table.insert(globalCalls, {fn = fn, args = args}) end}
 
 dofile(path)
 -- every combination gets a fake URL, as if the sheet were filled
+local allBiomes = {}
+for b, v in pairs(MAPTILE.biomes) do
+  allBiomes[v.deck] = allBiomes[v.deck] or {}
+  table.insert(allBiomes[v.deck], b)
+  for _, tier in pairs(MAPTILE.tiers[b] or {}) do
+    if MAPTILE.biomes[tier.tileset] == nil then table.insert(allBiomes[v.deck], tier.tileset) end
+  end
+end
 for _, d in ipairs(MAPTILE.decks) do
   d.back = "back_" .. d.id
-  for _, b in ipairs(d.biomes) do
+  for _, b in ipairs(allBiomes[d.id]) do
     for _, p in ipairs(MAPTILE.patterns) do
       for _, o in ipairs(MAPTILE.orientations[p]) do
         for _, n in ipairs(MAPTILE.densities) do
@@ -69,9 +84,16 @@ end
 
 print("== panel ==")
 onLoad("")
-check(#self.buttons == 7, "7 panel buttons (Draw, Draw specific, 5 settings)")
+check(#self.buttons == 4, "4 panel buttons while Advanced is hidden")
+check(self.buttons[3].label == "Spawn guildhall", "guildhall on the top row")
+local sc = self.buttons[1].scale
+check(math.abs(sc[1] * 3.7 - sc[3] * 2.23) < 1e-9, "button scale cancels the bag's uneven scale")
+check(math.abs(self.buttons[1].position[2] * 4.95 - (-0.9)) < 1e-9, "buttons sit LIFT above the bag's base")
+toggleAdvanced()
+check(#self.buttons == 9, "Advanced adds the 5 settings")
 local function label(i) return self.buttons[i + 1].label end
-check(label(2) == "Deck: Random" and label(3) == "Biome: Random", "everything starts Random")
+check(label(4) == "Deck: Random" and label(5) == "Biome: Random", "everything starts Random")
+check(self.buttons[5].position[3] == self.buttons[6].position[3], "Deck and Biome share a row")
 
 print("== cycling ==")
 cycleBiome(nil, "White", false)
@@ -97,7 +119,13 @@ cyclePattern(nil, "White", false)
 check(SETTINGS.orientation == "random", "changing pattern resets orientation")
 cycleDensity(nil, "White", false)
 check(SETTINGS.density == "1", "density cycles 1..3")
-check(label(6) == "Density: 1", "label follows the value")
+check(label(8) == "Density: 1", "label follows the value")
+toggleAdvanced()
+check(#self.buttons == 4, "Advanced again hides them")
+cycleDensity(nil, "White", false)
+check(SETTINGS.density == "2", "settings still cycle while hidden")
+toggleAdvanced()
+check(label(8) == "Density: 2", "and show the current value when reopened")
 
 print("== draw specific ==")
 SETTINGS = {deck = "woodland", biome = "forest", pattern = "corner", orientation = "ES", density = "2"}
@@ -109,8 +137,15 @@ check(t.data.Nickname == "Forest Corner Tile", "name: <Biome> <Pattern> Tile")
 check(t.data.GMNotes == "forest", "GMNotes = biome")
 check(t.data.Memo == "d=2|explore=2|rendered=0", "memo from density table")
 check(t.data.GUID == nil, "GUID cleared for TTS to assign")
-check(t.data.Tags[1] == "MapTile" and #t.data.Tags == 1, "tagged MapTile, Template tag stripped")
-check(#t.buttons == 2 and t.buttons[1].label == "Explore: 2" and t.buttons[2].label == "Render", "tile shows Explore + Render")
+check(t.data.Tags[1] == "MapTile" and t.data.Tags[2] == "Region:woodland" and t.data.Tags[3] == "Biome:forest"
+      and #t.data.Tags == 3, "tagged MapTile + Region + Biome, Template tag stripped")
+check(#t.buttons == 3 and t.buttons[1].label == "Explore: 2" and t.buttons[2].label == "Render" and
+      t.buttons[3].label == "?", "tile shows Explore + Render + ?")
+check(t.data.Tooltip == false and t.buttons[3].font_color[1] > 0.3, "tooltip starts off, ? is grey")
+tileHelp(t)
+check(t.tooltip == true and t.buttons[3].font_color[1] == 0, "? turns the tooltip on and goes black")
+tileHelp(t)
+check(t.tooltip == false and t.buttons[3].font_color[1] > 0.3, "? again turns it off")
 check(takes == 1, "template taken out once")
 
 print("== tile buttons ==")
@@ -118,10 +153,15 @@ tileExplore(t, "Red")
 check(t.memo == "d=2|explore=1|rendered=0" and t.buttons[1].label == "Explore: 1", "explore decrements memo + label")
 tileExplore(t, "Red"); tileExplore(t, "Red")
 check(t.memo:find("explore=0") and messages[#messages]:find("Nothing left"), "explore stops at 0")
-tileRender(t, "Red")
-check(t.memo:find("rendered=1") and #t.buttons == 1, "render runs once, then its button goes")
-tileRender(t, "Red")
-check(t.memo:find("rendered=1"), "second render does nothing")
+MAPTILE.table.forest = {meeple = {{"Cave"}}, gold = {1, 3}}
+tileRender(t)
+check(t.memo:find("rendered=1") and #t.buttons == 2, "render runs once, then its button goes")
+local call = globalCalls[#globalCalls]
+check(call and call.fn == "spawnFromFor" and call.args.guid == t.guid and call.args.spawn.meeple[1][1] == "Cave",
+      "render hands the biome's spawn table to Global by tile GUID")
+tileRender(t)
+check(t.memo:find("rendered=1") and #globalCalls == 1, "second render does nothing")
+MAPTILE.table.forest = nil
 
 print("== draw random ==")
 local before = #spawned
@@ -135,6 +175,68 @@ end
 local n = 0
 for _ in pairs(decks) do n = n + 1 end
 check(n == #MAPTILE.decks, "every deck comes up")
+local drewGuildhall = false
+for i = before + 1, #spawned do
+  if spawned[i].data.GMNotes == MAPTILE.guildhall then drewGuildhall = true end
+end
+check(not drewGuildhall, "Draw never gives the guildhall")
+local settlement = nil
+for _, d in ipairs(MAPTILE.decks) do
+  if d.id == MAPTILE.biomes[MAPTILE.guildhall].deck then settlement = d end
+end
+local listed = false
+for _, b in ipairs(settlement.biomes) do
+  if b == MAPTILE.guildhall then listed = true end
+end
+check(not listed, "Draw specific cannot cycle to the guildhall")
+
+print("== town tiers ==")
+local inPool = false
+for _, b in ipairs(MAPTILE.weights["biome:settlement"]) do
+  if b == "town" or b == "settlement" then inPool = true end
+end
+check(not inPool, "settlement/town only come from a tier")
+MAPTILE.weights["tier:city"] = {"1"}
+SETTINGS = {deck = "settlement", biome = "city", pattern = "corner", orientation = "ES", density = "2"}
+drawSpecific(nil, "White")
+local town = spawned[#spawned]
+check(town.data.CustomImage.ImageURL == "url:settlement|corner|ES|2", "tier 1 city uses the settlement images")
+check(town.data.GMNotes == "settlement" and town.data.Nickname == "Settlement Corner Tile", "tier 1 becomes a settlement")
+check(town.data.Memo == "d=2|explore=2|rendered=0", "tier never reaches the memo")
+check(town.data.Tags[2] == "Region:settlement" and town.data.Tags[3] == "Biome:settlement", "tagged by its gmnotes biome")
+MAPTILE.weights["tier:city"] = {"2"}
+drawSpecific(nil, "White")
+check(spawned[#spawned].data.GMNotes == "town" and
+      spawned[#spawned].data.CustomImage.ImageURL == "url:town|corner|ES|2", "tier 2 becomes a town on town images")
+MAPTILE.weights["tier:city"] = {"3"}
+drawSpecific(nil, "White")
+check(spawned[#spawned].data.CustomImage.ImageURL == "url:city|corner|ES|2" and
+      spawned[#spawned].data.GMNotes == "city", "tier 3 is a city on city images")
+MAPTILE.weights["tier:city"] = {"1", "2", "3"}
+MAPTILE.images["settlement|corner|ES|2"] = nil
+MAPTILE.images["town|corner|ES|2"] = nil
+local n0 = #spawned
+for _ = 1, 20 do drawSpecific(nil, "White") end
+check(#spawned - n0 == 20, "a tier with no image rerolls the tier instead of failing")
+for i = n0 + 1, #spawned do
+  if spawned[i].data.GMNotes ~= "city" then check(false, "only tier 3 can be drawn here") break end
+end
+MAPTILE.images["settlement|corner|ES|2"] = "url:settlement|corner|ES|2"
+MAPTILE.images["town|corner|ES|2"] = "url:town|corner|ES|2"
+
+print("== spawn guildhall ==")
+before = #spawned
+for _ = 1, 50 do spawnGuildhall(nil, "White") end
+local allGuildhall = #spawned - before == 50
+for i = before + 1, #spawned do
+  if spawned[i].data.GMNotes ~= MAPTILE.guildhall then allGuildhall = false end
+end
+check(allGuildhall, "Spawn guildhall always gives a guildhall")
+check(spawned[#spawned].data.CustomImage.ImageSecondaryURL == "back_" .. settlement.id, "guildhall gets its deck's back")
+MAPTILE.weights["guildhall:pattern"] = {"cross"}
+MAPTILE.weights["guildhall:density"] = {"3"}
+spawnGuildhall(nil, "White")
+check(spawned[#spawned].data.CustomImage.ImageURL == "url:guildhall|cross|NESW|3", "guildhall rolls from guildhall:* pools")
 check(takes == 1, "template still taken out only once")
 
 print("== missing url ==")
@@ -147,9 +249,10 @@ check(#spawned == count and messages[#messages]:find("No image URL"), "missing u
 print("== reload ==")
 tagged = {t}
 t.buttons = {}
-onLoad("deck=woodland;biome=forest;pattern=tee;orientation=NES;density=3")
+onLoad("deck=woodland;biome=forest;pattern=tee;orientation=NES;density=3;advanced=1")
 check(SETTINGS.biome == "forest" and SETTINGS.orientation == "NES", "settings restored from save")
-check(#t.buttons == 1, "onLoad re-renders tagged tiles from memo")
+check(ADVANCED and #self.buttons == 9, "Advanced open state restored")
+check(#t.buttons == 2, "onLoad re-renders tagged tiles from memo")
 onLoad("deck=nope;biome=forest;pattern=tee;orientation=XX;density=3")
 check(SETTINGS.deck == "random" and SETTINGS.orientation == "random", "unknown saved values fall back to Random")
 

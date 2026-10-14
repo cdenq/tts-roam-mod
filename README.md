@@ -133,7 +133,7 @@ python tools/build_map_tiles.py --region forest --shape back cross tee straight 
 
 | flag | sets | values | omitted = |
 | --- | --- | --- | --- |
-| `--region` | which regions | any region name in `asset_variables.csv`, e.g. `forest` `marsh` `village` (space-separated) | every region |
+| `--region` | which regions | any region name in `asset_variables.csv`, e.g. `forest` `marsh` `settlement` (space-separated) | every region |
 | `--shape` | structural variants | `back` (the deck backs of the chosen regions) `cross` `tee` `straight` `corner` `deadend` `none`, or one orientation e.g. `corner_ES` | region's `patterns` + its deck's `back` |
 | `--density` | density range | `3`, `1-4`, `"1\|3\|5"` (quote a list) | region's `densities` |
 | `--variants` | looks per orientation | `1`, `2`, `3`… (draws `_1` to `_N`) | region's `variants` |
@@ -387,9 +387,15 @@ once their images are uploaded. Data: `data/maptile.xlsx`, inlined by
 Panel:
 
 ```
-[ Draw ]            [ Draw specific ]
-[ Deck ]  [ Biome ]  [ Pattern ]  [ Orientation ]  [ Density ]   (stacked)
+[ Draw ]  [ Draw specific ]  [ Spawn guildhall ]
+             [ Advanced ]
+[ Deck ]     [ Biome ]          (Advanced toggles this grid; open/closed is saved)
+[ Pattern ]  [ Orientation ]
+[ Density ]
 ```
+
+- panel geometry (`PANEL`) is in world units; buttons cancel the bag's uneven scale, so text is
+  never stretched, and sit just above the bag's base
 
 - left-click a setting = next, right-click = back; every setting starts `Random`
 - Biome only offers the chosen deck's biomes (locked to Random while Deck is
@@ -400,6 +406,12 @@ Panel:
   `weights` pool, so a deck with more biomes is not drawn more. Free rolls:
   the same tile can come twice
 - settings survive save/load
+- a biome on the `tiers` sheet (`city`) rolls a hidden tier after it is drawn (`tier:<biome>`
+  weights). The tier only picks the tile's GMNotes biome (`settlement` / `town` / `city`) and the
+  tileset whose images it uses (same names: `settlement` / `town` / `city`); it is stored and shown nowhere
+- the guildhall (starter tile) is never drawn and never offered by Biome. Spawn guildhall rolls a
+  random guildhall image from `guildhall:pattern`, `guildhall:density` and optional
+  `guildhall:orientation:<pattern>` (else `orientation:<pattern>`)
 
 A drawn tile is a copy of the bag's template (Custom Tile, GMNotes
 `maptile_template`, tagged `Template`), placed beside the bag (`SPAWN`):
@@ -407,15 +419,18 @@ A drawn tile is a copy of the bag's template (Custom Tile, GMNotes
 | field | value |
 | --- | --- |
 | name | `<Biome> <Pattern> Tile` (biome name from `biome_descriptions`) |
-| description | `biome_descriptions.description` |
+| description | `[effect]`, blank line, `"flavor"` from `biome_descriptions` |
 | GMNotes | biome id, e.g. `forest` -- every lookup keys on it |
 | memo | `d=<density>\|explore=<left>\|rendered=<0/1>` |
 | images | front = rolled image url, back = its deck's back url |
-| tag | `MapTile` |
+| tags | `MapTile`, `Region:<deck>`, `Biome:<biome>` (ids, e.g. `Region:woodland`, `Biome:forest`; a tiered city is tagged by its GMNotes, `Biome:town`) |
 
 Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + memo):
 - `Explore: N` -- N from the `density` sheet; click = N-1. The exploration itself is a stub
-- `Render` -- once; reads `maptile_table` for the biome. Spawning is a stub (prints the row)
+- `?` -- toggles the tile's hover tooltip (name + description). Tiles spawn with it off; grey text =
+  off, black = on. State is the object's own `tooltip`, saved by TTS, not the memo
+- `Render` -- once; spawns the biome's `maptile_table` row onto the tile through Global
+  (`Global.call("spawnFromFor", {guid, spawn})` -> `spawnFrom`, same bags as every other spawn)
 
 ### `data/maptile.xlsx`
 
@@ -423,14 +438,18 @@ Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + me
 | --- | --- | --- |
 | `settlement` `woodland` `opencountry` `waterside` `scarred` | image of that deck | `biome` `pattern` `orientation` `density` `image` `file` **`url`** |
 | `backs` | deck | `deck` `name` `image` `file` **`url`** |
-| `biome_descriptions` | biome | `biome` `deck` `name` `description` |
-| `maptile_table` | biome (GMNotes) | `gmnotes` + placeholder spawn columns |
+| `biome_descriptions` | biome | `biome` `deck` `name` `effect` `flavor` |
+| `maptile_table` | biome (GMNotes) | `gmnotes` + spawn cells (`spawnN`, `spawnmeepleN`, `spawngold`); names checked against tiles/tokens |
+| `exploration` | biome | draft spawn cells for Explore; no sync reads it yet |
+| `tiers` | biome + tier | `biome` `tier` `gmnotes` `tileset` -- gmnotes = the biome the tile becomes (needs its own `biome_descriptions` row, kept out of the pools); tileset = whose images it uses; a tileset that is not a biome has image rows only |
 | `density` | density stage | `density` `explorations` |
-| `weights` | roll | `param` `pool` -- `deck`, `biome:<deck>`, `pattern`, `orientation:<pattern>`, `density`; repeat an entry to make it likelier (`1\|1\|2\|2\|3`) |
+| `weights` | roll | `param` `pool` -- `deck`, `biome:<deck>`, `pattern`, `orientation:<pattern>`, `density`, `guildhall:*`, `tier:<biome>`; repeat an entry to make it likelier (`1\|1\|2\|2\|3`) |
 
 - rows come from `python tools/scaffold_maptile_xlsx.py` (one per generated
   image). Re-run after generating new art: adds rows, never overwrites a filled cell
 - only images with a `url` can be drawn; the sync counts the rest
+- `url` = `https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/maptiles/` + `file`.
+  Push the PNG before it can load in game
 - Google Drive: a share link (`/file/d/<id>/view`) is rewritten to
   `uc?export=download&id=<id>` automatically. The file must be shared "anyone with the link"
 - offline test: `tts_envs/tools/bin/lua54.exe tts_envs/tools/test_maptile_manager.lua ".tts/objects/Maptile Manager.b77050.lua"`
@@ -475,17 +494,19 @@ Code-drawn storybook tiles. Manual step, not part of `master_sync.cmd`.
     reserved for gems, not regions
 - regions: forest, plains, city, mountain, guildhall, riverside, marsh, hills,
   blossomgrove, mushroomhollow, deepwood, heath, ashland, ruins, quarry,
-  lumbercamp, farmstead, orchard, village, lakeshore, briarthicket,
+  lumbercamp, farmstead, orchard, settlement, town, lakeshore, briarthicket,
   wildflowermeadow, canyon, waterfallcliffs, standingstones, battlefield, hotsprings
 - `icons` = `painter:weight:lo-hi` joined by `|`. Painters: tree, pine, bush,
   mountain, house, tent, blossom, fruit, oak, heather, deadtree, charred,
   stump, rock, hill, reeds, mushroom, ruinwall, column, crane, logpile,
-  haystack, gnarled, briar, flowers, menhir, cart, spears, warbanner (also: stake = palisade; guildhall, windmill, statue =
+  haystack, gnarled, briar, flowers, menhir, cart, spears, warbanner, townhouse (also: stake = palisade;
+  wallblock + tower = stone wall; guildhall, windmill, statue =
   centrepieces)
-- optional walled-town keys (city uses them; leave out elsewhere):
+- optional walled-town keys (settlement, town, city use them; leave out elsewhere):
   - `town_radius` — `icons` stay inside this circle (0 = off)
   - `wall` — `palisade` = ring of stakes at `town_radius`, gates where roads
-    cross; `menhirs` = ring of standing stones; `none`
+    cross; `menhirs` = ring of standing stones; `stone` = crenellated rampart with a tower each
+    side of every gate and one every `global.tower_gap_count` blocks (`rampart_*`, `tower_size` globals); `none`
   - `outer_icons` / `outer_spacing` — scatter outside the wall
   - `centerpiece` (`guildhall`, `windmill`, `statue`) + `centerpiece_size` — one big
     building just north of the plaza; scatter keeps clear of it
