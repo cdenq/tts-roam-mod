@@ -1,22 +1,31 @@
 --[[ Maptile Manager: draw overworld map tiles from the generated art.
 
 Source for the in-game bag nicknamed "Maptile Manager" (GUID b77050). Staged
-by tools/sync_maptile_manager.py, which also inlines MAPTILE from
+by tools/sync/sync_maptile_manager.py, which also inlines MAPTILE from
 data/maptile.xlsx.
 
 THE PANEL
 
   [ Draw ]  [ Draw specific ]  [ Spawn guildhall ]
                [ Advanced ]                         toggles the grid below
-  [ Region: Random   ]  [ Biome: Random       ]     left-click = next, right-click = back
+  [ Region: Random ]↺  [ Biome: Random     ]↺     left-click = next, right-click = back, ↺ = Random
   [ Pattern: Random  ]  [ Orientation: Random ]     Biome / Orientation depend on the left one
-  [ Density: Random  ]  [ Force Connection: None ]
+  [ Density: Random  ]  [ Force: Off          ]
+  [ Force: N ] [ Force: E ] [ Force: S ] [ Force: W ]      edge toggles
 
 Draw ignores the settings and rolls everything; Draw specific rolls only what
-is still Random. Force Connection N/E/S/W overrides Pattern and Orientation:
-Draw specific picks evenly among every pattern+rotation with a road on that
-edge (so the three tees with one outweigh the single cross), then rolls the
-rest as usual. The guildhall is the starter tile: neither Draw offers it.
+is still Random. Force: On overrides Pattern and Orientation: Draw specific
+picks evenly among every pattern+rotation that fits the edges, then rolls the
+rest as usual. Each edge is one of three states:
+
+  green  left-click   the tile MUST have a road on this edge
+  red    right-click  the tile must NOT have a road on this edge
+  blue   (default)    either way
+
+Clicking the same button again clears it; the other button switches it
+(green -> red). Red N, E, S + green W = only the dead end open to the W. No
+shape fitting = nothing is drawn. The edges can be set while Force is Off and
+take effect when it goes On. The guildhall is the starter tile: neither Draw offers it.
 Spawn guildhall rolls one from the guildhall:* pools in MAPTILE.weights. Every
 roll goes deck -> biome -> pattern -> orientation -> density, each from its
 pool in MAPTILE.weights, so a deck with more biomes is not drawn more often.
@@ -52,7 +61,7 @@ TEMPLATE_GM = "maptile_template"
 TEMPLATE_TAG = "Template"
 TILE_TAG = "Maptile"
 RANDOM = "random"
-NONE = "none"
+EDGES = {"N", "E", "S", "W"}
 MAX_REROLLS = 40
 
 PATTERN_NAMES = {deadend = "Dead End", corner = "Corner", straight = "Straight", tee = "Tee", cross = "Cross"}
@@ -85,13 +94,20 @@ PANEL = {
   GRID_X = {-3.9, 3.9},
   ROW_STEP = 1.4,
   BTN_W = 2400, BTN_H = 540, BTN_FONT = 260,
-  CONFIG_W = 3600,
+  CONFIG_W = 3000,
+  RESET_W = 420,        -- the ↺ beside each setting
+  RESET_DX = 3.55,      -- its x offset from the setting's centre
+  EDGE_X = {-5.85, -1.95, 1.95, 5.85},  -- Force: N E S W, one row under the grid
+  EDGE_W = 1650,
   BTN_SCALE = 1,
   DRAW_COLOR = {0.25, 0.45, 0.3},
   ADVANCED_COLOR = {0.25, 0.25, 0.25},
   GUILDHALL_COLOR = {0.5, 0.36, 0.18},
   CONFIG_COLOR = {0.3, 0.34, 0.5},
   LOCKED_COLOR = {0.32, 0.32, 0.32},
+  FORCE_ON_COLOR = {0.62, 0.36, 0.18},
+  MUST_COLOR = {0.22, 0.55, 0.25},     -- edge: must have a road
+  MUST_NOT_COLOR = {0.65, 0.2, 0.18},  -- edge: must not have a road
   TEXT_COLOR = {1, 1, 1},
 }
 
@@ -116,14 +132,17 @@ TILE_UI = {
   TEXT_COLOR = {1, 1, 1},
 }
 
-CONFIG_KEYS = {"deck", "biome", "pattern", "orientation", "density", "connection"}
+CONFIG_KEYS = {"deck", "biome", "pattern", "orientation", "density"}
 CONFIG_TITLES = {deck = "Region", biome = "Biome", pattern = "Pattern", orientation = "Orientation",
-                 density = "Density", connection = "Force Connection"}
+                 density = "Density"}
 
+-- force = "on"/"off"; edges = edges that must have a road, noedges = edges that must
+-- not, each in NESW order ("NE"). Strings, so they save as-is.
 SETTINGS = {deck = RANDOM, biome = RANDOM, pattern = RANDOM, orientation = RANDOM, density = RANDOM,
-            connection = NONE}
+            force = "off", edges = "", noedges = ""}
 ADVANCED = false          -- config grid shown; saved
 local configButton = {}   -- key -> button index on self; empty while the grid is hidden
+local forceButton = {}    -- "toggle" / "N" / "E" / "S" / "W" -> button index; empty while hidden
 local templateData = nil  -- cached getData() of the template; refreshed each load
 local renderTile          -- defined with the tile buttons; spawning needs it first
 
@@ -158,15 +177,9 @@ end
 
 -- ---------------------------------------------------------------- settings
 
---[[ Force Connection is labelled by where the new tile sits next to the
-one it joins, the opposite of the edge its road is on: "N" (goes north of it)
-stores S, a road on the tile's south edge. Ordered so the labels read N E S W. ]]
-CONNECTION_LABELS = {N = "S", E = "W", S = "N", W = "E"}
-
 --[[ The values one config button cycles through, its default first.
 Dependent buttons collapse to {Random} while what they depend on is Random. ]]
 local function options(key)
-  if key == "connection" then return {NONE, "S", "W", "N", "E"} end
   local list = {RANDOM}
   if key == "deck" then
     for _, d in ipairs(MAPTILE.decks) do table.insert(list, d.id) end
@@ -187,7 +200,6 @@ end
 
 local function display(key, value)
   if value == RANDOM then return "Random" end
-  if value == NONE then return "None" end
   if key == "deck" then
     local d = deckById(value)
     return d and d.name or value
@@ -198,26 +210,31 @@ local function display(key, value)
     return PATTERN_NAMES[value] or value
   elseif key == "orientation" then
     return ORIENTATION_GLYPHS[value] or value
-  elseif key == "connection" then
-    return CONNECTION_LABELS[value] or value
   end
   return value
 end
 
-local function forcedConnection(spec)
-  return spec.connection ~= nil and spec.connection ~= NONE
+local function forced(spec)
+  return spec.force == "on"
 end
 
--- Pattern and Orientation do nothing while a connection is forced.
+-- "must", "not" or "" (either way) for one edge
+local function edgeState(edge)
+  if SETTINGS.edges:find(edge, 1, true) then return "must" end
+  if SETTINGS.noedges:find(edge, 1, true) then return "not" end
+  return ""
+end
+
+-- Pattern and Orientation do nothing while Force is on.
 local function overridden(key)
-  return (key == "pattern" or key == "orientation") and forcedConnection(SETTINGS)
+  return (key == "pattern" or key == "orientation") and forced(SETTINGS)
 end
 
 local LOCKED_HINT = {biome = "Pick a Region first", orientation = "Pick a Pattern first"}
 
 -- Hover text: every value the button can take, or why it cannot change.
 local function configTooltip(key)
-  if overridden(key) then return "Overridden by Force Connection (set it to None)" end
+  if overridden(key) then return "Overridden by Force (turn it Off)" end
   local list = options(key)
   if #list == 1 and LOCKED_HINT[key] then return LOCKED_HINT[key] end
   local names = {}
@@ -232,6 +249,26 @@ local function refreshConfigLabels()
       local locked = #options(key) == 1 or overridden(key)
       self.editButton({index = idx, label = CONFIG_TITLES[key] .. ": " .. display(key, SETTINGS[key]),
                        tooltip = configTooltip(key), color = locked and PANEL.LOCKED_COLOR or PANEL.CONFIG_COLOR})
+    end
+  end
+  local on = forced(SETTINGS)
+  if forceButton.toggle ~= nil then
+    self.editButton({index = forceButton.toggle, label = on and "Force: On" or "Force: Off",
+                     color = on and PANEL.FORCE_ON_COLOR or PANEL.CONFIG_COLOR})
+  end
+  for _, edge in ipairs(EDGES) do
+    if forceButton[edge] ~= nil then
+      -- green = must, red = must not, blue = either; all grey while Force is off
+      local state = edgeState(edge)
+      local color = PANEL.CONFIG_COLOR
+      if not on then
+        color = PANEL.LOCKED_COLOR
+      elseif state == "must" then
+        color = PANEL.MUST_COLOR
+      elseif state == "not" then
+        color = PANEL.MUST_NOT_COLOR
+      end
+      self.editButton({index = forceButton[edge], label = "Force: " .. edge, color = color})
     end
   end
 end
@@ -253,15 +290,58 @@ local function cycle(key, back)
   refreshConfigLabels()
 end
 
+--[[ ↺: straight back to Random, clearing what depends on it like a cycle does.
+Pattern / Orientation stay put while Force overrides them. ]]
+local function reset(key)
+  if overridden(key) then return end
+  SETTINGS[key] = RANDOM
+  if key == "deck" then SETTINGS.biome = RANDOM end
+  if key == "pattern" then SETTINGS.orientation = RANDOM end
+  refreshConfigLabels()
+end
+
+function resetDeck() reset("deck") end
+function resetBiome() reset("biome") end
+function resetPattern() reset("pattern") end
+function resetOrientation() reset("orientation") end
+function resetDensity() reset("density") end
+RESET_FN = {deck = "resetDeck", biome = "resetBiome", pattern = "resetPattern",
+            orientation = "resetOrientation", density = "resetDensity"}
+
 -- Button callbacks must be global functions named by string.
 function cycleDeck(_, _, alt) cycle("deck", alt) end
 function cycleBiome(_, _, alt) cycle("biome", alt) end
 function cyclePattern(_, _, alt) cycle("pattern", alt) end
 function cycleOrientation(_, _, alt) cycle("orientation", alt) end
 function cycleDensity(_, _, alt) cycle("density", alt) end
-function cycleConnection(_, _, alt) cycle("connection", alt) end
 CYCLE_FN = {deck = "cycleDeck", biome = "cycleBiome", pattern = "cyclePattern",
-            orientation = "cycleOrientation", density = "cycleDensity", connection = "cycleConnection"}
+            orientation = "cycleOrientation", density = "cycleDensity"}
+
+function toggleForce()
+  SETTINGS.force = forced(SETTINGS) and "off" or "on"
+  refreshConfigLabels()
+end
+
+--[[ Left-click asks for "must", right-click for "not". Asking for the state the
+edge already has clears it; asking for the other one switches straight to it.
+Both strings are rebuilt in NESW order. ]]
+local function setEdge(edge, want)
+  local now = edgeState(edge)
+  local new = now == want and "" or want
+  local must, mustNot = "", ""
+  for _, e in ipairs(EDGES) do
+    local st = e == edge and new or edgeState(e)
+    if st == "must" then must = must .. e end
+    if st == "not" then mustNot = mustNot .. e end
+  end
+  SETTINGS.edges, SETTINGS.noedges = must, mustNot
+  refreshConfigLabels()
+end
+
+function toggleForceN(_, _, alt) setEdge("N", alt and "not" or "must") end
+function toggleForceE(_, _, alt) setEdge("E", alt and "not" or "must") end
+function toggleForceS(_, _, alt) setEdge("S", alt and "not" or "must") end
+function toggleForceW(_, _, alt) setEdge("W", alt and "not" or "must") end
 
 -- ---------------------------------------------------------------- panel
 
@@ -292,6 +372,7 @@ end
 local function buildPanel()
   self.clearButtons()
   configButton = {}
+  forceButton = {}
   addButton("drawRandom", "Draw", "Draw a fully random map tile", PANEL.TOP_X[1], PANEL.TOP_Z,
             PANEL.BTN_W, PANEL.DRAW_COLOR)
   addButton("drawSpecific", "Draw specific", "Draw a tile using the Advanced settings (Random = roll it)",
@@ -306,6 +387,28 @@ local function buildPanel()
       configButton[key] = addButton(CYCLE_FN[key], "", "",
                                     PANEL.GRID_X[col + 1], PANEL.GRID_Z + row * PANEL.ROW_STEP,
                                     PANEL.CONFIG_W, PANEL.CONFIG_COLOR)
+    end
+    -- Force: On/Off takes the grid's next free cell; the four edges get a row of their own
+    local n = #CONFIG_KEYS
+    local row = math.floor(n / 2)
+    forceButton.toggle = addButton("toggleForce", "", "Force: only draw shapes that fit the edges below",
+                                   PANEL.GRID_X[n % 2 + 1], PANEL.GRID_Z + row * PANEL.ROW_STEP,
+                                   PANEL.CONFIG_W, PANEL.CONFIG_COLOR)
+    local edgeName = {N = "north", E = "east", S = "south", W = "west"}
+    for i, edge in ipairs(EDGES) do
+      forceButton[edge] = addButton("toggleForce" .. edge, "",
+                                    "Left-click: must have a road " .. edgeName[edge] .. " (green)\n" ..
+                                    "Right-click: must NOT have one (red)\nSame click again: either way",
+                                    PANEL.EDGE_X[i], PANEL.GRID_Z + (row + 1) * PANEL.ROW_STEP,
+                                    PANEL.EDGE_W, PANEL.CONFIG_COLOR)
+    end
+    -- last, so adding them shifts no other button's index. Literal glyph: if the
+    -- button font lacks it, it shows an empty box -- swap in "R"
+    for i, key in ipairs(CONFIG_KEYS) do
+      local col, r = (i - 1) % 2, math.floor((i - 1) / 2)
+      addButton(RESET_FN[key], "↺", "Reset " .. CONFIG_TITLES[key] .. " to Random",
+                PANEL.GRID_X[col + 1] + PANEL.RESET_DX, PANEL.GRID_Z + r * PANEL.ROW_STEP,
+                PANEL.RESET_W, PANEL.ADVANCED_COLOR)
     end
     refreshConfigLabels()
   end
@@ -336,27 +439,36 @@ local function finish(t)
   return t
 end
 
---[[ Every pattern+rotation with a road on that edge, one entry each, so the
-pick is even across shapes rather than patterns. ]]
-local function shapesWith(edge)
+--[[ Every pattern+rotation with a road on ALL of `must` ("NE") and on none of
+`mustNot`, one entry each, so the pick is even across shapes rather than
+patterns. Both "" = every shape. ]]
+local function shapesWith(must, mustNot)
   local shapes = {}
   for _, p in ipairs(MAPTILE.patterns) do
     for _, o in ipairs(MAPTILE.orientations[p] or {}) do
-      if o:find(edge, 1, true) then table.insert(shapes, {pattern = p, orientation = o}) end
+      local fits = true
+      for e in must:gmatch(".") do
+        if not o:find(e, 1, true) then fits = false end
+      end
+      for e in (mustNot or ""):gmatch(".") do
+        if o:find(e, 1, true) then fits = false end
+      end
+      if fits then table.insert(shapes, {pattern = p, orientation = o}) end
     end
   end
   return shapes
 end
 
---[[ Fill every Random in spec from the weight pools, in dependency order. A
-forced connection replaces the pattern + orientation rolls. ]]
+--[[ Fill every Random in spec from the weight pools, in dependency order.
+Force replaces the pattern + orientation rolls. ]]
 local function roll(spec)
   local t = {}
   local w = MAPTILE.weights
   t.deck = spec.deck ~= RANDOM and spec.deck or pick(w.deck)
   t.biome = spec.biome ~= RANDOM and spec.biome or pick(w["biome:" .. t.deck])
-  if forcedConnection(spec) then
-    local shape = pick(shapesWith(spec.connection))
+  local shapes = forced(spec) and shapesWith(spec.edges or "", spec.noedges or "") or {}
+  if #shapes > 0 then
+    local shape = pick(shapes)
     t.pattern, t.orientation = shape.pattern, shape.orientation
   else
     t.pattern = spec.pattern ~= RANDOM and spec.pattern or pick(w.pattern)
@@ -380,7 +492,7 @@ end
 
 -- Every setting chosen AND nothing left to roll (a tiered biome still rolls its tier).
 local function fullySpecified(spec)
-  if forcedConnection(spec) then return false end
+  if forced(spec) then return false end
   for _, key in ipairs(CONFIG_KEYS) do
     if spec[key] == RANDOM then return false end
   end
@@ -460,7 +572,7 @@ end
 change, so one miss is final. ]]
 local function drawWith(rollFn, exact, who)
   if #MAPTILE.decks == 0 then
-    broadcastToAll("Maptile Manager: no tile data -- run tools/sync_maptile_manager.py and push.", {1, 0.3, 0.3})
+    broadcastToAll("Maptile Manager: no tile data -- run tools/sync/sync_maptile_manager.py and push.", {1, 0.3, 0.3})
     return
   end
   for _ = 1, (exact and 1 or MAX_REROLLS) do
@@ -489,6 +601,10 @@ function drawRandom(_, color)
 end
 
 function drawSpecific(_, color)
+  if forced(SETTINGS) and #shapesWith(SETTINGS.edges, SETTINGS.noedges) == 0 then
+    broadcastToColor("No tile shape fits those Force edges.", color, {1, 0.6, 0.3})
+    return
+  end
   draw(SETTINGS, color)
 end
 
@@ -586,8 +702,19 @@ function onLoad(state)
       if saved and saved[key] ~= nil then SETTINGS[key] = tostring(saved[key]) end
     end
     ADVANCED = saved ~= nil and saved.advanced == "1"
+    SETTINGS.force = saved ~= nil and saved.force == "on" and "on" or "off"
+    -- rebuilt in NESW order; an edge saved as both keeps "must"
+    local must, mustNot = "", ""
+    for _, e in ipairs(EDGES) do
+      if saved ~= nil and tostring(saved.edges or ""):find(e, 1, true) then
+        must = must .. e
+      elseif saved ~= nil and tostring(saved.noedges or ""):find(e, 1, true) then
+        mustNot = mustNot .. e
+      end
+    end
+    SETTINGS.edges, SETTINGS.noedges = must, mustNot
   end
-  -- a saved value the data no longer has falls back to the default (Random / None)
+  -- a saved value the data no longer has falls back to Random
   for _, key in ipairs(CONFIG_KEYS) do
     local ok = false
     for _, v in ipairs(options(key)) do

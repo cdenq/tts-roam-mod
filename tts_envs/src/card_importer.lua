@@ -13,7 +13,7 @@ push, and every card already on the table re-renders. Baking data into each
 card would mean re-importing for every typo.
 
 CARD_SETS and CARD_SET_ORDER are read from Global at load time -- they are
-generated into Global by tools/sync_events_data.py alongside EVENT_DATA.
+generated into Global by tools/sync/sync_events_data.py alongside EVENT_DATA.
 
 Templates sit loose in this bag, each a Card whose GMNotes is the value the
 `template` column names (scenario_intro, origins) -- any value works.

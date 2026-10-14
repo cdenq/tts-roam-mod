@@ -31,6 +31,8 @@ SPAWN_CATEGORIES = [
   {"key": "status", "prefix": "spawnstatus", "count": 3},
   # A sheet only needs the columns it uses: origins carry spawnmeeple1 alone.
   {"key": "meeple", "prefix": "spawnmeeple", "count": 12},
+  # One unnumbered column: spawncard. Cards come out of their own bag by exact name.
+  {"key": "card", "prefix": "spawncard", "count": 1, "single": True},
 ]
 GOLD_COLUMN = "spawngold"
 
@@ -38,11 +40,18 @@ MONTHS = ("jan", "feb", "mar", "apr", "may", "jun",
           "jul", "aug", "sep", "oct", "nov", "dec")
 
 
+def category_columns(cat):
+  """A category's column names: spawn1..spawn5, or just the prefix when single."""
+  if cat.get("single"):
+    return [cat["prefix"]]
+  return ["%s%d" % (cat["prefix"], i) for i in range(1, cat["count"] + 1)]
+
+
 def spawn_columns():
   """Every column name a spawn table uses, in order."""
   cols = [GOLD_COLUMN]
   for cat in SPAWN_CATEGORIES:
-    cols += ["%s%d" % (cat["prefix"], i) for i in range(1, cat["count"] + 1)]
+    cols += category_columns(cat)
   return cols
 
 
@@ -99,8 +108,8 @@ def read_spawn(row):
   spawn = {}
   for cat in SPAWN_CATEGORIES:
     slots = []
-    for i in range(1, cat["count"] + 1):
-      names = weighted_list(row.get("%s%d" % (cat["prefix"], i)))
+    for col in category_columns(cat):
+      names = weighted_list(row.get(col))
       if names:
         slots.append(names)
     if slots:
@@ -144,8 +153,8 @@ def referenced_names(row, keys=None):
   for cat in SPAWN_CATEGORIES:
     if keys is not None and cat["key"] not in keys:
       continue
-    for i in range(1, cat["count"] + 1):
-      for raw in weighted_list(row.get("%s%d" % (cat["prefix"], i))):
+    for col in category_columns(cat):
+      for raw in weighted_list(row.get(col)):
         name = strip_unique(raw)
         if name:
           out.append(name)

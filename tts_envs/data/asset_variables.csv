@@ -113,7 +113,7 @@ global,frost,#dde7ea,rime streaks (not snow)
 global,lily_flower,#f0b8c8,water lily flowers
 global,valley,#8e9a8c,far valley floor below cliffs
 global,flower_colours,#e8c547|#f2f0e6|#e59ab0|#a98bd0|#e07a4f,one picked per flower clump
-global,back_font,Luminari-Regular.ttf,font for the region name on tile backs (path from repo root)
+global,back_font,internal/asset_generation/Luminari-Regular.ttf,font for the region name on tile backs (path from repo root)
 global,back_gem_size,400,longest side of the gem on tile backs (design units)
 global,river_anchor,256,feature river: x where it crosses the N and S edges (canyon mirrors it from the east). Fixed so stacked tiles join
 global,river_width,110,feature river: width (design units; a tile is 1024 wide)

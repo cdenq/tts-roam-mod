@@ -1,0 +1,57 @@
+file,species,class,scale_from_psd,figure_w,figure_h
+vb_adventurer.png,vagabond,base,0.587,497,681
+vb_ranger.png,vagabond,base,0.556,612,729
+vb_vagrant.png,vagabond,base,0.569,600,728
+vb_arbiter.png,vagabond,base,0.59,573,677
+vb_tinker.png,vagabond,base,0.602,711,753
+vb_gladiator.png,vagabond,base,0.601,554,690
+vb_harrier.png,vagabond,base,0.58,562,752
+vb_cheat.png,vagabond,base,0.556,514,679
+vb_jailor.png,vagabond,base,0.629,623,682
+vb_scoundrel.png,vagabond,base,0.555,545,730
+vb_thief.png,vagabond,base,0.525,643,732
+vb_ronin.png,vagabond,base,0.525,643,731
+hireling_bird.png,bird,base,0.586,606,698
+hireling_frog.png,frog,base,0.631,621,680
+hireling_crow.png,crow,base,0.671,667,686
+special_stag.png,stag,big,0.57,1000,1092
+hireling_cat.png,cat,base,0.594,616,724
+hireling_badger.png,badger,base,0.587,645,662
+hireling_bat.png,bat,base,0.533,485,718
+special_vb.png,bear,big,0.517,650,839
+hireling_otter.png,otter (trio + cart),special,0.486,995,799
+denizen_duck.png,duck,short,0.452,501,557
+hireling_lizard.png,lizard,base,0.64,621,714
+hireling_mole.png,mole,short,0.572,573,559
+hireling_rat.png,rat,short,0.461,563,564
+hireling_wa.png,rabbit,base,0.641,528,721
+faction_cat.png,cat,base,0.622,548,727
+faction_badger.png,badger,base,0.648,649,762
+faction_rat.png,rat,short,0.439,542,542
+faction_rat_wl.png,rat warlord,base,0.548,802,921
+faction_rat_wl2.png,rat warlord,base,0.548,725,920
+faction_frog.png,frog,base,0.641,718,684
+faction_bat.png,bat,base,0.554,521,767
+faction_skunk.png,skunk,base,0.636,567,707
+faction_crow.png,crow,base,0.671,591,686
+faction_otter.png,otter,base,0.657,558,673
+faction_mole.png,mole,short,0.601,588,557
+faction_bird.png,bird,base,0.626,605,742
+faction_lizard.png,lizard,base,0.647,600,661
+faction_wa_mouse.png,mouse,short,0.562,540,539
+faction_wa_rabbit.png,rabbit,base,0.498,494,702
+faction_wa_fox.png,fox,base,0.579,663,737
+faction_wa_bird.png,bird,base,0.627,609,746
+denizen_mouse.png,mouse,short,0.562,540,539
+denizen_rabbit.png,rabbit,base,0.498,493,702
+denizen_fox.png,fox,base,0.578,662,736
+denizen_bird.png,bird,base,0.626,608,745
+denizen_stoat.png,stoat,short,0.478,660,564
+denizen_porcupine.png,porcupine,short,0.519,565,587
+special_boar.png,boar,big,0.644,707,856
+denizen_bristle.png,hedgehog,base,0.568,649,716
+denizen_redpanda.png,red panda,base,0.593,658,679
+denizen_squirrel.png,squirrel,base,0.642,546,750
+special_snake.png,snake,special,0.648,964,1104
+special_guildmaster.png,guildmaster,big,0.807,1047,1148
+special_penguin.png,penguin,short,0.577,648,552

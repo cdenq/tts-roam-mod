@@ -90,7 +90,8 @@ local sc = self.buttons[1].scale
 check(math.abs(sc[1] * 3.7 - sc[3] * 2.23) < 1e-9, "button scale cancels the bag's uneven scale")
 check(math.abs(self.buttons[1].position[2] * 4.95 - (-0.9)) < 1e-9, "buttons sit LIFT above the bag's base")
 toggleAdvanced()
-check(#self.buttons == 10, "Advanced adds the 6 settings")
+check(#self.buttons == 19, "Advanced adds 5 settings + Force + 4 edges + 5 resets")
+check(self.buttons[15].label == "↺" and self.buttons[15].click_function == "resetDeck", "a reset beside each setting")
 local function label(i) return self.buttons[i + 1].label end
 check(label(4) == "Region: Random" and label(5) == "Biome: Random", "everything starts Random; Deck shows as Region")
 local function tip(i) return self.buttons[i + 1].tooltip end
@@ -132,42 +133,100 @@ check(SETTINGS.density == "2", "settings still cycle while hidden")
 toggleAdvanced()
 check(label(8) == "Density: 2", "and show the current value when reopened")
 
-print("== force connection ==")
-check(label(9) == "Force Connection: None", "Force Connection starts None")
+print("== reset ==")
+SETTINGS.deck = MAPTILE.decks[1].id; SETTINGS.biome = MAPTILE.decks[1].biomes[1]
+SETTINGS.pattern = "tee"; SETTINGS.orientation = "NES"; SETTINGS.density = "2"
+resetBiome()
+check(SETTINGS.biome == "random" and SETTINGS.deck == MAPTILE.decks[1].id, "reset Biome: only Biome goes Random")
+SETTINGS.biome = MAPTILE.decks[1].biomes[1]
+resetDeck()
+check(SETTINGS.deck == "random" and SETTINGS.biome == "random", "reset Region also resets Biome")
+resetPattern()
+check(SETTINGS.pattern == "random" and SETTINGS.orientation == "random", "reset Pattern also resets Orientation")
+resetDensity()
+check(SETTINGS.density == "random" and label(8) == "Density: Random", "reset Density, label follows")
+SETTINGS.pattern = "tee"; SETTINGS.orientation = "NES"; SETTINGS.force = "on"
+resetPattern()
+check(SETTINGS.pattern == "tee", "reset ignored while Force overrides Pattern")
+SETTINGS.force = "off"; SETTINGS.density = "2"
+
+print("== force ==")
+check(label(9) == "Force: Off" and label(10) == "Force: N" and label(13) == "Force: W", "Force: Off + four edge buttons")
+check(self.buttons[11].color == PANEL.LOCKED_COLOR, "edges are grey while Force is off")
 SETTINGS.pattern = "tee"; SETTINGS.orientation = "NES"
-check(tip(9):find("^Options: None, N, E, S, W"), "Force Connection tooltip lists N E S W")
-cycleConnection(nil, "White", false)
-check(SETTINGS.connection == "S" and label(9) == "Force Connection: N", "label N = a road on the S edge")
-cycleConnection(nil, "White", false)
-check(SETTINGS.connection == "W" and label(9) == "Force Connection: E", "label E = a road on the W edge")
+toggleForceN(); toggleForceE()
+check(SETTINGS.edges == "NE" and SETTINGS.force == "off", "edges can be set while Force is off")
+toggleForce()
+check(SETTINGS.force == "on" and label(9) == "Force: On", "Force toggles on")
+check(self.buttons[11].color == PANEL.MUST_COLOR and self.buttons[13].color == PANEL.CONFIG_COLOR,
+      "must edges green, either-way edges blue while on")
 check(tip(7):find("Overridden"), "overridden buttons say so")
 local prev = {SETTINGS.pattern, SETTINGS.orientation}
 cyclePattern(nil, "White", false); cycleOrientation(nil, "White", false)
 check(SETTINGS.pattern == prev[1] and SETTINGS.orientation == prev[2], "pattern + orientation ignore clicks while forced")
 check(self.buttons[7].color == PANEL.LOCKED_COLOR and self.buttons[8].color == PANEL.LOCKED_COLOR,
       "pattern + orientation shown locked while forced")
-cycleConnection(nil, "White", true); cycleConnection(nil, "White", true); cycleConnection(nil, "White", true)
-check(SETTINGS.connection == "E" and label(9) == "Force Connection: W", "right-click wraps None -> W (an E road)")
-local shapes = {}
-local n1 = #spawned
-SETTINGS = {deck = "woodland", biome = "forest", pattern = "cross", orientation = "NESW", density = "2", connection = "N"}
-for _ = 1, 800 do drawSpecific(nil, "White") end
-check(#spawned - n1 == 800, "forced draws all spawn")
-local allHaveN = true
-for i = n1 + 1, #spawned do
-  local key = spawned[i].data.CustomImage.ImageURL:match("^url:forest|(%w+|%w+)|2$")
-  if key == nil or not key:match("|%w*N") then allHaveN = false end
-  shapes[key or "?"] = (shapes[key or "?"] or 0) + 1
+toggleForceN()
+check(SETTINGS.edges == "E", "clicking a selected edge clears it")
+toggleForceW(); toggleForceN()
+check(SETTINGS.edges == "NEW", "edges stay in NESW order whatever the click order")
+toggleForceS(nil, "White", true)
+check(SETTINGS.noedges == "S" and self.buttons[13].color == PANEL.MUST_NOT_COLOR, "right-click = must NOT, red")
+toggleForceS(nil, "White", true)
+check(SETTINGS.noedges == "" and self.buttons[13].color == PANEL.CONFIG_COLOR, "right-click again clears it")
+toggleForceN(nil, "White", true)
+check(SETTINGS.edges == "EW" and SETTINGS.noedges == "N", "right-click on a green edge switches it to red")
+toggleForceN(nil, "White", false)
+check(SETTINGS.edges == "NEW" and SETTINGS.noedges == "", "left-click on a red edge switches it to green")
+
+local function drawForced(edges, n, noedges)
+  local got, n1 = {}, #spawned
+  SETTINGS = {deck = "woodland", biome = "forest", pattern = "cross", orientation = "NESW", density = "2",
+              force = "on", edges = edges, noedges = noedges or ""}
+  for _ = 1, n do drawSpecific(nil, "White") end
+  for i = n1 + 1, #spawned do
+    local key = spawned[i].data.CustomImage.ImageURL:match("^url:forest|(%w+|%w+)|2$") or "?"
+    got[key] = (got[key] or 0) + 1
+  end
+  return got, #spawned - n1
 end
-check(allHaveN, "every forced tile has a road to N, deck/biome/density kept")
-local kinds, tees = 0, 0
-for k, c in pairs(shapes) do
-  kinds = kinds + 1
+local function kinds(got)
+  local n = 0
+  for _ in pairs(got) do n = n + 1 end
+  return n
+end
+local got, n = drawForced("NE", 600)
+local ok = n == 600
+for k in pairs(got) do
+  local o = k:match("|(%w+)$") or ""
+  if not (o:find("N") and o:find("E")) then ok = false end
+end
+check(ok, "N + E: every tile has a road on both, deck/biome/density kept")
+check(kinds(got) == 4, "N + E: corner NE, tee NES, tee NEW, cross all come up (got " .. kinds(got) .. ")")
+got = drawForced("N", 800)
+local tees = 0
+for k, c in pairs(got) do
   if k:find("^tee") then tees = tees + c end
 end
-check(kinds == 8, "all 8 shapes with an N road come up (got " .. kinds .. ")")
+check(kinds(got) == 8, "N alone: all 8 shapes with an N road (got " .. kinds(got) .. ")")
 check(tees > 800 * 3 / 8 * 0.75 and tees < 800 * 3 / 8 * 1.25, "even per shape: tees ~3/8 (got " .. tees .. ")")
-SETTINGS.connection = "none"
+got = drawForced("NESW", 50)
+check(kinds(got) == 1 and got["cross|NESW"] == 50, "all four edges = only the cross")
+got = drawForced("", 400)
+check(kinds(got) == 15, "Force on with no edge = any of the 15 shapes (got " .. kinds(got) .. ")")
+got = drawForced("W", 40, "NES")
+check(kinds(got) == 1 and got["deadend|W"] == 40, "red N E S + green W = only the dead end open to the W")
+got = drawForced("", 300, "N")
+local noN = true
+for k in pairs(got) do
+  if (k:match("|(%w+)$") or ""):find("N") then noN = false end
+end
+check(noN and kinds(got) == 7, "red N alone: the 7 shapes with no N road (got " .. kinds(got) .. ")")
+local before = #spawned
+SETTINGS.edges, SETTINGS.noedges = "", "NESW"
+drawSpecific(nil, "White")
+check(#spawned == before and messages[#messages]:find("No tile shape"), "nothing fits: says so, draws nothing")
+SETTINGS.force = "off"; SETTINGS.edges = ""; SETTINGS.noedges = ""
 
 print("== draw specific ==")
 SETTINGS = {deck = "woodland", biome = "forest", pattern = "corner", orientation = "ES", density = "2"}
@@ -292,13 +351,14 @@ check(#spawned == count and messages[#messages]:find("No image URL"), "missing u
 print("== reload ==")
 tagged = {t}
 t.buttons = {}
-onLoad("deck=woodland;biome=forest;pattern=tee;orientation=NES;density=3;connection=E;advanced=1")
-check(SETTINGS.biome == "forest" and SETTINGS.orientation == "NES" and SETTINGS.connection == "E", "settings restored from save")
-check(ADVANCED and #self.buttons == 10, "Advanced open state restored")
+onLoad("deck=woodland;biome=forest;pattern=tee;orientation=NES;density=3;force=on;edges=SN;noedges=WE;advanced=1")
+check(SETTINGS.biome == "forest" and SETTINGS.orientation == "NES" and SETTINGS.force == "on" and SETTINGS.edges == "NS" and SETTINGS.noedges == "EW",
+      "settings restored from save, edges back in NESW order")
+check(ADVANCED and #self.buttons == 19, "Advanced open state restored")
 check(#t.buttons == 1, "onLoad re-renders tagged tiles from memo")
-onLoad("deck=nope;biome=forest;pattern=tee;orientation=XX;density=3;connection=Q")
-check(SETTINGS.deck == "random" and SETTINGS.orientation == "random" and SETTINGS.connection == "none",
-      "unknown saved values fall back to Random / None")
+onLoad("deck=nope;biome=forest;pattern=tee;orientation=XX;density=3;force=maybe;edges=QZ")
+check(SETTINGS.deck == "random" and SETTINGS.orientation == "random" and SETTINGS.force == "off" and SETTINGS.edges == "" and SETTINGS.noedges == "",
+      "unknown saved values fall back to Random, Force off, no edges")
 
 print(string.format("\n%d/%d checks passed", pass, pass + fail))
 os.exit(fail == 0 and 0 or 1)

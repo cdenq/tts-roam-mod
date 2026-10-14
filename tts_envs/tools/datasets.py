@@ -16,7 +16,7 @@ is one edit here instead of a hunt through every tool.
   data/origins.xlsx         origins                  one row per origin card
   data/gold_variables.csv
   data/shops.xlsx
-  data/asset_variables.csv  art knobs for tools/build_map_tiles.py + build_gems.py + build_landmarks.py
+  data/asset_variables.csv  art knobs for tools/build/build_map_tiles.py + build_gems.py + build_landmarks.py
   data/maptile.xlsx         <deck> x5, backs       image URLs for the Maptile Manager
                             biome_descriptions     tile description per biome
                             maptile_table          what Render spawns, per biome (GMNotes)

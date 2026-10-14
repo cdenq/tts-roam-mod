@@ -1,10 +1,10 @@
 --[[ Tile/Token Importer: mass-import items from the generated data bank.
 
 This is the source for the in-game bag nicknamed "Tile/Token Importer"
-(GUID 85a721). tools/sync_items_data.py inlines the data and writes the result
+(GUID 85a721). tools/sync/sync_items_data.py inlines the data and writes the result
 to .tts/objects/ for the extension to push.
 
-ITEM_DATA and ITEM_SETS are inlined above by tools/sync_items_data.py. They live
+ITEM_DATA and ITEM_SETS are inlined above by tools/sync/sync_items_data.py. They live
 HERE rather than in Global because this script is their only consumer, and
 object scripts do not share Global's scope.
 

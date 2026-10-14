@@ -197,10 +197,11 @@ cython_debug/
 .vscode/
 
 # Files
-plans/
+internal/
 assets/cards/*.png
 assets/gems/*.png
 assets/landmarks/*.png
 scratch/
 .tts/
 CLAUDE.md
+tts_envs/tools/build/

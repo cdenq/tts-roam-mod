@@ -430,6 +430,21 @@ check(ys[2] - ys[1] == SPAWN_PLACEMENT.step and ys[3] - ys[2] == SPAWN_PLACEMENT
       "one shared y sequence across categories, no overlap")
 EVENT_DATA.F1_sneak_fail.spawn = nil
 
+print("\n== spawncard pulls a card from its own bag ==")
+objects = {}
+CLONED = {}
+local ibag2 = makeBag("c98e54", {"Ration"})
+local cbag = makeBag("32e095", {"The Bell Line", "For Winter"})
+EVENT_DATA.F1_sneak_fail.spawn = {card = {{"For Winter"}}}
+local cc = makeCard("cardcard", "F1")
+cc.getPosition = function() return {x = 0, y = 0, z = 0} end
+setMemory(cc, {at = "F1_sneak_fail",
+               picks = {{node = "F1", option = 2, label = "Sneak", outcome = "F1_sneak_fail"}}})
+spawnClick(cc)
+check(#CLONED == 1 and CLONED[1].name == "For Winter", "the named card is spawned by exact name")
+check(cbag._takes == 1 and ibag2._takes == 0, "it comes from bag 32e095, not the item bag")
+EVENT_DATA.F1_sneak_fail.spawn = nil
+
 print("\n== gold: fewest coins ==")
 -- the split itself, independent of any bag
 local counts, short = splitGold(17, {5, 1})
@@ -806,7 +821,7 @@ EVENT_DATA = FIXTURE_DATA
 
 --[[ ==== economy: reputation and pricing ====
 
-These exercise the real ECONOMY table spliced in by tools/sync_gold.py, so a
+These exercise the real ECONOMY table spliced in by tools/sync/sync_gold.py, so a
 gold_variables.csv edit that breaks an invariant fails the build rather than surfacing
 as a wrong price at a merchant three sessions later.
 ]]

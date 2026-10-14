@@ -1,7 +1,7 @@
 --[[ Merchant Board: one board, every merchant.
 
 Source for the in-game board, GUID ecde97 (nicknamed "Shop" in game). Staged
-by tools/sync_merchant_board.py, which also inlines SHOPS and STOCK from
+by tools/sync/sync_merchant_board.py, which also inlines SHOPS and STOCK from
 data/shops.xlsx.
 
 HOW IT WORKS

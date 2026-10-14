@@ -4,8 +4,8 @@ Co-op RPG board game set in the Root universe, built in Tabletop Simulator.
 Content is authored in spreadsheets, compiled to Lua by Python syncs, and
 pushed into TTS through the VS Code "Tabletop Simulator Lua" extension.
 
-- design (settled) -> `plans/taxonomy.md`
-- open work -> `plans/auto_TODO.md`
+- design (settled) -> `internal/agent/taxonomy.md`
+- open work -> `internal/plans/auto_TODO.md`
 - art / image source -> Google Drive link in `assets/README.txt`
 
 # Setup
@@ -20,9 +20,13 @@ pushed into TTS through the VS Code "Tabletop Simulator Lua" extension.
 
 ```
 ROAM/
-├── plans/
-│   ├── taxonomy.md           # settled game design
-│   └── auto_TODO.md          # open work; read before changes
+├── internal/                 # gitignored working docs + art sources
+│   ├── agent/
+│   │   ├── taxonomy.md       # settled game design
+│   │   └── *_artguide.md     # art specs for agents (map tiles + landmarks, meeples)
+│   ├── plans/
+│   │   └── auto_TODO.md      # open work; read before changes
+│   └── asset_generation/     # Luminari font, meeples.psd, old meeple art
 ├── assets/
 │   ├── README.txt            # link to art folder
 │   └── maptiles/             # generated: <region>/ tiles, backs/, manifest.csv
@@ -51,10 +55,12 @@ ROAM/
     │   ├── datasets.py       # where every sheet lives; edit here to move one
     │   ├── spawn_cells.py    # spawn-cell grammar + staged_path()
     │   ├── lua_inline.py     # pastes src/lib/ into object scripts
-    │   ├── sync_*.py         # one per target, run by master_sync.cmd
-    │   ├── scaffold_maptile_xlsx.py # adds a maptile.xlsx row per generated image
-    │   ├── build_map_tiles.py # draws overworld tiles (manual, not in master_sync)
-    │   ├── test_events.lua   # offline harness, stubs TTS API
+    │   ├── refresh_master_reload.py, debug.py # write master_reload.lua / debug.lua
+    │   ├── sync/sync_*.py    # xlsx -> Lua, one per target, run by master_sync.cmd
+    │   ├── build/            # art generators (manual, not in master_sync)
+    │   │   ├── build_map_tiles.py, build_gems.py, build_cards.py, build_landmarks.py
+    │   │   └── scaffold_maptile_xlsx.py # adds a maptile.xlsx row per generated image
+    │   ├── test_*.lua        # offline harness, stubs TTS API
     │   └── bin/lua54.exe     # harness interpreter (5.4; TTS is 5.2)
     ├── master_sync.cmd       # rebuild everything + run tests
     ├── master_reload.lua     # generated; Execute Code -> live-apply Global
@@ -128,7 +134,7 @@ Map tile images. Run in Git Bash from the repo root. Not part of `master_sync.cm
 
 ```bash
 cd "/c/Users/Owner/Data/D/Board Games/ROAM/tts_envs"
-python tools/build_map_tiles.py --region forest --shape back cross tee straight corner deadend --density 1-4 --variants 1
+python tools/build/build_map_tiles.py --region forest --shape back cross tee straight corner deadend --density 1-4 --variants 1
 ```
 
 | flag | sets | values | omitted = |
@@ -150,27 +156,27 @@ python tools/build_map_tiles.py --region forest --shape back cross tee straight 
 Examples:
 
 ```bash
-python tools/build_map_tiles.py                                         # everything the CSV describes
-python tools/build_map_tiles.py --region forest --shape back            # just the forest back
-python tools/build_map_tiles.py --region forest --shape corner_ES --density 1-5
-python tools/build_map_tiles.py --region city plains --shape tee --variants 2
-python tools/build_map_tiles.py --prune                                 # rebuild all + clear leftovers
+python tools/build/build_map_tiles.py                                         # everything the CSV describes
+python tools/build/build_map_tiles.py --region forest --shape back            # just the forest back
+python tools/build/build_map_tiles.py --region forest --shape corner_ES --density 1-5
+python tools/build/build_map_tiles.py --region city plains --shape tee --variants 2
+python tools/build/build_map_tiles.py --prune                                 # rebuild all + clear leftovers
 ```
 
 Card fronts + backs (one pair per gem in `card.gems`, see [Card frame art](#card-frame-art)):
 
 ```bash
 cd "/c/Users/Owner/Data/D/Board Games/ROAM/tts_envs"
-python tools/build_gems.py     # only if gem art changed; cards read assets/gems/
-python tools/build_cards.py    # every gem in card.gems -> assets/cards/<colour>_front.png + _back.png
-python tools/build_cards.py ruby   # one colour, others untouched
+python tools/build/build_gems.py     # only if gem art changed; cards read assets/gems/
+python tools/build/build_cards.py    # every gem in card.gems -> assets/cards/<colour>_front.png + _back.png
+python tools/build/build_cards.py ruby   # one colour, others untouched
 ```
 
 Landmark standees (see [Landmark art](#landmark-art)):
 
 ```bash
 cd "/c/Users/Owner/Data/D/Board Games/ROAM/tts_envs"
-python tools/build_landmarks.py <landmark ..> --size <1-4 ..>
+python tools/build/build_landmarks.py <landmark ..> --size <1-4 ..>
 ```
 
 | arg | sets | values | omitted = |
@@ -180,10 +186,10 @@ python tools/build_landmarks.py <landmark ..> --size <1-4 ..>
 | `--prune` | cleanup | — | off |
 
 ```bash
-python tools/build_landmarks.py                         # everything the CSV describes (~20 s)
-python tools/build_landmarks.py building --size 4       # just the capital hall
-python tools/build_landmarks.py cave guildhall          # all sizes of two landmarks
-python tools/build_landmarks.py --prune                 # rebuild all + clear leftovers
+python tools/build/build_landmarks.py                         # everything the CSV describes (~20 s)
+python tools/build/build_landmarks.py building --size 4       # just the capital hall
+python tools/build/build_landmarks.py cave guildhall          # all sizes of two landmarks
+python tools/build/build_landmarks.py --prune                 # rebuild all + clear leftovers
 ```
 
 # Systems
@@ -228,7 +234,9 @@ the bag.
   | `!Key\|!Key\|Box` | Key 2/3 TAKEN from bag (unique), Box 1/3 cloned |
 
 - `spawngold`: flat (`5`) or range (`1-5`); blank = none
-- columns `spawn1..5`, `spawnstatus1..3`, `spawnmeepleN`; one roll per cell
+- columns `spawn1..5`, `spawnstatus1..3`, `spawnmeepleN`, `spawncard`; one roll per cell
+- `spawncard` (scenario_outcomes): a card from bag `32e095` by exact name; same grammar (`A|B`, `!` = take
+  the card out instead of cloning it). Not checked at sync: the names live only in that bag
 - every name checked against `tiles.xlsx` / `tokens.xlsx` at sync
 
 ## Event cards (scenarios)
@@ -245,7 +253,7 @@ every click.
 - node id = `<scenario_id>_<outcome_key>` (`EV1_pay_through`), built by sync
 - `outcomes` = `|`-separated keys, repeats raise odds
 - `region` = the event deck (`settlement` `woodland` `opencountry` `waterside`
-  `scarred`, see `plans/taxonomy.md` "Event decks"): one importer button per
+  `scarred`, see `internal/agent/taxonomy.md` "Event decks"): one importer button per
   deck, and the biomes that draw from it. Map-tile biomes (`forest`, `marsh`...)
   are a different list
 - GMNotes = `scenario_id` (permanent); memo = current node (empty = intro)
@@ -382,7 +390,7 @@ Board `ecde97` ("Shop"). `shops.xlsx` inlined into the board by
 
 Bag `b77050`. Draws overworld tiles from the generated art (Offline Generation)
 once their images are uploaded. Data: `data/maptile.xlsx`, inlined by
-`tools/sync_maptile_manager.py` (in `master_sync.cmd`).
+`tools/sync/sync_maptile_manager.py` (in `master_sync.cmd`).
 
 Panel:
 
@@ -391,22 +399,28 @@ Panel:
              [ Advanced ]
 [ Region ]   [ Biome ]          (Advanced toggles this grid; open/closed is saved)
 [ Pattern ]  [ Orientation ]
-[ Density ]  [ Force Connection ]
+[ Density ]  [ Force: Off ]
+[ Force: N ] [ Force: E ] [ Force: S ] [ Force: W ]
 ```
 
 - panel geometry (`PANEL`) is in world units; buttons cancel the bag's uneven scale, so text is
   never stretched, and sit just above the bag's base
 
-- left-click a setting = next, right-click = back; every setting starts `Random` (Force Connection: `None`)
+- left-click a setting = next, right-click = back; every setting starts `Random`; Force starts Off, no edges
+- the `↺` beside each setting puts it back to `Random` (Region also resets Biome, Pattern also
+  resets Orientation; ignored while Force overrides Pattern/Orientation)
 - Biome only offers the chosen deck's biomes (locked to Random while Deck is
   Random); Orientation only the chosen pattern's rotations (locked while
   Pattern is Random). Changing Deck/Pattern resets the dependent one
 - Orientation label shows a box-drawing glyph of the roads (`┼`, `├`, ...)
-- Force Connection (`None` N E S W) overrides Pattern + Orientation (greyed, clicks ignored):
-  Draw specific picks evenly among every pattern+rotation with a road on that edge (8 for any
-  edge, 3 of them tees), then rolls deck/biome/density as usual. Draw ignores it
-- Force Connection labels say where the new tile goes next to the one it joins, so they are
-  the opposite edge: `N` = goes north = needs a road on its S edge (E <-> W likewise)
+- `Force: On/Off` overrides Pattern + Orientation (greyed, clicks ignored). Each `Force: N/E/S/W`
+  edge has three states: left-click = **must** have a road there (green), right-click = must
+  **not** (red), the same click again = either way (blue). The other click switches green <-> red.
+  All grey while Force is off, but still clickable
+- Draw specific picks evenly among every pattern+rotation that fits (green N + E: corner NE, tees
+  NES and NEW, the cross; red N, E, S + green W: only the dead end open to the W), then rolls
+  deck/biome/density as usual. Nothing fits = a message, no tile. Draw ignores Force. Saved
+- the edge letter is the tile's own edge: `N` = a road leaving the new tile's north side
 - the Deck setting is labelled `Region`. Each setting's tooltip lists its options, or says
   what unlocks / overrides it
 - Draw = everything Random. Draw specific = rolls only what is still Random
@@ -453,7 +467,7 @@ Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + me
 | `density` | density stage | `density` `explorations` |
 | `weights` | roll | `param` `pool` -- `deck`, `biome:<deck>`, `pattern`, `orientation:<pattern>`, `density`, `guildhall:*`, `tier:<biome>`; repeat an entry to make it likelier (`1\|1\|2\|2\|3`) |
 
-- rows come from `python tools/scaffold_maptile_xlsx.py` (one per generated
+- rows come from `python tools/build/scaffold_maptile_xlsx.py` (one per generated
   image). Re-run after generating new art: adds rows, never overwrites a filled cell
 - only images with a `url` can be drawn; the sync counts the rest
 - `url` = `https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/maptiles/` + `file`.
@@ -468,7 +482,7 @@ Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + me
   fraction of `gold_anchor`
 - `sync_gold.py` writes INTO `data/` (`base_gold`, `spawngold`). Hand-typed
   values that disagree are kept as `OVERRIDE kept`
-- **after changing the gold numbers, run `python tools/sync_gold.py --force`**
+- **after changing the gold numbers, run `python tools/sync/sync_gold.py --force`**
   (a stale value looks like a hand override)
 - Change Converter `305b4a`: coins = objects tagged `Gold`, GMNotes = value.
   Cash-up (fewest coins) / Break-down. Hand-written, no data
@@ -483,7 +497,7 @@ Code-drawn storybook tiles. Manual step, not part of `master_sync.cmd`.
   `assets/maptiles/manifest.csv`
 - knobs in `data/asset_variables.csv` (`group,key,value,notes`):
   - `global` rows: size, supersample, seed, palette, path/frame sizes,
-    `back_font` (repo-root path, Luminari), `back_gem_size`, `density_scale`,
+    `back_font` (path from repo root, `internal/asset_generation/Luminari-Regular.ttf`), `back_gem_size`, `density_scale`,
     and feature/wall tuning: `river_anchor`, `river_width`, `canyon_width`, `lake_land`, `wharf_land`, `pond_size`,
     `falls_size`, `pit_size`, `pool_count`/`pool_size`, `mud_count`/`mud_size`,
     `spring_count`/`spring_size`, `reed_size`, `field_width`/`field_height`,
@@ -567,7 +581,7 @@ Code-drawn storybook tiles. Manual step, not part of `master_sync.cmd`.
 Code-drawn storybook gems on transparent PNGs, for cards. Same style helpers
 as the map tiles. Manual step, not part of `master_sync.cmd`.
 
-- `python tools/build_gems.py` — every colour (~7 s); `... ruby` — one colour
+- `python tools/build/build_gems.py` — every colour (~7 s); `... ruby` — one colour
 - writes `assets/gems/<colour>_<cut><n>.png` + `manifest.csv`. Every colour gets every cut
 - knobs in `data/asset_variables.csv`:
   - `gem` rows: `out_size`, `variants`, `cuts`, `size` (lo-hi % of canvas,
