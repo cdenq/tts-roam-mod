@@ -255,7 +255,13 @@ local function stampItem(clone, it, ctx)
   end
   clone.setCustomObject(p)
 
-  clone.setName(it.name)
+  -- Item rows only: tokens.xlsx rows carry a role, and meeples are matched by name.
+  local name = it.name
+  if it.role == nil then
+    -- nil when Global predates NAME_COLORS: import plain rather than fail.
+    name = Global.call("itemDisplayName", {name = it.name, tier = it.tier, subtype = it.subtype}) or it.name
+  end
+  clone.setName(name)
   clone.setDescription(it.description)
   clone.setGMNotes(it.gmnotes)
 

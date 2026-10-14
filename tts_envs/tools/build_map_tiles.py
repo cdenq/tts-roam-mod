@@ -103,12 +103,15 @@ GLOBAL_COLOURS = ("ink", "frame", "paper", "path", "path_pebble", "clearing",
                   "hill_lt", "hay", "hay_dk", "statue", "statue_dk", "statue_lt",
                   "gnarl_bark", "gnarl_bark_dk", "gnarl_leaf", "gnarl_leaf_dk", "gnarl_leaf_lt", "moss", "glow",
                   "chasm", "chasm_wall", "spring", "spring_dk", "mud", "mud_dk", "briar", "briar_dk",
-                  "berry", "cat_banner", "bird_banner", "foam")
+                  "berry", "cat_banner", "bird_banner", "foam", "barrow", "barrow_dk", "barrow_lt", "cave",
+                  "slag", "slag_dk", "ember", "smoke", "hole", "spoil", "blight", "blight_dk", "blight_lt",
+                  "blight_bark", "rot", "cold_rock_lt", "cold_rock_dk", "cold_pine", "cold_pine_dk", "frost",
+                  "lily_flower", "valley")
 GLOBAL_LISTS = ("roofs", "fields", "flower_colours")
 # Region keys that may be left out; the default reproduces an unwalled region.
 OPTIONAL_REGION_KEYS = {"town_radius": "0", "wall": "none", "outer_icons": "", "outer_spacing": "",
                         "centerpiece": "none", "centerpiece_size": "0",
-                        "feature": "none", "speckle": "", "layout": "scatter", "required": ""}
+                        "feature": "none", "speckle": "", "layout": "scatter", "required": "", "mud": "0"}
 WALLS = ("none", "palisade", "menhirs", "stone")
 CENTERPIECES = ("none", "guildhall", "windmill", "statue")
 # how far north of the plaza centre a centerpiece's base sits, as a fraction of
@@ -116,15 +119,19 @@ CENTERPIECES = ("none", "guildhall", "windmill", "statue")
 CENTERPIECE_SETBACK = {"guildhall": 0.3, "windmill": 0.3, "statue": 0.55}
 # area the scatter keeps clear, as (half-width, height) fractions of centerpiece_size
 CENTERPIECE_BOX = {"guildhall": (0.56, 0.66), "windmill": (0.56, 0.66), "statue": (0.42, 1.12)}
-FEATURES = ("none", "river", "pools", "pit", "lake", "canyon", "falls", "mud", "springs")
+FEATURES = ("none", "river", "pools", "pit", "lake", "canyon", "falls", "mud", "springs",
+            "ponds", "wharf", "flood", "millrace", "dam", "holes", "blight", "cliffs", "bighill")
+RIVER_FEATURES = ("river", "millrace", "dam")  # all draw the same river first
 LAYOUTS = ("scatter", "rows")
 GLOBAL_STRINGS = ("back_font",)
 GLOBAL_NUMBER_LISTS = ("density_scale",)
 # Feature + wall tuning. Numbers are design units unless named *_count.
 GLOBAL_FEATURE_NUMBERS = ("river_anchor", "river_width", "canyon_width", "pool_count", "mud_count", "spring_count",
-                          "menhir_spacing", "stake_spacing", "rampart_spacing", "tower_gap_count")
+                          "menhir_spacing", "stake_spacing", "rampart_spacing", "tower_gap_count",
+                          "hole_count", "cliff_width", "cliff_height", "bighill_size", "lake_land", "wharf_land")
 # "lo-hi" pairs
-GLOBAL_RANGES = ("lake_size", "falls_size", "pit_size", "pool_size", "mud_size", "spring_size",
+GLOBAL_RANGES = ("falls_size", "pit_size", "pool_size", "mud_size", "spring_size",
+                 "hole_size", "pond_size", "dam_pond_size",
                  "menhir_size", "stake_size", "rampart_size", "tower_size", "field_width", "field_height", "reed_size")
 # Groups in asset_variables.csv that belong to other generators, not regions.
 OTHER_GROUPS = ("gem", "gem_colour", "landmark", "landmark_size", "landmark_colour", "card")
@@ -194,7 +201,7 @@ def parse_global(raw):
       g[k] = (lo, hi)
   except ValueError as e:
     die("global: bad value %s" % e)
-  for k in ("pool_count", "mud_count", "spring_count"):
+  for k in ("pool_count", "mud_count", "spring_count", "hole_count"):
     g[k] = int(g[k])
   for k in ("out_size", "supersample", "seed"):
     g[k] = int(g[k])
@@ -255,6 +262,7 @@ def parse_region(name, raw):
   try:
     r["town_radius"] = float(opt["town_radius"])
     r["outer_spacing"] = float(opt["outer_spacing"] or raw["spacing"])
+    r["mud"] = int(opt["mud"])  # battlefield mud patches on top of any feature
   except ValueError as e:
     die("%s: bad value %s" % (name, e))
   if opt["wall"] not in WALLS:
@@ -433,6 +441,14 @@ def paint_oak(canvas, ax, ay, s, rng):
 
 
 def paint_pine(canvas, ax, ay, s, rng):
+  _pine(canvas, ax, ay, s, rng, G["pine"], G["pine_dk"])
+
+
+def paint_coldpine(canvas, ax, ay, s, rng):
+  _pine(canvas, ax, ay, s, rng, G["cold_pine"], G["cold_pine_dk"])
+
+
+def _pine(canvas, ax, ay, s, rng, fill, dk):
   w, h = s * 0.9, s * 1.7
   cx, by = PAD + w / 2, PAD + h
   trunk = blank(w, h)
@@ -445,7 +461,7 @@ def paint_pine(canvas, ax, ay, s, rng):
     d.polygon(wobble([(cx, top), (cx + half, top + s * 0.62), (cx - half, top + s * 0.62)], rng, 3), fill=255)
   ox, oy = ax - cx, ay - by
   stamp(canvas, trunk, ox, oy, G["trunk"])
-  stamp(canvas, m, ox, oy, G["pine"], G["pine_dk"])
+  stamp(canvas, m, ox, oy, fill, dk)
 
 
 def _bush(canvas, ax, ay, s, rng, fill, dk, lt):
@@ -579,6 +595,15 @@ def paint_reeds(canvas, ax, ay, s, rng):
 
 
 def paint_mushroom(canvas, ax, ay, s, rng):
+  _mushroom(canvas, ax, ay, s, rng, G["cap"], G["cap_dk"], tuple(min(255, int(c * 1.25)) for c in G["cap"]), G["stem"])
+
+
+def paint_blightcap(canvas, ax, ay, s, rng):
+  """Sickly toadstool: pale green cap with glowing spots."""
+  _mushroom(canvas, ax, ay, s, rng, G["blight_lt"], G["blight"], shade_of(G["blight_lt"], 1.1), G["glow"])
+
+
+def _mushroom(canvas, ax, ay, s, rng, cap, cap_dk, cap_lt, spot):
   w, h = s * 1.1, s * 1.05
   cx, by = PAD + w / 2, PAD + h
   stem = _mask_poly(w, h, [(cx - s * 0.12, by), (cx - s * 0.085, by - s * 0.6), (cx + s * 0.085, by - s * 0.6),
@@ -588,15 +613,15 @@ def paint_mushroom(canvas, ax, ay, s, rng):
   cy, rx, ry = by - s * 0.56, s * 0.46, s * 0.4
   pts = [(cx + math.cos(math.pi + math.pi * k / 15) * rx, cy + math.sin(math.pi + math.pi * k / 15) * ry) for k in range(16)]
   pts += [(cx + rx * 0.7, cy + s * 0.05), (cx - rx * 0.7, cy + s * 0.05)]
-  cap = _mask_poly(w, h, pts, rng, amp=1.5, sub=2)
-  stamp(canvas, cap, ox, oy, G["cap"], G["cap_dk"], tuple(min(255, int(c * 1.25)) for c in G["cap"]))
+  cap_m = _mask_poly(w, h, pts, rng, amp=1.5, sub=2)
+  stamp(canvas, cap_m, ox, oy, cap, cap_dk, cap_lt)
   dc = ImageDraw.Draw(canvas)
   for _ in range(5):
     a = rng.uniform(math.pi * 1.15, math.pi * 1.85)
     rr = rng.uniform(0.3, 0.75)
     x, y = cx + ox + math.cos(a) * rx * rr, cy + oy + math.sin(a) * ry * rr
     e = s * rng.uniform(0.035, 0.06)
-    dc.ellipse([x - e, y - e * 0.8, x + e, y + e * 0.8], fill=G["stem"])
+    dc.ellipse([x - e, y - e * 0.8, x + e, y + e * 0.8], fill=spot)
 
 
 def paint_ruinwall(canvas, ax, ay, s, rng):
@@ -1007,6 +1032,22 @@ def paint_windmill(canvas, ax, ay, s, rng):
 
 
 def paint_mountain(canvas, ax, ay, s, rng):
+  _mountain(canvas, ax, ay, s, rng, G["rock_dk"], G["rock_lt"], G["snow"])
+
+
+def paint_coldpeak(canvas, ax, ay, s, rng):
+  """Cold peak: blue-grey rock, a small cap of snow, a few streaks of rime."""
+  apex = _mountain(canvas, ax, ay, s, rng, G["cold_rock_dk"], G["cold_rock_lt"], G["snow"], cap_t=0.21)
+  dc = ImageDraw.Draw(canvas)
+  for _ in range(4):
+    t = rng.uniform(0.2, 0.7)
+    x = apex[0] + (ax - s * 0.8 - apex[0]) * t * rng.uniform(0.3, 0.9)
+    y = apex[1] + (ay - apex[1]) * t
+    dc.line([(x, y), (x - u(14), y + u(26))], fill=G["frost"], width=max(1, int(u(4))))
+
+
+def _mountain(canvas, ax, ay, s, rng, dk, lt, cap, cap_t=0.32):
+  """Returns the apex in canvas coordinates."""
   w, h = s * 1.6, s * 1.25
   cx, by = PAD + w / 2, PAD + h
   apex = (cx + rng.uniform(-s * 0.15, s * 0.15), by - h)
@@ -1017,7 +1058,7 @@ def paint_mountain(canvas, ax, ay, s, rng):
   lit = blank(w, h)
   ImageDraw.Draw(lit).polygon([left, apex, foot], fill=255)
   lit = ImageChops.multiply(lit, m)
-  t = 0.32
+  t = cap_t
   sl = (apex[0] + (left[0] - apex[0]) * t, apex[1] + (left[1] - apex[1]) * t)
   sr = (apex[0] + (right[0] - apex[0]) * t, apex[1] + (right[1] - apex[1]) * t)
   zig = [sl] + [(sl[0] + (sr[0] - sl[0]) * k / 5, sl[1] + (u(18) if k % 2 else -u(6))) for k in range(1, 5)]
@@ -1026,13 +1067,15 @@ def paint_mountain(canvas, ax, ay, s, rng):
   snow = ImageChops.multiply(snow, m)
   ox, oy = int(ax - cx), int(ay - by)
   box = (ox, oy, ox + m.size[0], oy + m.size[1])
-  stamp(canvas, m, ox, oy, G["rock_dk"])
-  canvas.paste(G["rock_lt"], box, lit)
-  canvas.paste(G["snow"], box, snow)
+  stamp(canvas, m, ox, oy, dk)
+  canvas.paste(lt, box, lit)
+  if cap:
+    canvas.paste(cap, box, snow)
   ImageDraw.Draw(canvas).line(
     [(apex[0] + ox, apex[1] + oy),
      (apex[0] + (foot[0] - apex[0]) * 0.6 + ox, apex[1] + (foot[1] - apex[1]) * 0.6 + oy)],
     fill=G["ink"], width=max(1, int(u(5))))
+  return apex[0] + ox, apex[1] + oy
 
 
 def paint_house(canvas, ax, ay, s, rng):
@@ -1341,6 +1384,467 @@ def paint_guildhall(canvas, ax, ay, s, rng, tier=3):
       put(poly([(x - 0.026, 0.165), (x, 0.195), (x + 0.026, 0.165)], amp=0.6), G["timber"])
 
 
+def _ripples(canvas, x, y, half, rng, n=2):
+  """Water-line arcs either side of something standing in water."""
+  dc = ImageDraw.Draw(canvas)
+  for k in range(n):
+    e = half * (1 + 0.35 * k)
+    dc.arc([x - e, y - u(7) - k * u(3), x + e, y + u(7) + k * u(3)], 10, 170, fill=G["water_lt"], width=max(1, int(u(4))))
+
+
+def paint_barrel(canvas, ax, ay, s, rng):
+  """One or two cargo barrels: bulged staves, iron hoops, cut-wood lid."""
+  for k in range(int(rng.integers(1, 3))):
+    bx = ax + (k - 0.5) * s * 0.42 if k else ax - s * 0.1
+    w, h = s * 0.6, s * 0.8
+    cx, by = PAD + w / 2, PAD + h
+    bw, bh = s * 0.2, s * 0.62
+    pts = [(cx - bw * 0.85, by), (cx - bw, by - bh * 0.5), (cx - bw * 0.85, by - bh),
+           (cx + bw * 0.85, by - bh), (cx + bw, by - bh * 0.5), (cx + bw * 0.85, by)]
+    m = _mask_poly(w, h, pts, rng, amp=0.8, sub=2)
+    ox, oy = bx - cx, ay - by
+    stamp(canvas, m, ox, oy, G["palisade"], G["palisade_dk"])
+    dc = ImageDraw.Draw(canvas)
+    for f in (0.2, 0.8):
+      y = by - bh * f + oy
+      dc.line([(cx - bw * 0.95 + ox, y), (cx + bw * 0.95 + ox, y)], fill=G["rock_dk"], width=max(1, int(u(5))))
+    dc.ellipse([cx - bw * 0.85 + ox, by - bh - u(7) + oy, cx + bw * 0.85 + ox, by - bh + u(7) + oy],
+               fill=G["stump_top"], outline=G["ink"], width=max(1, int(u(3))))
+
+
+def paint_crate(canvas, ax, ay, s, rng):
+  """A stack of one to three shipping crates: planks and a cross brace."""
+  box = s * 0.42
+  stack = [(0, 0)] + [((k - 0.5) * box * 1.05, 0) for k in range(int(rng.integers(0, 2)))]
+  if rng.random() < 0.5:
+    stack.append((rng.uniform(-0.15, 0.15) * box, -box))
+  fill = shade_of(G["stump_top"], 0.92)
+  for dx, dy in sorted(stack, key=lambda q: -q[1]):
+    w, h = box * 1.6, box * 1.6
+    cx, by = PAD + w / 2, PAD + h
+    pts = [(cx - box / 2, by), (cx - box / 2, by - box), (cx + box / 2, by - box), (cx + box / 2, by)]
+    m = _mask_poly(w, h, pts, rng, amp=0.6, sub=2)
+    ox, oy = ax + dx - cx, ay + dy - by
+    stamp(canvas, m, ox, oy, fill, shade_of(fill, 0.75))
+    dc = ImageDraw.Draw(canvas)
+    lw = max(1, int(u(3)))
+    for f in (0.33, 0.66):
+      y = by - box * f + oy
+      dc.line([(cx - box / 2 + ox, y), (cx + box / 2 + ox, y)], fill=G["palisade_dk"], width=lw)
+    dc.line([(cx - box / 2 + ox, by + oy), (cx + box / 2 + ox, by - box + oy)], fill=G["timber"], width=int(u(5)))
+
+
+def paint_barge(canvas, ax, ay, s, rng):
+  """Riverfolk barge afloat: plank hull, cargo on deck, a mast with a furled sail."""
+  w, h = s * 1.5, s * 1.3
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  flip = 1 if rng.random() < 0.5 else -1
+
+  def P(x, y):
+    return (cx + flip * x * s, by - y * s)
+
+  mast = (P(0.1, 0.22), P(0.1, 1.05))
+  _ink_line(canvas, [(mast[0][0] + ox, mast[0][1] + oy), (mast[1][0] + ox, mast[1][1] + oy)], G["timber"], u(6))
+  sail = _mask_poly(w, h, [P(0.12, 0.95), P(0.42, 0.62), P(0.12, 0.5)], rng, amp=1)
+  stamp(canvas, sail, ox, oy, G["stem"], shade_of(G["stem"], 0.85))
+  paint_crate(canvas, P(-0.25, 0.22)[0] + ox, P(-0.25, 0.22)[1] + oy, s * 0.55, rng)
+  paint_barrel(canvas, P(0.32, 0.22)[0] + ox, P(0.32, 0.22)[1] + oy, s * 0.42, rng)
+  hull = _mask_poly(w, h, [P(-0.62, 0.3), P(0.66, 0.3), P(0.5, 0.04), P(-0.48, 0.02)], rng, amp=1)
+  stamp(canvas, hull, ox, oy, G["timber"], shade_of(G["timber"], 0.75), G["palisade"])
+  dc = ImageDraw.Draw(canvas)
+  a, b = P(-0.55, 0.18), P(0.58, 0.18)
+  dc.line([(a[0] + ox, a[1] + oy), (b[0] + ox, b[1] + oy)], fill=G["palisade"], width=max(1, int(u(4))))
+  _ripples(canvas, ax, ay, s * 0.62, rng)
+
+
+def paint_raft(canvas, ax, ay, s, rng):
+  """Log raft afloat: a row of log ends, a barrel, a punt pole."""
+  _ink_line(canvas, [(ax + s * 0.25, ay - s * 0.15), (ax + s * 0.45, ay - s * 0.95)], G["timber"], u(5))
+  paint_barrel(canvas, ax - s * 0.12, ay - s * 0.16, s * 0.5, rng)
+  rr = s * 0.08
+  dc = ImageDraw.Draw(canvas)
+  for k in range(7):
+    x = ax + (k - 3) * rr * 2.05
+    m = blank(rr * 2, rr * 2)
+    ImageDraw.Draw(m).ellipse([PAD, PAD, PAD + rr * 2, PAD + rr * 2], fill=255)
+    stamp(canvas, m, x - rr - PAD, ay - rr * 1.6 - PAD, G["stump_top"], shade_of(G["stump_top"], 0.8))
+    dc.ellipse([x - rr * 0.45, ay - rr * 1.6 + rr - rr * 0.45, x + rr * 0.45, ay - rr * 1.6 + rr + rr * 0.45],
+               outline=shade_of(G["stump_top"], 0.65), width=max(1, int(u(2.5))))
+  _ripples(canvas, ax, ay, s * 0.6, rng)
+
+
+def paint_lodge(canvas, ax, ay, s, rng):
+  """Beaver lodge: a dome of piled sticks standing in the pond."""
+  w, h = s * 1.3, s * 0.8
+  cx, by = PAD + w / 2, PAD + h
+  pts = [(cx + math.cos(math.pi + math.pi * k / 13) * s * 0.55,
+          by + math.sin(math.pi + math.pi * k / 13) * s * 0.55) for k in range(14)]
+  m = _mask_poly(w, h, pts, rng, amp=3, sub=2)
+  ox, oy = ax - cx, ay - by
+  stamp(canvas, m, ox, oy, G["trunk"], shade_of(G["trunk"], 0.7), G["palisade"])
+  dc = ImageDraw.Draw(canvas)
+  for _ in range(22):
+    a = rng.uniform(math.pi * 1.05, math.pi * 1.95)
+    rr = rng.uniform(0.2, 0.9)
+    x, y = ax + math.cos(a) * s * 0.5 * rr, ay - s * 0.05 + math.sin(a) * s * 0.5 * rr
+    t = rng.uniform(0, math.pi)
+    ln = s * rng.uniform(0.08, 0.16)
+    dc.line([(x - math.cos(t) * ln, y - math.sin(t) * ln * 0.4), (x + math.cos(t) * ln, y + math.sin(t) * ln * 0.4)],
+            fill=G["ink"] if rng.random() < 0.5 else G["stump_top"], width=max(1, int(u(3.5))))
+  _ripples(canvas, ax, ay, s * 0.55, rng)
+
+
+def paint_watermill(canvas, ax, ay, s, rng):
+  """Mill on the riverbank, its great paddle wheel turning in the water to the
+  west of the base point. s = width of the whole piece."""
+  w, h = s * 1.4, s * 1.2
+  cx, by = PAD + w * 0.6, PAD + h
+  ox, oy = ax - cx, ay - by
+
+  def P(x, y):
+    return (cx + x * s, by - y * s)
+
+  # mill house on the east bank
+  wall = _mask_poly(w, h, [P(-0.06, 0), P(-0.06, 0.42), P(0.5, 0.42), P(0.5, 0)], rng, amp=1)
+  stamp(canvas, wall, ox, oy, G["wall"], G["wall_dk"])
+  roofc = G["roofs"][int(rng.integers(0, len(G["roofs"])))]
+  roof = _mask_poly(w, h, [P(-0.12, 0.4), P(0.22, 0.72), P(0.56, 0.4)], rng, amp=1.5)
+  stamp(canvas, roof, ox, oy, roofc, shade_of(roofc, 0.78))
+  dc = ImageDraw.Draw(canvas)
+  x0, y0 = P(0.28, 0.2)
+  x1, y1 = P(0.38, 0)
+  dc.rounded_rectangle([x0 + ox, y0 + oy, x1 + ox, y1 + oy], int(u(6)), fill=G["ink"])
+  wx, wy = P(0.1, 0.3)
+  e = s * 0.035
+  dc.rectangle([wx - e + ox, wy - e + oy, wx + e + ox, wy + e + oy], fill=G["window"], outline=G["ink"],
+               width=max(1, int(u(4))))
+  # wheel: rim, spokes, paddles round the rim
+  hx, hy = P(-0.3, 0.26)
+  hx, hy = hx + ox, hy + oy
+  r = s * 0.3
+  axle = (P(-0.06, 0.26)[0] + ox, hy)
+  _ink_line(canvas, [(hx, hy), axle], G["timber"], u(8))
+  spin = rng.uniform(0, math.pi / 6)
+  paddles = blank(w, h)
+  dp = ImageDraw.Draw(paddles)
+  for k in range(12):
+    a = spin + k * math.pi / 6
+    dx, dy = math.cos(a), math.sin(a)
+    nx, ny = -dy, dx
+    px, py = hx - ox + dx * r, hy - oy + dy * r
+    q = [(px - nx * s * 0.035, py - ny * s * 0.035), (px + dx * s * 0.09 - nx * s * 0.035, py + dy * s * 0.09 - ny * s * 0.035),
+         (px + dx * s * 0.09 + nx * s * 0.035, py + dy * s * 0.09 + ny * s * 0.035), (px + nx * s * 0.035, py + ny * s * 0.035)]
+    dp.polygon(q, fill=255)
+  stamp(canvas, paddles, ox, oy, G["palisade"], G["palisade_dk"])
+  rim = blank(w, h)
+  dr = ImageDraw.Draw(rim)
+  rx, ry = hx - ox, hy - oy
+  dr.ellipse([rx - r, ry - r, rx + r, ry + r], outline=255, width=int(s * 0.045))
+  dr.ellipse([rx - r * 0.18, ry - r * 0.18, rx + r * 0.18, ry + r * 0.18], fill=255)
+  for k in range(6):
+    a = spin + k * math.pi / 6
+    dr.line([(rx - math.cos(a) * r, ry - math.sin(a) * r), (rx + math.cos(a) * r, ry + math.sin(a) * r)],
+            fill=255, width=max(2, int(s * 0.022)))
+  stamp(canvas, rim, ox, oy, G["timber"], shade_of(G["timber"], 0.75))
+  # flume pouring onto the top of the wheel, and the churn where it meets the river
+  fx0, fy0 = hx - r * 1.25, hy - r * 1.25
+  fx1, fy1 = hx - r * 0.1, hy - r * 1.08
+  _ink_line(canvas, [(fx0, fy0), (fx1, fy1)], G["palisade"], u(14))
+  dc.line([(fx0, fy0 - u(3)), (fx1, fy1 - u(3))], fill=G["water"], width=max(1, int(u(6))))
+  for k in range(3):
+    x = fx1 + u(4) + k * u(7)
+    dc.line([(x, fy1), (x + u(4), fy1 + r * 0.45)], fill=G["water_lt"], width=max(1, int(u(4))))
+  for a0 in (200, 20):  # motion arcs: the wheel is turning
+    rr = r * 1.18
+    dc.arc([hx - rr, hy - rr, hx + rr, hy + rr], a0, a0 + 50, fill=G["water_lt"], width=max(1, int(u(5))))
+  for _ in range(8):
+    x, y = hx + rng.uniform(-r, r * 0.8), hy + r + rng.uniform(-u(14), u(10))
+    e = u(rng.uniform(8, 14))
+    dc.ellipse([x - e, y - e * 0.6, x + e, y + e * 0.6], fill=G["foam"], outline=G["ink"], width=max(1, int(u(2.5))))
+
+
+def paint_mangrove(canvas, ax, ay, s, rng):
+  """Swamp tree on arched prop roots, standing in water."""
+  dc = ImageDraw.Draw(canvas)
+  top = ay - s * 0.42
+  n = int(rng.integers(4, 7))
+  for k in range(n):
+    f = (k - (n - 1) / 2) / ((n - 1) / 2)
+    foot = (ax + f * s * 0.32 + rng.uniform(-s * 0.03, s * 0.03), ay)
+    knee = (ax + f * s * 0.24, top + s * 0.05)
+    _ink_line(canvas, [(ax + f * s * 0.05, top), knee, foot], G["trunk"], u(6))
+  for k in range(n):  # ripples where each root enters the water
+    f = (k - (n - 1) / 2) / ((n - 1) / 2)
+    x = ax + f * s * 0.32
+    dc.arc([x - u(14), ay - u(5), x + u(14), ay + u(5)], 10, 170, fill=G["water_lt"], width=max(1, int(u(3))))
+  w, h = s * 1.3, s * 1.3
+  cx, by = PAD + w / 2, PAD + h
+  trunk = blank(w, h)
+  ImageDraw.Draw(trunk).rectangle([cx - s * 0.07, by - s * 0.8, cx + s * 0.07, by - s * 0.38], fill=255)
+  ox, oy = ax - cx, ay - by
+  stamp(canvas, trunk, ox, oy, G["trunk"])
+  can = blank(w, h)
+  d = ImageDraw.Draw(can)
+  ccx, ccy, r = cx, by - s * 0.95, s * 0.5
+  d.ellipse([ccx - r * 0.85, ccy - r * 0.55, ccx + r * 0.85, ccy + r * 0.55], fill=255)
+  for k in range(int(rng.integers(7, 10))):
+    a = 2 * math.pi * k / 8 + rng.normal(0, 0.15)
+    rr = r * rng.uniform(0.32, 0.42)
+    px, py = ccx + math.cos(a) * r * 0.7, ccy + math.sin(a) * r * 0.4
+    d.ellipse([px - rr, py - rr, px + rr, py + rr], fill=255)
+  stamp(canvas, can, ox, oy, G["oak"], G["oak_dk"], G["oak_lt"])
+  for _ in range(3):
+    tx, ty = ccx + ox + rng.uniform(-r * 0.6, r * 0.5), ccy + oy + rng.uniform(-r * 0.3, r * 0.3)
+    dc.arc([tx - u(14), ty - u(10), tx + u(14), ty + u(10)], 200, 340, fill=G["ink"], width=max(1, int(u(4))))
+
+
+def paint_blighttree(canvas, ax, ay, s, rng):
+  """Diseased tree: bare grey-brown limbs carrying sickly green clumps,
+  hanging rot and shelf fungus on the trunk."""
+  _dead(canvas, ax, ay, s, rng, G["blight_bark"])
+  dc = ImageDraw.Draw(canvas)
+  for fx, fy, r in ((-0.36, 0.85, 0.16), (0.32, 0.72, 0.15), (-0.18, 1.1, 0.13), (0.08, 1.05, 0.12)):
+    if rng.random() < 0.2:
+      continue
+    x, y, rr = ax + fx * s, ay - fy * s, r * s
+    m = blank(rr * 3, rr * 3)
+    dm = ImageDraw.Draw(m)
+    for _ in range(4):
+      px, py = PAD + rr * 1.5 + rng.uniform(-rr * 0.6, rr * 0.6), PAD + rr * 1.5 + rng.uniform(-rr * 0.4, rr * 0.3)
+      e = rr * rng.uniform(0.45, 0.65)
+      dm.ellipse([px - e, py - e * 0.8, px + e, py + e * 0.8], fill=255)
+    stamp(canvas, m, x - rr * 1.5 - PAD, y - rr * 1.5 - PAD, G["blight"], G["blight_dk"], G["blight_lt"])
+    for _ in range(3):  # drips of rot hanging off the clump
+      tx = x + rng.uniform(-rr, rr)
+      ln = s * rng.uniform(0.1, 0.22)
+      _ink_line(canvas, [(tx, y + rr * 0.3), (tx + u(3), y + rr * 0.3 + ln * 0.5), (tx - u(2), y + rr * 0.3 + ln)],
+                G["blight_lt"], u(4))
+  for k in range(int(rng.integers(1, 3))):  # shelf fungus
+    x, y = ax + (1 if k else -1) * s * 0.08, ay - s * rng.uniform(0.2, 0.5)
+    e = s * 0.07
+    dc.pieslice([x - e, y - e * 0.5, x + e, y + e * 0.5], 180, 360, fill=G["blight_lt"], outline=G["ink"],
+                width=max(1, int(u(3))))
+
+
+def paint_barrow(canvas, ax, ay, s, rng):
+  """Burial mound: a dark grassy dome with a stone-framed door into the dark."""
+  w, h = s * 1.8, s * 0.95
+  cx, by = PAD + w / 2, PAD + h
+  pts = [(cx + math.cos(math.pi + math.pi * k / 15) * s * 0.8,
+          by + math.sin(math.pi + math.pi * k / 15) * s * 0.66 * rng.uniform(0.95, 1.04)) for k in range(16)]
+  m = _mask_poly(w, h, pts, rng, amp=2, sub=2)
+  ox, oy = ax - cx, ay - by
+  stamp(canvas, m, ox, oy, G["barrow"], G["barrow_dk"], G["barrow_lt"])
+  dx = rng.uniform(-0.12, 0.12) * s
+  dw, dh = s * 0.16, s * 0.3
+  door = blank(w, h)
+  dd = ImageDraw.Draw(door)
+  dd.rectangle([cx + dx - dw, by - dh * 0.75, cx + dx + dw, by], fill=255)
+  dd.ellipse([cx + dx - dw, by - dh, cx + dx + dw, by - dh * 0.5], fill=255)
+  stamp(canvas, door, ox, oy, G["cave"])
+  for side in (-1, 1):  # door stones and lintel
+    x = cx + dx + side * dw * 1.15
+    st = _mask_poly(w, h, [(x - s * 0.05, by), (x - s * 0.045, by - dh * 1.05), (x + s * 0.045, by - dh * 1.05),
+                           (x + s * 0.05, by)], rng, amp=0.8)
+    stamp(canvas, st, ox, oy, G["stone"], G["stone_dk"])
+  lin = _mask_poly(w, h, [(cx + dx - dw * 1.8, by - dh * 1.02), (cx + dx + dw * 1.8, by - dh * 1.02),
+                          (cx + dx + dw * 1.7, by - dh * 1.22), (cx + dx - dw * 1.7, by - dh * 1.22)], rng, amp=0.8)
+  stamp(canvas, lin, ox, oy, G["stone"], G["stone_dk"])
+  dc = ImageDraw.Draw(canvas)
+  for _ in range(4):  # tufts on the mound
+    x, y = ax + rng.uniform(-s * 0.55, s * 0.55), ay - s * rng.uniform(0.35, 0.55)
+    for k in range(3):
+      dc.line([(x + k * u(8), y), (x + k * u(8) + (k - 1) * u(4), y - u(12))], fill=G["barrow_dk"], width=max(1, int(u(3))))
+
+
+def paint_cave(canvas, ax, ay, s, rng):
+  """Rocky outcrop with a black cave mouth at its foot."""
+  w, h = s * 1.4, s * 1.0
+  cx, by = PAD + w / 2, PAD + h
+  n = 9
+  pts = [(cx + math.cos(math.pi + math.pi * k / (n - 1)) * s * 0.62 * rng.uniform(0.85, 1.05),
+          by + math.sin(math.pi + math.pi * k / (n - 1)) * s * 0.85 * rng.uniform(0.8, 1.05)) for k in range(n)]
+  m = blank(w, h)
+  ImageDraw.Draw(m).polygon(pts, fill=255)
+  ox, oy = ax - cx, ay - by
+  stamp(canvas, m, ox, oy, G["rock_lt"], G["rock_dk"])
+  mw, mh = s * 0.24, s * 0.34
+  mouth = _mask_poly(w, h, [(cx - mw, by), (cx - mw * 0.9, by - mh * 0.6), (cx - mw * 0.3, by - mh),
+                            (cx + mw * 0.5, by - mh * 0.85), (cx + mw, by - mh * 0.3), (cx + mw * 0.9, by)], rng, amp=1.5)
+  stamp(canvas, mouth, ox, oy, G["cave"])
+  dc = ImageDraw.Draw(canvas)
+  for _ in range(3):  # cracks
+    x, y = ax + rng.uniform(-s * 0.4, s * 0.4), ay - s * rng.uniform(0.45, 0.75)
+    dc.line([(x, y), (x + u(8), y + u(16)), (x + u(2), y + u(28))], fill=G["ink"], width=max(1, int(u(3))))
+
+
+def paint_furnace(canvas, ax, ay, s, rng):
+  """Iron bloomery: banded stone stack, glowing mouth, smoke."""
+  w, h = s * 1.0, s * 1.6
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  for k in range(3):  # smoke, behind the stack
+    rr = s * (0.1 + 0.04 * k)
+    px, py = cx + rng.uniform(-0.05, 0.12) * s + k * s * 0.06, by - s * (0.85 + 0.2 * k)
+    m = blank(w, h)
+    ImageDraw.Draw(m).ellipse([px - rr, py - rr * 0.8, px + rr, py + rr * 0.8], fill=255)
+    stamp(canvas, m, ox, oy, G["smoke"], shade_of(G["smoke"], 0.85))
+  stack = _mask_poly(w, h, [(cx - s * 0.3, by), (cx - s * 0.16, by - s * 0.72), (cx + s * 0.16, by - s * 0.72),
+                            (cx + s * 0.3, by)], rng, amp=1.2)
+  stamp(canvas, stack, ox, oy, G["stone"], G["stone_dk"])
+  dc = ImageDraw.Draw(canvas)
+  for f in (0.25, 0.5):
+    y = by - s * 0.72 * f + oy
+    half = s * (0.3 - 0.14 * f)
+    dc.line([(cx - half + ox, y), (cx + half + ox, y)], fill=G["stone_dk"], width=max(1, int(u(4))))
+  mouth = blank(w, h)
+  dm = ImageDraw.Draw(mouth)
+  dm.rectangle([cx - s * 0.09, by - s * 0.12, cx + s * 0.09, by], fill=255)
+  dm.ellipse([cx - s * 0.09, by - s * 0.21, cx + s * 0.09, by - s * 0.03], fill=255)
+  stamp(canvas, mouth, ox, oy, G["ember"], None, G["window"])
+  e = s * 0.04
+  dc.ellipse([cx - e + ox, by - s * 0.07 - e + oy, cx + e + ox, by - s * 0.07 + e + oy], fill=G["window"])
+
+
+def paint_slagheap(canvas, ax, ay, s, rng):
+  """Heap of black slag from the furnaces, still glowing in places."""
+  w, h = s * 1.3, s * 0.8
+  cx, by = PAD + w / 2, PAD + h
+  m = blank(w, h)
+  d = ImageDraw.Draw(m)
+  for k in range(5):
+    rr = s * rng.uniform(0.16, 0.26) * (1.3 if k == 2 else 1)
+    px = cx + (k - 2) * s * 0.17 + rng.uniform(-s * 0.03, s * 0.03)
+    py = by - rr * 0.8 - (s * 0.12 if k == 2 else 0)
+    d.ellipse([px - rr, py - rr * 0.8, px + rr, py + rr * 0.8], fill=255)
+  ox, oy = ax - cx, ay - by
+  stamp(canvas, m, ox, oy, G["slag"], G["slag_dk"], shade_of(G["slag"], 1.3))
+  dc = ImageDraw.Draw(canvas)
+  for _ in range(int(rng.integers(3, 6))):
+    x, y = ax + rng.uniform(-s * 0.4, s * 0.4), ay - s * rng.uniform(0.08, 0.4)
+    e = u(rng.uniform(4, 7))
+    dc.ellipse([x - e, y - e * 0.7, x + e, y + e * 0.7], fill=G["ember"])
+
+
+def paint_sword(canvas, ax, ay, s, rng):
+  """Broken sword: hilt-up stump of blade driven into the ground, the snapped
+  tip lying beside it."""
+  lean = rng.uniform(-0.25, 0.25)
+  dx, dy = math.sin(lean), -math.cos(lean)
+  nx, ny = -dy, dx
+  blade_w, stub = s * 0.07, s * rng.uniform(0.5, 0.65)
+  w, h = s * 1.4, s * 1.2
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  top = (cx + dx * stub, by + dy * stub)
+  jag = [(cx + dx * stub * f + nx * blade_w * g, by + dy * stub * f + ny * blade_w * g) for f, g in ((1.0, 1), (0.88, 0.2), (0.96, -0.4), (0.9, -1))]
+  blade = _mask_poly(w, h, [(cx + nx * blade_w, by + ny * blade_w)] + jag + [(cx - nx * blade_w, by - ny * blade_w)], rng, amp=0.5)
+  stamp(canvas, blade, ox, oy, G["rock_lt"], G["rock_dk"])
+  # crossguard, grip and pommel above the blade (the sword is upside down: hilt in the air)
+  gx, gy = cx + dx * (stub + s * 0.02), by + dy * (stub + s * 0.02)
+  _ink_line(canvas, [(gx - nx * s * 0.17 + ox, gy - ny * s * 0.17 + oy), (gx + nx * s * 0.17 + ox, gy + ny * s * 0.17 + oy)],
+            G["banner_lt"], u(6))
+  hx, hy = gx + dx * s * 0.2, gy + dy * s * 0.2
+  _ink_line(canvas, [(gx + ox, gy + oy), (hx + ox, hy + oy)], G["timber"], u(6))
+  e = s * 0.045
+  ImageDraw.Draw(canvas).ellipse([hx - e + ox, hy - e + oy, hx + e + ox, hy + e + oy], fill=G["banner_lt"], outline=G["ink"],
+                                 width=max(1, int(u(3))))
+  # the snapped-off tip, flat on the ground
+  side = 1 if rng.random() < 0.5 else -1
+  tx, ty = ax + side * s * 0.32, ay - s * 0.02
+  ln = s * rng.uniform(0.3, 0.42)
+  tip = blank(w, h)
+  ImageDraw.Draw(tip).polygon([(cx + side * s * 0.32 - ln / 2, by - s * 0.02 - blade_w * 0.8),
+                               (cx + side * s * 0.32 + ln / 2, by - s * 0.02),
+                               (cx + side * s * 0.32 - ln / 2, by - s * 0.02 + blade_w * 0.8)], fill=255)
+  stamp(canvas, tip, ox, oy, G["rock_lt"], G["rock_dk"])
+
+
+def paint_helmet(canvas, ax, ay, s, rng):
+  """One to three dented helmets in the grass: Marquisate ones with ear
+  guards, Eyrie ones with a crest."""
+  n = int(rng.integers(1, 3))
+  for k in range(n):
+    hx = ax + (k - (n - 1) / 2) * s * 0.75 + rng.uniform(-s * 0.1, s * 0.1)
+    hy = ay + rng.uniform(-s * 0.15, s * 0.1)
+    w, h = s * 1.4, s * 1.4
+    cx, by = PAD + w / 2, PAD + h
+    tilt = rng.uniform(-0.35, 0.35)
+
+    def P(x, y):
+      return (cx + (x * math.cos(tilt) - y * math.sin(tilt)) * s, by - (x * math.sin(tilt) + y * math.cos(tilt)) * s)
+
+    cat = rng.random() < 0.5
+    dome = [P(math.cos(math.pi * t / 12) * 0.42, math.sin(math.pi * t / 12) * 0.5 + 0.08) for t in range(13)]
+    shape = dome + [P(-0.46, 0.0), P(0.46, 0.0)][::-1]
+    m = _mask_poly(w, h, shape, rng, amp=0.8, sub=2)
+    if cat:  # ear guards
+      d = ImageDraw.Draw(m)
+      for side in (-1, 1):
+        d.polygon([P(side * 0.18, 0.5), P(side * 0.3, 0.78), P(side * 0.38, 0.4)], fill=255)
+    ox, oy = hx - cx, hy - by
+    stamp(canvas, m, ox, oy, G["rock_lt"], G["rock_dk"], shade_of(G["rock_lt"], 1.1))
+    dc = ImageDraw.Draw(canvas)
+    a, b = P(-0.44, 0.1), P(0.44, 0.1)  # brim
+    dc.line([(a[0] + ox, a[1] + oy), (b[0] + ox, b[1] + oy)], fill=G["ink"], width=max(1, int(u(4))))
+    a, b = P(-0.2, 0.28), P(0.2, 0.28)  # eye slit
+    dc.line([(a[0] + ox, a[1] + oy), (b[0] + ox, b[1] + oy)], fill=G["ink"], width=max(2, int(s * 0.08)))
+    if not cat:  # crest plume
+      plume = _mask_poly(w, h, [P(-0.05, 0.56), P(0.05, 0.82), P(0.3, 0.86), P(0.18, 0.55)], rng, amp=0.8)
+      stamp(canvas, plume, ox, oy, G["bird_banner"], shade_of(G["bird_banner"], 0.75))
+    else:
+      e = s * 0.05
+      x, y = P(0.0, 0.42)
+      dc.ellipse([x - e + ox, y - e + oy, x + e + ox, y + e + oy], fill=G["cat_banner"], outline=G["ink"],
+                 width=max(1, int(u(2.5))))
+
+
+def paint_catapult(canvas, ax, ay, s, rng):
+  """Abandoned siege catapult: wheeled base, A-frame, throwing arm with its
+  cup -- often snapped."""
+  w, h = s * 1.6, s * 1.4
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  flip = 1 if rng.random() < 0.5 else -1
+
+  def P(x, y):
+    return (cx + flip * x * s + ox, by - y * s + oy)
+
+  beam = u(9)
+  broken = rng.random() < 0.6
+  # throwing arm first (behind the frame): pivot at the frame top, cup at the far end
+  pivot = P(0.05, 0.5)
+  cup = P(-0.5, 0.95) if not broken else P(-0.2, 0.72)
+  _ink_line(canvas, [P(0.38, 0.28), pivot, cup], G["timber"], beam)
+  if broken:  # the snapped half lying on the ground
+    _ink_line(canvas, [P(-0.62, 0.06), P(-0.22, 0.12)], G["timber"], beam)
+    cup_at = P(-0.66, 0.1)
+  else:
+    cup_at = cup
+  e = s * 0.08
+  m = blank(w, h)
+  ImageDraw.Draw(m).pieslice([cup_at[0] - ox - e, cup_at[1] - oy - e, cup_at[0] - ox + e, cup_at[1] - oy + e], 0, 180, fill=255)
+  stamp(canvas, m, ox, oy, G["palisade"], G["palisade_dk"])
+  # base and A-frame
+  _ink_line(canvas, [P(-0.42, 0.12), P(0.42, 0.12)], G["palisade"], beam * 1.3)
+  for x in (-0.22, 0.28):
+    _ink_line(canvas, [P(x, 0.12), P(0.05, 0.55)], G["palisade"], beam)
+  _ink_line(canvas, [P(-0.12, 0.32), P(0.2, 0.32)], G["palisade"], beam * 0.8)
+  dc = ImageDraw.Draw(canvas)
+  r = s * 0.11
+  for x in (-0.3, 0.3):  # wheels
+    wx, wy = P(x, 0.1)
+    dc.ellipse([wx - r, wy - r, wx + r, wy + r], fill=G["timber"], outline=G["ink"], width=max(1, int(u(4))))
+    for k in range(2):
+      a = k * math.pi / 2 + 0.4
+      dc.line([(wx - math.cos(a) * r, wy - math.sin(a) * r), (wx + math.cos(a) * r, wy + math.sin(a) * r)],
+              fill=G["palisade_dk"], width=max(1, int(u(3))))
+  e = s * 0.035
+  px, py = pivot
+  dc.ellipse([px - e, py - e, px + e, py + e], fill=G["rock_dk"], outline=G["ink"], width=max(1, int(u(2.5))))
+
+
 def paint_field(canvas, x0, y0, fw, fh, rng):
   m = blank(fw, fh)
   ImageDraw.Draw(m).polygon(
@@ -1369,7 +1873,13 @@ PAINTERS = {"tree": paint_tree, "pine": paint_pine, "bush": paint_bush,
             "haystack": paint_haystack, "windmill": paint_windmill, "statue": paint_statue,
             "gnarled": paint_gnarled, "briar": paint_briar, "flowers": paint_flowers,
             "menhir": paint_menhir, "cart": paint_cart, "spears": paint_spears, "warbanner": paint_warbanner,
-            "townhouse": paint_townhouse, "wallblock": paint_wallblock, "tower": paint_tower}
+            "townhouse": paint_townhouse, "wallblock": paint_wallblock, "tower": paint_tower,
+            "coldpine": paint_coldpine, "coldpeak": paint_coldpeak, "blightcap": paint_blightcap,
+            "barrel": paint_barrel, "crate": paint_crate, "barge": paint_barge, "raft": paint_raft,
+            "lodge": paint_lodge, "watermill": paint_watermill, "mangrove": paint_mangrove,
+            "blighttree": paint_blighttree, "barrow": paint_barrow, "cave": paint_cave,
+            "furnace": paint_furnace, "slagheap": paint_slagheap, "sword": paint_sword, "helmet": paint_helmet,
+            "catapult": paint_catapult}
 
 
 # ---------------------------------------------------------------- tile
@@ -1457,12 +1967,16 @@ def frame(img, edges=(), cuts=()):
 
 
 # half-width of a painter's body (x size) for scatter collision, and its ground shadow width
-WIDE_BASE = ("hill", "ruinwall", "gnarled", "briar", "cart")
-BODY_HALF = {"gnarled": 0.5, "briar": 0.6, "cart": 0.6, "mountain": 0.7, "hill": 0.9, "ruinwall": 0.62, "crane": 0.45, "logpile": 0.35, "townhouse": 0.5}
+WIDE_BASE = ("hill", "ruinwall", "gnarled", "briar", "cart", "barrow", "slagheap", "catapult")
+BODY_HALF = {"gnarled": 0.5, "briar": 0.6, "cart": 0.6, "mountain": 0.7, "hill": 0.9, "ruinwall": 0.62, "crane": 0.45, "logpile": 0.35, "townhouse": 0.5,
+             "coldpeak": 0.7, "barrow": 0.8, "cave": 0.6, "slagheap": 0.6, "mangrove": 0.45, "catapult": 0.8, "helmet": 0.6}
 SHADOW_WIDTH = {"gnarled": 0.6, "briar": 0.62, "flowers": 0.3, "menhir": 0.22, "cart": 0.6, "spears": 0.25,
                 "warbanner": 0.15, "statue": 0.3, "mountain": 0.8, "stake": 0.3, "guildhall": 0.52, "windmill": 0.3, "hill": 0.85,
                 "rock": 0.55, "crane": 0.3, "reeds": 0.25, "ruinwall": 0.62, "column": 0.25,
-                "logpile": 0.45, "stump": 0.45, "townhouse": 0.55, "wallblock": 0.4, "tower": 0.35}
+                "logpile": 0.45, "stump": 0.45, "townhouse": 0.55, "wallblock": 0.4, "tower": 0.35,
+                "barrow": 0.8, "cave": 0.6, "furnace": 0.35, "slagheap": 0.6, "barrel": 0.3, "crate": 0.35,
+                "sword": 0.25, "helmet": 0.5, "catapult": 0.6}
+NO_SHADOW = ("barge", "raft", "lodge", "watermill")  # afloat: no ground under them
 
 
 def river_points(rng):
@@ -1483,11 +1997,11 @@ def river_points(rng):
   return ctrl
 
 
-def fit_corner(clear_of, max_r, min_r, squash=0.75):
-  """Largest ellipse (radius, squash) centred in a tile corner that stays clear
-  of roads and the clearing. Off-tile rim points don't count, so it can spill
-  over the edge. Returns (centre, radius) or None."""
-  best = None
+def fit_corners(clear_of, max_r, min_r, squash=0.75):
+  """Per tile corner, the largest ellipse (radius, squash) centred there that
+  stays clear of roads and the clearing. Off-tile rim points don't count, so it
+  can spill over the edge. Returns [(centre, radius)] for the corners that fit."""
+  out = []
   for fx, fy in ((0.2, 0.2), (0.8, 0.2), (0.2, 0.8), (0.8, 0.8)):
     c = (R * fx, R * fy)
     r = max_r
@@ -1496,9 +2010,31 @@ def fit_corner(clear_of, max_r, min_r, squash=0.75):
       if all(clear_of(q, u(15)) for q in rim if 0 <= q[0] <= R and 0 <= q[1] <= R):
         break
       r -= u(15)
-    if r >= min_r and (best is None or r > best[1]):
+    if r >= min_r:
+      out.append((c, r))
+  return out
+
+
+def fit_corner(clear_of, max_r, min_r, squash=0.75):
+  """The biggest of fit_corners, or None."""
+  best = None
+  for c, r in fit_corners(clear_of, max_r, min_r, squash):
+    if best is None or r > best[1]:
       best = (c, r)
   return best
+
+
+def lily(d, x, y, e, rng, flower=False):
+  """A lily pad (notched disc) floating at (x, y), optionally in flower."""
+  a0 = rng.uniform(0, 360)
+  d.ellipse([x - e - u(3), y - e * 0.7 - u(3), x + e + u(3), y + e * 0.7 + u(3)], fill=G["ink"])
+  d.pieslice([x - e, y - e * 0.7, x + e, y + e * 0.7], a0 + 40, a0 + 360, fill=G["leaf"])
+  if flower:
+    f = e * 0.5
+    d.ellipse([x - f - u(3), y - f - u(3), x + f + u(3), y + f + u(3)], fill=G["ink"])
+    d.ellipse([x - f, y - f, x + f, y + f], fill=G["lily_flower"])
+    c = f * 0.35
+    d.ellipse([x - c, y - c, x + c, y + c], fill=G["window"])
 
 
 def blob(img, cx, cy, rx, ry, rng, fill, shade=None, light=None, amp=4):
@@ -1601,7 +2137,7 @@ def draw_tile(region, seed, edges, density):
   blockers = []
   bank_spots = []
   river = None
-  if region["feature"] == "river":
+  if region["feature"] in RIVER_FEATURES:
     river = river_points(rng)
     rw = u(G["river_width"])
     d.line(river, fill=G["ink"], width=int(rw + u(12)), joint="curve")
@@ -1668,26 +2204,6 @@ def draw_tile(region, seed, edges, density):
         ImageDraw.Draw(m).polygon(wobble(ring, rng, 3, sub=2), fill=255)
         stamp(img, m, pcx - rx - PAD, pcy - ry - PAD + (1 - f) * u(30), fill, shade_of(fill, 0.8))
       blockers.append(lambda q: ((q[0] - pcx) / (pr + u(25))) ** 2 + ((q[1] - pcy) / (pr * 0.8 + u(45))) ** 2 < 1)
-  elif region["feature"] == "lake":
-    fit = fit_corner(clear_of, u(G["lake_size"][1]), u(G["lake_size"][0]))
-    if fit:
-      (lcx, lcy), lr = fit
-      lry = lr * 0.75
-      blob(img, lcx, lcy, lr, lry, rng, G["water"], G["water_dk"], G["water_lt"], amp=6)
-      for _ in range(16):  # ripples
-        x, y = lcx + rng.uniform(-lr * 0.6, lr * 0.6), lcy + rng.uniform(-lry * 0.6, lry * 0.6)
-        if 0 < x < R and 0 < y < R:
-          d.arc([x - u(18), y - u(6), x + u(18), y + u(6)], 200, 340, fill=G["water_lt"], width=max(1, int(u(4))))
-      for _ in range(int(rng.integers(4, 8))):  # lily pads
-        x, y = lcx + rng.uniform(-lr * 0.55, lr * 0.55), lcy + rng.uniform(-lry * 0.55, lry * 0.55)
-        e = u(14)
-        d.ellipse([x - e - u(3), y - e * 0.7 - u(3), x + e + u(3), y + e * 0.7 + u(3)], fill=G["ink"])
-        d.pieslice([x - e, y - e * 0.7, x + e, y + e * 0.7], 40, 360, fill=G["leaf"])
-      for a in np.linspace(0, 2 * math.pi, 26, endpoint=False):  # shore reeds
-        q = (lcx + math.cos(a) * (lr + u(22)), lcy + math.sin(a) * (lry + u(22)) + u(20))
-        if rng.random() < 0.5 and u(60) < q[0] < R - u(40) and u(80) < q[1] < R - u(40) and clear_of(q, u(15)):
-          bank_spots.append((q[0], q[1], "reeds", u(rng.uniform(*G["reed_size"]))))
-      blockers.append(lambda q: ((q[0] - lcx) / (lr + u(25))) ** 2 + ((q[1] - lcy) / (lry + u(40))) ** 2 < 1)
   elif region["feature"] == "canyon":
     canyon = [(R - x, y) for x, y in river_points(rng)]  # east side, so it isn't a river's twin
     cw = u(G["canyon_width"])
@@ -1774,6 +2290,334 @@ def draw_tile(region, seed, edges, density):
           d.line(wisp, fill=G["foam"], width=max(1, int(u(5))), joint="curve")
     blockers.append(lambda q: any(((q[0] - hx) / (hrx + u(20))) ** 2 + ((q[1] - hy) / (hry + u(20))) ** 2 < 1
                                   for hx, hy, hrx, hry in holes))
+  elif region["feature"] == "ponds":
+    ponds = []
+    lo, hi = G["pond_size"]
+    for (pcx, pcy), pr in fit_corners(clear_of, u(hi), u(lo), squash=0.8):
+      pry = pr * 0.8
+      blob(img, pcx, pcy, pr, pry, rng, G["water"], G["water_dk"], G["water_lt"], amp=6)
+      ponds.append((pcx, pcy, pr, pry))
+      for _ in range(int(pr * pry / u(36) ** 2 * 0.55)):  # crowded with lilies, some in flower
+        a, rr = rng.uniform(0, 2 * math.pi), math.sqrt(rng.random()) * 0.85
+        x, y = pcx + math.cos(a) * pr * rr, pcy + math.sin(a) * pry * rr
+        if u(40) < x < R - u(40) and u(40) < y < R - u(40):
+          lily(d, x, y, u(rng.uniform(12, 20)), rng, flower=rng.random() < 0.3)
+      for a in np.linspace(0, 2 * math.pi, 22, endpoint=False):  # shore reeds
+        q = (pcx + math.cos(a) * (pr + u(22)), pcy + math.sin(a) * (pry + u(22)) + u(20))
+        if rng.random() < 0.45 and u(60) < q[0] < R - u(40) and u(80) < q[1] < R - u(40) and clear_of(q, u(15)):
+          bank_spots.append((q[0], q[1], "reeds", u(rng.uniform(*G["reed_size"]))))
+    blockers.append(lambda q: any(((q[0] - px) / (prx + u(25))) ** 2 + ((q[1] - py) / (pry + u(40))) ** 2 < 1
+                                  for px, py, prx, pry in ponds))
+  elif region["feature"] in ("lake", "wharf"):
+    # one body of water over everything but a strip of land along each road and
+    # round the clearing: the roads become causeways through a single lake
+    land_w = u(G["lake_land"] if region["feature"] == "lake" else G["wharf_land"])
+    land = Image.new("L", (R, R), 0)
+    dl = ImageDraw.Draw(land)
+    for pts in paths:
+      dl.line(pts, fill=255, width=int(2 * land_w), joint="curve")
+    cr = clear_r + land_w
+    dl.ellipse([R / 2 - cr, R / 2 - cr, R / 2 + cr, R / 2 + cr], fill=255)
+    soft = np.asarray(land.filter(ImageFilter.GaussianBlur(u(30))), float) / 255
+    water = soft + (fbm(R, seed + 67, octaves=4, base=5) - 0.5) * 0.5 < 0.5
+    wm = Image.fromarray(water.astype(np.uint8) * 255)
+    stamp(img, wm, 0, 0, G["water"], G["water_dk"], G["water_lt"])
+
+    def wet(q, margin=0):
+      return any(0 <= x < R and 0 <= y < R and water[int(y), int(x)]
+                 for x, y in ((q[0], q[1]), (q[0], q[1] + margin), (q[0] - margin, q[1]), (q[0] + margin, q[1])))
+
+    def deep(q, margin):
+      return all(0 <= x < R and 0 <= y < R and water[int(y), int(x)]
+                 for x, y in ((q[0], q[1]), (q[0] + margin, q[1]), (q[0] - margin, q[1]), (q[0], q[1] + margin),
+                              (q[0], q[1] - margin)))
+
+    for _ in range(40):  # ripples
+      x, y = rng.uniform(u(40), R - u(40), 2)
+      if deep((x, y), u(25)):
+        d.arc([x - u(18), y - u(6), x + u(18), y + u(6)], 200, 340, fill=G["water_lt"], width=max(1, int(u(4))))
+    want = 14 if region["feature"] == "lake" else 10
+    pads = 0
+    for _ in range(1500):  # a scatter of lilies
+      if pads >= want:
+        break
+      x, y = rng.uniform(u(40), R - u(40), 2)
+      if deep((x, y), u(28)):
+        lily(d, x, y, u(rng.uniform(12, 20)), rng)
+        pads += 1
+    reeds = []
+    for _ in range(1500):  # reeds on the shore
+      if len(reeds) >= 24:
+        break
+      x, y = rng.uniform(u(60), R - u(40)), rng.uniform(u(80), R - u(40))
+      if wet((x, y)) or not wet((x, y), u(30)) or not clear_of((x, y), u(15)):
+        continue
+      if any(math.dist((x, y), q) < u(45) for q in reeds):
+        continue
+      reeds.append((x, y))
+      bank_spots.append((x, y, "reeds", u(rng.uniform(*G["reed_size"]))))
+    blockers.append(lambda q: wet(q, u(20)))
+  elif region["feature"] == "flood":
+    # the region's ground colour IS the floodwater; this adds its surface
+    for _ in range(70):
+      x, y = rng.uniform(u(40), R - u(40), 2)
+      d.arc([x - u(18), y - u(6), x + u(18), y + u(6)], 200, 340, fill=G["water_lt"], width=max(1, int(u(4))))
+    for _ in range(16):
+      x, y = rng.uniform(u(40), R - u(40), 2)
+      if clear_of((x, y), u(10)):
+        lily(d, x, y, u(rng.uniform(8, 12)), rng)
+  elif region["feature"] == "holes":
+    holes = []
+    lo, hi = G["hole_size"]
+    for _ in range(400):
+      if len(holes) >= G["hole_count"]:
+        break
+      rx = u(rng.uniform(lo, hi))
+      ry = rx * rng.uniform(0.55, 0.7)
+      c = (rng.uniform(u(60) + rx, R - u(60) - rx), rng.uniform(u(60) + ry, R - u(60) - ry))
+      rim = [(c[0] + math.cos(a) * rx * 1.35, c[1] + math.sin(a) * ry * 1.35) for a in np.linspace(0, 2 * math.pi, 12, endpoint=False)]
+      if not all(clear_of(q, u(15)) for q in rim + [c]):
+        continue
+      if any(math.dist(c, (hx, hy)) < (rx + hrx) * 1.35 + u(15) for hx, hy, hrx, _ in holes):
+        continue
+      holes.append((c[0], c[1], rx * 1.35, ry * 1.35))
+      blob(img, c[0], c[1], rx * 1.35, ry * 1.35, rng, G["spoil"], shade_of(G["spoil"], 0.8))  # dug-out earth
+      blob(img, c[0], c[1] + ry * 0.12, rx * 0.85, ry * 0.75, rng, G["hole"], None, shade_of(G["spoil"], 0.7))
+      for _ in range(4):  # clods thrown out round the rim
+        a = rng.uniform(0, 2 * math.pi)
+        x, y = c[0] + math.cos(a) * rx * 1.6, c[1] + math.sin(a) * ry * 1.6
+        e = u(rng.uniform(5, 9))
+        d.ellipse([x - e, y - e * 0.7, x + e, y + e * 0.7], fill=G["spoil"], outline=G["ink"], width=max(1, int(u(2.5))))
+    blockers.append(lambda q: any(((q[0] - hx) / (hrx + u(15))) ** 2 + ((q[1] - hy) / (hry + u(15))) ** 2 < 1
+                                  for hx, hy, hrx, hry in holes))
+  elif region["feature"] == "blight":
+    # blotches of diseased growth and rot across the ground
+    noise = fbm(R, seed + 31, octaves=4, base=4)
+    for lo, hi, fill in ((0.6, 1.01, shade_of(G["blight"], 0.85)), (-0.01, 0.27, G["rot"])):
+      m = Image.fromarray(((noise >= lo) & (noise < hi)).astype(np.uint8) * 255)
+      stamp(img, m, 0, 0, fill, shade_of(fill, 0.8))
+  elif region["feature"] == "cliffs":
+    # each road runs along a ledge; off the ledges the land drops away as a
+    # rock face to a far valley floor
+    lw = u(G["cliff_width"])
+    ledge = Image.new("L", (R, R), 0)
+    dl = ImageDraw.Draw(ledge)
+    for pts in paths:
+      dl.line(pts, fill=255, width=int(2 * lw), joint="curve")
+    cr = clear_r + lw * 1.15
+    dl.ellipse([R / 2 - cr, R / 2 - cr, R / 2 + cr, R / 2 + cr], fill=255)
+    soft = np.asarray(ledge.filter(ImageFilter.GaussianBlur(u(22))), float) / 255
+    top = soft + (fbm(R, seed + 53, octaves=4, base=6) - 0.5) * 0.45 > 0.5
+    drop = int(u(G["cliff_height"]))
+    face, upper = top.copy(), top.copy()
+    for k in range(2, drop + 1, 2):
+      face[k:] |= top[:-k]
+      if k <= drop // 2:
+        upper[k:] |= top[:-k]
+    face &= ~top
+    valley = np.array(G["valley"], float) * (0.9 + 0.15 * fbm(R, seed + 59, octaves=3, base=5)[..., None])
+    out = np.where(top[..., None], np.asarray(img, float), valley)
+    img.paste(Image.fromarray(out.clip(0, 255).astype(np.uint8)))
+    box = (0, 0, R, R)
+    fm = Image.fromarray(face.astype(np.uint8) * 255)
+    img.paste(G["ink"], box, ink_ring(fm))
+    img.paste(G["rock_lt"], box, fm)
+    img.paste(shade_of(G["rock_lt"], 0.8), box, Image.fromarray((face & ~upper).astype(np.uint8) * 255))
+    strata = Image.new("L", (R, R), 0)
+    ds = ImageDraw.Draw(strata)
+    for y in np.arange(rng.uniform(0, u(22)), R, u(22)):
+      ds.line([(x, y + math.sin(x / u(60) + y) * u(4)) for x in np.linspace(0, R, 24)], fill=255, width=max(1, int(u(3))))
+    for _ in range(90):  # cracks
+      x, y = rng.uniform(0, R, 2)
+      ds.line([(x, y), (x + u(4), y + u(20))], fill=255, width=max(1, int(u(3))))
+    img.paste(G["rock_dk"], box, ImageChops.multiply(strata, fm.filter(ImageFilter.MinFilter(5))))
+    tm = Image.fromarray(top.astype(np.uint8) * 255)
+    img.paste(G["ink"], box, ImageChops.subtract(ink_ring(tm), tm))  # the lip of each ledge
+    blockers.append(lambda q: not (0 <= q[0] < R and 0 <= q[1] < R) or not top[int(q[1]), int(q[0])])
+    far = []
+    for _ in range(400):  # small, distant pines down on the valley floor
+      if len(far) >= 40:
+        break
+      x, y = rng.uniform(u(40), R - u(40), 2)
+      if top[int(y), int(x)] or face[int(y), int(x)] or face[max(0, int(y - u(40))), int(x)]:
+        continue
+      if any(math.dist((x, y), q) < u(38) for q in far):
+        continue
+      far.append((x, y))
+      bank_spots.append((x, y, "pine", u(rng.uniform(28, 44))))
+  elif region["feature"] == "bighill":
+    # one broad hill under the clearing: the roads climb it from every edge
+    hr = u(G["bighill_size"])
+    hry = hr * 0.85
+    m = Image.new("L", (R, R), 0)
+    ring = [(R / 2 + math.cos(a) * hr, R / 2 + u(20) + math.sin(a) * hry) for a in np.linspace(0, 2 * math.pi, 24, endpoint=False)]
+    ImageDraw.Draw(m).polygon(wobble(ring, rng, 6, sub=2), fill=255)
+    box = (0, 0, R, R)
+    img.paste(G["ink"], box, ink_ring(m))
+    img.paste(G["hill"], box, m)
+    img.paste(G["hill_dk"], box, ImageChops.subtract(m, ImageChops.offset(m, -int(u(70)), -int(u(60)))))
+    lit = ImageChops.subtract(m, ImageChops.offset(m, int(u(50)), int(u(50))))
+    img.paste(G["hill_lt"], box, ImageChops.multiply(lit, ImageChops.offset(m, -int(u(12)), -int(u(12)))))
+    for _ in range(22):  # hachures down the shaded slope
+      a = rng.uniform(-0.4, 2.0)
+      x, y = R / 2 + math.cos(a) * hr * 0.9, R / 2 + u(20) + math.sin(a) * hry * 0.9
+      d.line([(x, y), (x - math.cos(a) * u(28), y - math.sin(a) * u(24))], fill=G["hill_dk"], width=max(1, int(u(4))))
+
+  # extras built on a feature drawn above
+  if region["feature"] in ("millrace", "dam"):
+    def site_score(i, probes):
+      worst = float("inf")
+      for q in probes(river[i]):
+        worst = min(worst, math.dist(q, (R / 2, R / 2)) - clear_r,
+                    min((seg_dist(q, a, b) - half_path for a, b in segs), default=worst))
+      return worst
+
+    span = range(int(len(river) * 0.15), int(len(river) * 0.85))
+    if region["feature"] == "millrace":
+      ms = u(260)
+      probes = lambda p: [(p[0] + ms * fx, p[1] + ms * fy) for fx in (0, 0.25, 0.55, 0.85) for fy in (0.26, -0.15, -0.5)]
+      i = max(span, key=lambda k: site_score(k, probes))
+      rx, ry = river[i]
+      bank_spots.append((rx + ms * 0.3, ry + ms * 0.26, "watermill", ms))
+      mill_box = (rx - ms * 0.4, ry - ms * 0.8, rx + ms * 0.9, ry + ms * 0.45)
+      inside = lambda q: mill_box[0] < q[0] < mill_box[2] and mill_box[1] < q[1] < mill_box[3]
+      bank_spots[:] = [q for q in bank_spots if q[2] == "watermill" or not inside(q)]
+      blockers.append(inside)
+    else:
+      probes = lambda p: [p, (p[0], p[1] - u(220)), (p[0] - u(140), p[1] - u(120)), (p[0] + u(140), p[1] - u(120))]
+      lo, hi = G["dam_pond_size"]
+
+      def fit_pond(k):
+        """Largest pond held back by a dam at river[k], upstream (north), clear of roads."""
+        px, py = river[k]
+        for pr in np.linspace(u(hi), u(lo), 6):
+          pry = pr * 0.7
+          c = (px, py - pry * 0.85)
+          rim = [(c[0] + math.cos(a) * pr, c[1] + math.sin(a) * pry) for a in np.linspace(0, 2 * math.pi, 20, endpoint=False)]
+          if all(clear_of(q, u(15)) for q in rim if 0 <= q[0] <= R and 0 <= q[1] <= R):
+            return c, pr, pry
+        return None
+
+      # best-scoring site that has room for its pond, kept off the tile's top and bottom
+      ranked = sorted((k for k in range(1, len(river) - 1) if R * 0.33 < river[k][1] < R * 0.8),
+                      key=lambda k: -site_score(k, probes))
+      i = next((k for k in ranked if fit_pond(k)), ranked[0])
+      pond = fit_pond(i)
+      px, py = river[i]
+      (x0, y0), (x1, y1) = river[i - 1], river[i + 1]
+      ln = math.hypot(x1 - x0, y1 - y0) or 1
+      nx, ny = -(y1 - y0) / ln, (x1 - x0) / ln
+      if pond:
+        (pcx, pcy), pr, pry = pond
+        blob(img, pcx, pcy, pr, pry, rng, G["water"], G["water_dk"], G["water_lt"], amp=5)
+        for _ in range(8):
+          x, y = pcx + rng.uniform(-pr * 0.6, pr * 0.6), pcy + rng.uniform(-pry * 0.6, pry * 0.6)
+          d.arc([x - u(16), y - u(6), x + u(16), y + u(6)], 200, 340, fill=G["water_lt"], width=max(1, int(u(4))))
+        inpond = lambda q: ((q[0] - pcx) / (pr + u(25))) ** 2 + ((q[1] - pcy) / (pry + u(35))) ** 2 < 1
+        bank_spots[:] = [q for q in bank_spots if not inpond(q)]
+        blockers.append(inpond)
+        bank_spots.append((pcx + pr * 0.3, pcy + pry * 0.15, "lodge", u(110)))
+      half = rw / 2 + u(50)
+      bow = u(26)  # the wall bows downstream (south) against the water it holds
+      line = [(px + nx * half * t, py + ny * half * t + bow * (1 - t * t)) for t in np.linspace(-1, 1, 15)]
+      thick = u(30)
+      wall = Image.new("L", (R, R), 0)
+      ImageDraw.Draw(wall).line(line, fill=255, width=int(thick * 2), joint="curve")
+      stamp(img, wall, 0, 0, G["trunk"], shade_of(G["trunk"], 0.7), G["palisade"])
+      for f in (-0.5, 0.0, 0.5):  # log seams along the wall
+        seam = [(x, y + f * thick * 0.9) for x, y in line[1:-1]]
+        d.line(seam, fill=G["ink"], width=max(1, int(u(3))), joint="curve")
+      for end_pt in (line[0], line[-1]):  # cut log ends where the wall meets each bank
+        for f in (-0.5, 0.0, 0.5):
+          x, y = end_pt[0], end_pt[1] + f * thick * 0.9
+          e = thick * 0.42
+          d.ellipse([x - e, y - e, x + e, y + e], fill=G["stump_top"], outline=G["ink"], width=max(1, int(u(3))))
+          d.ellipse([x - e * 0.45, y - e * 0.45, x + e * 0.45, y + e * 0.45], outline=shade_of(G["stump_top"], 0.65),
+                    width=max(1, int(u(2.5))))
+      for _ in range(16):  # sticks poking out of the wall, mostly upstream
+        x, y = line[int(rng.integers(2, len(line) - 2))]
+        side = -1 if rng.random() < 0.7 else 1
+        g = rng.uniform(-0.6, 0.6) + (math.pi / 2 if side > 0 else -math.pi / 2)
+        y0 = y + side * thick * 0.8
+        ln = u(rng.uniform(14, 24))
+        _ink_line(img, [(x, y0), (x + math.cos(g) * ln, y0 + math.sin(g) * ln)], G["timber"], u(4))
+      for k in range(5):  # water trickling over the face, foam where it lands
+        x, y = line[3 + k * 2]
+        d.line([(x, y + thick * 0.4), (x + u(2), y + thick + u(14))], fill=G["water_lt"], width=max(1, int(u(5))))
+      for _ in range(7):
+        x, y = px + rng.uniform(-rw * 0.4, rw * 0.4), py + bow + thick + u(18) + rng.uniform(0, u(18))
+        e = u(rng.uniform(7, 12))
+        d.ellipse([x - e, y - e * 0.6, x + e, y + e * 0.6], fill=G["foam"], outline=G["ink"], width=max(1, int(u(2.5))))
+      a, b = line[0], line[-1]
+      dam_box = lambda q: seg_dist(q, a, b) < u(45)
+      blockers.append(dam_box)
+  if region["feature"] == "wharf" and water.any():
+    # a jetty from the shore out towards the deepest water, boats moored off it
+    depth = np.asarray(wm.filter(ImageFilter.GaussianBlur(u(70))), float)
+    rim = int(u(170))  # keep the jetty and its boats off the tile edge
+    depth[:rim], depth[-rim:], depth[:, :rim], depth[:, -rim:] = 0, 0, 0, 0
+    dy_, dx_ = np.unravel_index(np.argmax(depth), depth.shape)
+    far = (float(dx_), float(dy_))
+    ln = math.dist(far, (R / 2, R / 2)) or 1
+    ux, uy = (R / 2 - far[0]) / ln, (R / 2 - far[1]) / ln
+    shore = far
+    while wet(shore) and math.dist(shore, far) < ln:
+      shore = (shore[0] + ux * u(8), shore[1] + uy * u(8))
+    reach = min(math.dist(shore, far) * 0.75, u(260))
+    end = (shore[0] - ux * reach, shore[1] - uy * reach)
+    shore = (shore[0] + ux * u(20), shore[1] + uy * u(20))  # foot of the jetty on dry land
+    pw = u(G["path_width"])
+    d.line([shore, end], fill=G["ink"], width=int(pw + u(12)))
+    d.line([shore, end], fill=G["palisade"], width=int(pw))
+    jx, jy = -uy, ux
+    n = max(1, int(math.dist(shore, end) / u(15)))
+    for k in range(1, n):
+      cx, cy = end[0] + (shore[0] - end[0]) * k / n, end[1] + (shore[1] - end[1]) * k / n
+      d.line([(cx - jx * pw / 2, cy - jy * pw / 2), (cx + jx * pw / 2, cy + jy * pw / 2)], fill=G["palisade_dk"],
+             width=max(1, int(u(3))))
+    for k in range(0, n + 1, 3):  # posts down both sides
+      cx, cy = end[0] + (shore[0] - end[0]) * k / n, end[1] + (shore[1] - end[1]) * k / n
+      for side in (-1, 1):
+        x, y = cx + side * jx * (pw / 2 + u(6)), cy + side * jy * (pw / 2 + u(6))
+        e = u(7)
+        d.ellipse([x - e, y - e, x + e, y + e], fill=G["timber"], outline=G["ink"], width=max(1, int(u(3))))
+    jetty = lambda q: seg_dist(q, shore, end) < pw / 2 + u(30)
+    blockers.append(jetty)
+    boats = []
+    for side in (1, -1):  # the barge moored alongside the jetty's end
+      q = (end[0] + side * jx * u(95) + ux * u(40), end[1] + side * jy * u(95) + uy * u(40))
+      if deep(q, u(60)) and u(110) < q[0] < R - u(110) and u(170) < q[1] < R - u(60):
+        boats.append((q[0], q[1], "barge", u(rng.uniform(130, 150))))
+        break
+    for _ in range(300):
+      x, y = rng.uniform(u(90), R - u(90)), rng.uniform(u(150), R - u(60))
+      if deep((x, y), u(55)) and all(math.dist((x, y), q[:2]) > u(170) for q in boats) and not jetty((x, y)):
+        boats.append((x, y, "raft", u(rng.uniform(80, 100))))
+        break
+    bank_spots[:] = [q for q in bank_spots if not jetty(q[:2])]
+    bank_spots += boats
+  if region["mud"]:  # battlefield mud on top of whatever the feature drew
+    patches = []
+    lo, hi = G["mud_size"]
+    for _ in range(300):
+      if len(patches) >= region["mud"]:
+        break
+      rx = u(rng.uniform(lo, hi))
+      ry = rx * rng.uniform(0.5, 0.7)
+      c = (rng.uniform(u(60) + rx, R - u(60) - rx), rng.uniform(u(60) + ry, R - u(60) - ry))
+      rim = [(c[0] + math.cos(a) * rx, c[1] + math.sin(a) * ry) for a in np.linspace(0, 2 * math.pi, 12, endpoint=False)]
+      if not all(clear_of(q, u(20)) and not any(b(q) for b in blockers) for q in rim + [c]):
+        continue
+      if any(math.dist(c, (hx, hy)) < rx + hrx + u(30) for hx, hy, hrx, _ in patches):
+        continue
+      patches.append((c[0], c[1], rx, ry))
+      blob(img, c[0], c[1], rx, ry, rng, G["mud"], G["mud_dk"])
+      for _ in range(3):  # puddles + hoof prints
+        x, y = c[0] + rng.uniform(-rx * 0.5, rx * 0.5), c[1] + rng.uniform(-ry * 0.4, ry * 0.4)
+        e = u(rng.uniform(6, 12))
+        d.ellipse([x - e, y - e * 0.6, x + e, y + e * 0.6], fill=G["water_dk"])
+    blockers.append(lambda q: any(((q[0] - hx) / (hrx + u(20))) ** 2 + ((q[1] - hy) / (hry + u(20))) ** 2 < 1
+                                  for hx, hy, hrx, hry in patches))
 
   fields = []
   for _ in range(400):
@@ -1805,6 +2649,17 @@ def draw_tile(region, seed, edges, density):
 
   for pts in paths:
     draw_path(d, pts)
+  if region["feature"] == "flood":  # over floodwater the roads are boardwalks
+    pw = u(G["path_width"])
+    for pts in paths:
+      d.line(pts, fill=G["palisade"], width=int(pw), joint="curve")
+      for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        ln = math.hypot(x1 - x0, y1 - y0) or 1
+        nx, ny = -(y1 - y0) / ln, (x1 - x0) / ln
+        for k in range(int(ln / u(15))):
+          cx, cy = x0 + (x1 - x0) * k * u(15) / ln, y0 + (y1 - y0) * k * u(15) / ln
+          d.line([(cx - nx * pw / 2, cy - ny * pw / 2), (cx + nx * pw / 2, cy + ny * pw / 2)], fill=G["palisade_dk"],
+                 width=max(1, int(u(3))))
   if river:
     for pts in paths:
       draw_bridge(img, pts, river, rw)
@@ -1951,6 +2806,8 @@ def draw_tile(region, seed, edges, density):
   shadow = Image.new("L", (R, R), 0)
   ds = ImageDraw.Draw(shadow)
   for x, y, name, s in spots:
+    if name in NO_SHADOW:
+      continue
     sw = s * SHADOW_WIDTH.get(name, 0.5)
     ds.ellipse([x - sw, y - s * 0.12, x + sw * 1.1, y + s * 0.14], fill=90)
   img.paste(shade_of(region["ground"], 0.72), (0, 0, R, R), shadow.filter(ImageFilter.GaussianBlur(u(6))))

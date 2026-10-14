@@ -282,7 +282,7 @@ TileToken Importer `85a721`. Data is inlined into the bag's own script.
 | column | values |
 | --- | --- |
 | `type` | weapon, armor, consumable, goods, skill |
-| `subtype` | weapon: category; armor: weight/trinket/misc; consumable: food, drink, potion, bandage, repair kit, rune, augment, lootbox; goods: treasure, quest, junk, material, misc; skill: profession, general |
+| `subtype` | weapon: category; armor: weight/trinket/misc; consumable: food, drink, potion, bandage, repair kit, rune, augment, lootbox; goods: treasure, quest, junk, material, misc, contraband; skill: profession, general |
 | `subsubtype` | weapon: variant (`1H Axe`, `2H Fire Heart`); armor: slot; material: kind (`ore`); profession skill: gathering/crafting |
 | `tier` | 0–3 |
 
@@ -332,7 +332,7 @@ data (so names must not clash with tiles).
 - description generated: affiliation/role/subtype, faction, tier/exp,
   effect, flavor
 - new role with subtypes = new `sub_<role>` column + matching named range
-- `factions`: `faction_id`, `name`, `default_rep` (starting rep)
+- `factions`: `faction_id`, `name`, `default_rep` (starting rep), `short` (name used in effect text: `Party gains 1 Dynasty reputation`)
 - `loot_table`: same columns/grammar as `lootbox_table`
 
 ### Landmarks
@@ -484,7 +484,7 @@ Code-drawn storybook tiles. Manual step, not part of `master_sync.cmd`.
 - knobs in `data/asset_variables.csv` (`group,key,value,notes`):
   - `global` rows: size, supersample, seed, palette, path/frame sizes,
     `back_font` (repo-root path, Luminari), `back_gem_size`, `density_scale`,
-    and feature/wall tuning: `river_anchor`, `river_width`, `canyon_width`, `lake_size`,
+    and feature/wall tuning: `river_anchor`, `river_width`, `canyon_width`, `lake_land`, `wharf_land`, `pond_size`,
     `falls_size`, `pit_size`, `pool_count`/`pool_size`, `mud_count`/`mud_size`,
     `spring_count`/`spring_size`, `reed_size`, `field_width`/`field_height`,
     `menhir_spacing`/`menhir_size`, `stake_spacing`/`stake_size` (sizes are
@@ -503,13 +503,17 @@ Code-drawn storybook tiles. Manual step, not part of `master_sync.cmd`.
 - regions: forest, plains, city, mountain, guildhall, riverside, marsh, hills,
   blossomgrove, mushroomhollow, deepwood, heath, ashland, ruins, quarry,
   lumbercamp, farmstead, orchard, settlement, town, lakeshore, briarthicket,
-  wildflowermeadow, canyon, waterfallcliffs, standingstones, battlefield, hotsprings
+  wildflowermeadow, canyon, waterfallcliffs, standingstones, battlefield, hotsprings, lilypond,
+  otterwharf, drownedwood, watermill, beaverdam, barrows, slagworks, blightwood, cliffside,
+  coldmountain, hillcentral, battlefieldmountain, battlefieldwaterside
 - `icons` = `painter:weight:lo-hi` joined by `|`. Painters: tree, pine, bush,
   mountain, house, tent, blossom, fruit, oak, heather, deadtree, charred,
   stump, rock, hill, reeds, mushroom, ruinwall, column, crane, logpile,
-  haystack, gnarled, briar, flowers, menhir, cart, spears, warbanner, townhouse (also: stake = palisade;
+  haystack, gnarled, briar, flowers, menhir, cart, spears, warbanner, townhouse, coldpeak, coldpine,
+  blightcap, blighttree, mangrove, barrow, cave, furnace, slagheap, barrel, crate, sword, helmet,
+  catapult (also: stake = palisade;
   wallblock + tower = stone wall; guildhall, windmill, statue =
-  centrepieces)
+  centrepieces; barge, raft, lodge, watermill = placed by a feature, afloat, no shadow)
 - optional walled-town keys (settlement, town, city use them; leave out elsewhere):
   - `town_radius` — `icons` stay inside this circle (0 = off)
   - `wall` — `palisade` = ring of stakes at `town_radius`, gates where roads
@@ -522,10 +526,18 @@ Code-drawn storybook tiles. Manual step, not part of `master_sync.cmd`.
   - `feature` — ground feature under the roads: `river` (with plank bridges;
     always crosses the N/S edges at `global.river_anchor`, through a gap in the
     frame, so N-S stacked river tiles join; E-W neighbours don't), `pools` (marsh water + lily pads),
-    `pit` (terraced quarry pit), `lake` (big corner lake), `canyon` (ravine +
+    `pit` (terraced quarry pit), `lake` (one continuous lake over
+    everything but a `lake_land` strip along the roads; the roads run through it as causeways), `canyon` (ravine +
     rope bridges; the river rule mirrored to the east side), `falls` (corner cliff + waterfall + pool), `mud`
-    (battlefield), `springs` (steaming stone-ringed pools), `none`. Grass never
-    draws on a feature
+    (battlefield), `springs` (steaming stone-ringed pools), `ponds` (a separate lily-covered pond
+    in every corner that fits, `pond_size`), `wharf` (the `lake` with a wider `wharf_land` strip, a
+    jetty, a barge and a raft), `flood` (the ground colour is the
+    water: ripples, floating leaves, roads become boardwalks), `millrace` (river + watermill on the
+    bank), `dam` (river + stick dam, pond and lodge upstream), `holes` (dug pits with spoil rims),
+    `blight` (diseased and rotten ground blotches), `cliffs` (roads on ledges, rock faces dropping
+    to a valley; `cliff_width`, `cliff_height`), `bighill` (one hill under the clearing,
+    `bighill_size`), `none`. Grass never draws on a feature
+  - `mud` — count of battlefield mud patches drawn on top of any feature (e.g. a battlefield on a river)
   - `speckle` — ground flecks `#colour:count|#colour:count` (petals, ash, spores)
   - `layout` — `scatter` (default) or `rows` (orchard grid)
   - `required` — `painter:COUNT:lo-hi`, always placed first at every density

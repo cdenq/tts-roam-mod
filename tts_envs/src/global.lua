@@ -632,6 +632,30 @@ function describePlan(plan)
   return table.concat(parts, ", ")
 end
 
+--[[ Item name colors, as BBCode hex. Mirrors taxonomy.md "Item name colors".
+
+A subtype color beats the tier color; tier 0 and untiered rows stay plain.
+Names are stamped colored at import, so every lookup by name goes through
+plainName() -- the sheet, ECONOMY and LOOTBOX all key on the plain name.
+]]
+NAME_COLORS = {
+  tier = {[1] = "50C050", [2] = "4A9EE8", [3] = "A86CE0"},
+  subtype = {contraband = "E05050", quest = "E8C040"},
+}
+
+-- Global.call shape: {name =, tier =, subtype =} -> the name to stamp.
+function itemDisplayName(args)
+  local color = NAME_COLORS.subtype[args.subtype or ""] or NAME_COLORS.tier[args.tier or -1]
+  if color == nil then return args.name end
+  return "[" .. color .. "]" .. args.name .. "[-]"
+end
+
+function plainName(name)
+  local plain = string.gsub(name or "", "%[%x%x%x%x%x%x%]", "")
+  plain = string.gsub(plain, "%[%-%]", "")
+  return plain
+end
+
 --[[ Find a named entry inside a bag.
 
 bag.getObjects() lists the CONTENTS without taking anything out; each entry has
@@ -661,7 +685,7 @@ end
 
 function findInBag(bag, name)
   for _, entry in ipairs(bag.getObjects()) do
-    if entry.name == name then return entry end
+    if plainName(entry.name) == name then return entry end
   end
   return nil
 end
@@ -1102,7 +1126,7 @@ function objectValue(obj)
     return nil
   end
   if ECONOMY == nil or ECONOMY.prices == nil then return nil end
-  local name = obj.getName and obj.getName() or ""
+  local name = plainName(obj.getName and obj.getName() or "")
   local v = ECONOMY.prices[name]
   if v == nil then return nil end
   return v, false
@@ -1430,7 +1454,7 @@ LOOTBOX_BUTTON = {
 
 function lootboxFor(obj)
   if obj == nil or LOOTBOX == nil then return nil end
-  local name = obj.getName and obj.getName() or nil
+  local name = obj.getName and plainName(obj.getName()) or nil
   if name == nil or name == "" then return nil end
   return LOOTBOX[name], name
 end

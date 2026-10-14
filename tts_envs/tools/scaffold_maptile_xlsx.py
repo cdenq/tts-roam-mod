@@ -57,6 +57,9 @@ BIOME_NAMES = {
   "blossomgrove": "Blossom Grove", "mushroomhollow": "Mushroom Hollow", "briarthicket": "Briar Thicket",
   "wildflowermeadow": "Wildflower Meadow", "waterfallcliffs": "Waterfall Cliffs",
   "standingstones": "Standing Stones", "hotsprings": "Hot Springs", "lumbercamp": "Lumber Camp",
+  "lilypond": "Lily Pond", "otterwharf": "Otter Wharf", "drownedwood": "Drowned Wood", "beaverdam": "Beaver Dam",
+  "coldmountain": "Cold Mountain", "hillcentral": "Great Hill", "battlefieldmountain": "Mountain Battlefield",
+  "battlefieldwaterside": "River Battlefield",
 }
 HEADER_FONT = Font(bold=True, color="FFFFFF")
 HEADER_FILL = PatternFill("solid", fgColor="3B2B20")
