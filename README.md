@@ -26,10 +26,11 @@ ROAM/
 │   │   └── *_artguide.md     # art specs for agents (map tiles + landmarks, meeples)
 │   ├── plans/
 │   │   └── auto_TODO.md      # open work; read before changes
-│   └── asset_generation/     # Luminari font, meeples.psd, old meeple art
+│   └── asset_generation/     # Luminari font, meeples_clean.psd (meeple source), meeple_shapes/ (generated), old meeple art
 ├── assets/
 │   ├── README.txt            # link to art folder
-│   └── maptiles/             # generated: <region>/ tiles, backs/, manifest.csv
+│   ├── maptiles/             # generated: <region>/ tiles, backs/, manifest.csv
+│   └── meeples/              # generated: base/ advanced/ custom/ special/ character/ denizens/, manifest.csv
 ├── .tts/                     # MANAGED BY EXTENSION, do not edit
 │   ├── bundled/              # ignore
 │   └── objects/              # staging; OVERWRITTEN by Ctrl+Alt+L
@@ -40,7 +41,7 @@ ROAM/
     │   ├── tiles.xlsx        # items, skills, statuses, lootbox_table, _values
     │   ├── tokens.xlsx       # tokens, landmarks, factions, loot_table, stats_table, _values
     │   ├── shops.xlsx        # shops, stock
-    │   ├── asset_variables.csv # art knobs for build_map_tiles.py + build_gems.py + build_cards.py + build_landmarks.py
+    │   ├── asset_variables.csv # art knobs for build_map_tiles.py + build_gems.py + build_cards.py + build_landmarks.py + meeple colours
     │   └── gold_variables.csv # every hand-authored gold number
     ├── src/                  # hand-written Lua
     │   ├── global.lua        # cards, rendering, spawning, rep, pricing
@@ -59,6 +60,8 @@ ROAM/
     │   ├── sync/sync_*.py    # xlsx -> Lua, one per target, run by master_sync.cmd
     │   ├── build/            # art generators (manual, not in master_sync)
     │   │   ├── build_map_tiles.py, build_gems.py, build_cards.py, build_landmarks.py
+    │   │   ├── build_meeple_shapes.py, build_meeples.py # meeple PSD -> shapes -> coloured PNGs
+    │   │   ├── meeple_brush.py, meeple_smooth.py # brush-pen details, clean outlines
     │   │   └── scaffold_maptile_xlsx.py # adds a maptile.xlsx row per generated image
     │   ├── test_*.lua        # offline harness, stubs TTS API
     │   └── bin/lua54.exe     # harness interpreter (5.4; TTS is 5.2)
@@ -82,7 +85,8 @@ Never hand-edit `generated/`, `.tts/objects/`, `master_reload.lua`, `debug.lua`.
 | any gold number | `data/gold_variables.csv` |
 | dropdown vocab | `_values` sheet of the workbook |
 | map tile URLs, biome text, draw odds | `data/maptile.xlsx` |
-| map tile + gem + landmark art | `data/asset_variables.csv` |
+| map tile + gem + landmark art, meeple colours | `data/asset_variables.csv` |
+| meeple shapes (outline + line work) | `internal/asset_generation/meeples_clean.psd` |
 | card logic / rendering | `src/global.lua` |
 | object behaviour | `src/<object>.lua` |
 
@@ -190,6 +194,17 @@ python tools/build/build_landmarks.py                         # everything the C
 python tools/build/build_landmarks.py building --size 4       # just the capital hall
 python tools/build/build_landmarks.py cave guildhall          # all sizes of two landmarks
 python tools/build/build_landmarks.py --prune                 # rebuild all + clear leftovers
+```
+
+Meeples (see [Meeple art](#meeple-art)):
+
+```bash
+cd "/c/Users/Owner/Data/D/Board Games/ROAM/tts_envs"
+python tools/build/build_meeple_shapes.py                  # after editing meeples_clean.psd (all layers, ~45 s)
+python tools/build/build_meeple_shapes.py denizen_beaver   # just the layers you changed
+python tools/build/build_meeples.py                        # after any meeple_* row change (~10 s)
+python tools/build/build_meeples.py custom/custom_beaver   # one PNG; manifest + preview still cover all
+python tools/build/build_meeples.py --prune                # also delete PNGs no meeple_skin row describes
 ```
 
 # Systems
@@ -575,6 +590,53 @@ Code-drawn storybook tiles. Manual step, not part of `master_sync.cmd`.
   one region with its `seed_offset`
 - names don't depend on `variants`; lowering it deletes the extra files
 - art changed -> re-upload those PNGs (TTS caches by URL, so use a new URL)
+
+## Meeple art
+
+Hand-painted meeples, split into colour-free **shapes** and coloured by data,
+so any shape can come out in any colour. Manual step, not part of
+`master_sync.cmd`. Style rules: `internal/agent/meeple_artguide.md`.
+
+```
+internal/asset_generation/meeples_clean.psd   one layer per shape; paint in any colours
+  -> python tools/build/build_meeple_shapes.py [layer ...]     (~45 s for all)
+internal/asset_generation/meeple_shapes/<layer>/   alpha + one mask per colour slot (generated)
+  -> python tools/build/build_meeples.py [file ...] [--prune]  (~10 s)
+assets/meeples/<folder>/<file>.png + manifest.csv, internal/asset_generation/meeples_preview.png
+```
+
+- shapes: every PSD layer is split into colour slots, then finished (outline
+  smoothed for the TTS side wall; `brush=yes` shapes get brush-pen details).
+  Slots: `body` (largest colour), `ink` (#231f20 when it is not the body),
+  `accent1..` (the rest, largest first). Gradient art (the badgers) keeps its
+  sheen as a `tone` map that tints any body colour
+- knobs in `data/asset_variables.csv`:
+  - `meeple` rows: `canvas` (1536), `brush_strength`, `brush_blotch`
+  - `meeple_colour` rows: named colours (`ink`, `denizen`, `marquise`, `eyrie`, ...)
+  - `meeple_shape` rows: one per PSD layer, `species=<x> class=<big|base|short|special> [brush=yes]`.
+    A layer without a row (or a row without a layer) fails the build
+  - `meeple_skin` rows: one per output PNG, key = `<folder>/<file>` (path under `assets/meeples/`, no `.png`).
+    `body=<colour>` required; `shape=<layer>` (default: the file name);
+    `ink=` / `accent1=` ... override a slot (unset slots keep their painted colour);
+    `tone=off` flattens a gradient shape. Colours are `meeple_colour` names or `#rrggbb`
+- output folders (every shape gets its normal colours; all but special + character also get a yellow denizen):
+
+  | folder | what | shapes |
+  | --- | --- | --- |
+  | `base/` | faction warriors, normal colours | `faction_*` |
+  | `advanced/` | hirelings, normal colours (incl. the Root stoat, porcupine, duck) | `hireling_*` |
+  | `custom/` | not from Root, their own colours | `custom_*` (beaver, bristle, red panda, squirrel) |
+  | `special/` | one-offs; no denizen version | `special_*` (stag, bear, boar, snake, penguin, guildmaster) |
+  | `character/` | vagabonds; no denizen version | `vb_*` |
+  | `denizens/` | every base/advanced/custom shape again in denizen yellow, as `denizen_<shape>` | |
+
+- new colour of an existing meeple = one row: `meeple_skin,custom/purple_cat,shape=faction_cat body=corvid,`
+- new shape = a layer in `meeples_clean.psd` (right group, 1536 canvas, feet on
+  the bottom row; layer name `<faction|hireling|custom|special|vb>_<species>`) + a `meeple_shape` row
+  + a normal `meeple_skin` row + (unless special/vb) a `denizens/denizen_<shape>` row, then run both scripts
+  `internal/` is gitignored: back the PSD up before editing
+- size lives in the shape (its pixels on the shared 1536 canvas), never in the skin
+- needs `psd-tools` and `scikit-image` (`pip install psd-tools scikit-image`)
 
 ## Gem art
 
