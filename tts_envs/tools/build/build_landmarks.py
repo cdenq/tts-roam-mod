@@ -2,18 +2,34 @@
 """Draw storybook landmarks (Guildhall, buildings, caves, gathering nodes,
 faction strongholds) as transparent PNG standees.
 
-One image per landmark per size 1-4. Size 1 is the smallest and simplest;
-each size up is drawn bigger AND with more shapes. Every size shares one
-canvas with the base on the same line near the bottom edge, so at the same
-in-game scale a size-4 landmark really stands taller than a size 1.
+One image per landmark per size 1-4. The SIZE picks how much is drawn (a
+size-4 building has more shapes than a size 1). How TALL it comes out is its
+CLASS, the same idea as meeple size classes: every landmark in a class is the
+same height in pixels, on one shared 1536 canvas (the meeples' canvas), base on
+the bottom row, so one TTS import scale fits meeples and landmarks alike.
+
+  class     height px   matches            used for
+  small        525      short meeples      gathering nodes
+  base         656      base meeples       tier-0 buildings
+  big          820      big meeples        tier-1 buildings
+  special     1000      (houses a big one) tier-2 buildings
+  capitol     1200                         tier-3 buildings
+
+(`landmark_class` rows give the heights; `landmark_tier` rows say which class
+each landmark size is.) The height is reached by RE-DRAWING at a fitted width,
+not by resizing the image, so the ink line is the same weight on every
+landmark. Something too wide to reach its height inside the canvas is drawn
+as tall as fits, and the build says so.
 
   data/asset_variables.csv            ->  assets/landmarks/<landmark>_s<size>.png
   (landmark, landmark_size,               assets/landmarks/manifest.csv
    landmark_colour rows + globals)
 
-Every knob is a CSV row: canvas size, margin, seed, colours, and the width
-of each landmark at each size. A landmark is drawn at a size only if its
-`landmark_size` row has a width in that slot (`|||760` = size 4 only).
+Every knob is a CSV row: canvas size, margin, seed, colours, the starting
+width of each landmark at each size (its proportions; the fit rescales it),
+the class heights and each landmark size's class. A landmark is drawn at a
+size only if its `landmark_size` row has a width in that slot (`|||760` = size
+4 only), and every drawn size needs a class in its `landmark_tier` row.
 Shapes live in the painters below; a new landmark = a painter registered in
 PAINTERS + a `landmark_size` row.
 
@@ -60,6 +76,10 @@ MIN_PIECE = 900
 # Enclosed holes smaller than this are filled with ink (a narrow slot triangulates
 # into stray walls); bigger ones stay open, which TTS cuts cleanly.
 MAX_HOLE = 2000
+# Fitting the height: stop within this fraction of the target, after at most FIT_TRIES draws.
+FIT_TOLERANCE = 0.01
+FIT_TRIES = 5
+SIDE_MARGIN = 16  # design units kept clear at the canvas sides when a wide landmark is capped
 
 
 # ---------------------------------------------------------------- drawing kit
@@ -1065,6 +1085,85 @@ def parse_widths(raw):
   return out
 
 
+def parse_classes(raw):
+  """landmark_class rows -> {class: height px on the out_size canvas}."""
+  if not raw:
+    die("no landmark_class rows (class name -> height px)")
+  try:
+    return {k: float(v) for k, v in raw.items()}
+  except ValueError as e:
+    die("landmark_class: bad height %s" % e)
+
+
+def parse_tiers(raw, widths, classes):
+  """landmark_tier rows -> {landmark: [class per size slot]}; every drawn size needs one."""
+  out = {}
+  for name, value in raw.items():
+    if name not in widths:
+      die("landmark_tier.%s: no landmark_size row for it" % name)
+    out[name] = [v.strip() or None for v in value.split("|")]
+    for c in out[name]:
+      if c is not None and c not in classes:
+        die("landmark_tier.%s: unknown class %r (have: %s)" % (name, c, " ".join(classes)))
+  for name, ws in widths.items():
+    have = out.get(name, [])
+    for n, w in enumerate(ws):
+      if w and (n >= len(have) or not have[n]):
+        die("landmark_tier.%s: size %d is drawn but has no class" % (name, n + 1))
+  return out
+
+
+def opaque_box(img):
+  """(left, top, right, bottom) of the non-transparent pixels, or None."""
+  return img.getchannel("A").point(lambda v: 255 if v >= 128 else 0).getbbox()
+
+
+def fit_width(lm, name, size, width, target_px):
+  """The drawing width that makes this landmark `target_px` tall on the final
+  canvas, found by drawing it at 1x and rescaling the width (a drawing grows
+  about linearly with its width, so this converges in two or three tries).
+  Returns (width, capped): capped = it could not reach the height without
+  running off the sides."""
+  keep = bm.R, bm.U
+  bm.R, bm.U = 1024, 1.0  # measure in design units: fast, and the geometry is the same
+  target = target_px * 1024.0 / lm["out_size"]
+  max_w = 1024 - 2 * SIDE_MARGIN
+  capped = False
+  try:
+    for _ in range(FIT_TRIES):
+      # measure the cleaned cut-out: a mote solid_alpha will drop must not count
+      box = opaque_box(solid_alpha(draw_landmark(lm, name, size, width), MIN_PIECE, MAX_HOLE))
+      if box is None:
+        die("%s size %d draws nothing" % (name, size))
+      w, h = box[2] - box[0], box[3] - box[1]
+      if h > 0.9 * 1024 or w > max_w:  # running off the canvas: measure again smaller
+        width *= 0.7
+        continue
+      f = target / h
+      capped = w * f > max_w
+      if capped:
+        f = max_w / w
+      if abs(f - 1) <= FIT_TOLERANCE:
+        break
+      width *= f
+  finally:
+    bm.R, bm.U = keep
+  return width, capped
+
+
+def ground_on_bottom(img):
+  """Shift the drawing so its lowest opaque row is the canvas's bottom row and
+  it is centred left-right -- the same placement as every meeple."""
+  box = opaque_box(img)
+  if box is None:
+    return img
+  out = Image.new("RGBA", img.size, (0, 0, 0, 0))
+  dx = (img.size[0] - (box[0] + box[2])) // 2
+  dy = img.size[1] - box[3]
+  out.paste(img, (dx, dy))
+  return out
+
+
 def landmark_seed(lm, name, size):
   # crc32 rather than hash(): stable across runs, so unchanged knobs = unchanged image
   key = "landmark|%s|%d" % (name, size)
@@ -1137,6 +1236,8 @@ def main():
   lm = parse_landmark(groups.get("landmark", {}))
   bm.G.update(parse_colours(groups.get("landmark_colour", {})))
   widths = parse_widths(groups.get("landmark_size", {}))
+  classes = parse_classes(groups.get("landmark_class", {}))
+  tiers = parse_tiers(groups.get("landmark_tier", {}), widths, classes)
   # same 1024-unit design space as a tile, so ink weighs the same at out_size 1024
   bm.R = lm["out_size"] * bm.G["supersample"]
   bm.U = bm.R / 1024.0
@@ -1158,13 +1259,17 @@ def main():
       print("  %s: no width for size %s in landmark_size, skipped" % (name, " ".join(map(str, args.size))))
     for size in sizes:
       file = "%s_s%d.png" % (name, size)
-      img = draw_landmark(lm, name, size, widths[name][size - 1])
-      img = img.resize((lm["out_size"], lm["out_size"]), Image.LANCZOS)
+      cls = tiers[name][size - 1]
+      width, capped = fit_width(lm, name, size, widths[name][size - 1], classes[cls])
+      img = draw_landmark(lm, name, size, width).resize((lm["out_size"], lm["out_size"]), Image.LANCZOS)
       area = (lm["out_size"] / 1024) ** 2
-      solid_alpha(img, MIN_PIECE * area, MAX_HOLE * area).save(os.path.join(OUT_DIR, file))
-      rows.append({"name": file[:-4], "landmark": name, "size": size,
+      # place AFTER the clean-up, so a dropped mote cannot pull it off centre
+      ground_on_bottom(solid_alpha(img, MIN_PIECE * area, MAX_HOLE * area)).save(os.path.join(OUT_DIR, file))
+      rows.append({"name": file[:-4], "landmark": name, "size": size, "class": cls, "width": "%.1f" % width,
                    "seed": landmark_seed(lm, name, size), "file": file})
-      print("  " + file[:-4])
+      box = opaque_box(Image.open(os.path.join(OUT_DIR, file)))
+      note = "  <-- too wide for its height: capped" if capped else ""
+      print("  %-22s %-8s %4d px tall%s" % (file[:-4], cls, box[3] - box[1], note))
 
   # Upsert: drawn rows replace their manifest entries, everything else stays.
   by_name = {}
@@ -1181,7 +1286,7 @@ def main():
         os.remove(os.path.join(OUT_DIR, f))
         print("  pruned " + f)
   with open(MANIFEST, "w", newline="", encoding="utf-8") as f:
-    w = csv.DictWriter(f, fieldnames=["name", "landmark", "size", "seed", "file"])
+    w = csv.DictWriter(f, fieldnames=["name", "landmark", "size", "class", "width", "seed", "file"], restval="")
     w.writeheader()
     w.writerows(sorted(by_name.values(), key=lambda r: (r["landmark"], int(r["size"]))))
   print("%d images -> %s" % (len(rows), os.path.relpath(OUT_DIR, os.path.dirname(ROOT))))

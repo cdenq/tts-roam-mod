@@ -250,9 +250,29 @@ guildhall,outer_icons,tree:5:80-105|pine:3:85-110|bush:2:60-80,
 guildhall,outer_spacing,90,
 guildhall,centerpiece,statue,optional. one feature just behind the plaza: none guildhall windmill statue
 guildhall,centerpiece_size,280,optional. centerpiece size (design units; width for buildings, height for the statue)
-landmark,out_size,1024,px of each landmark PNG (square; transparent background). Same design units as a tile
+landmark,out_size,1536,px of each landmark PNG (square; transparent background). Same canvas as the meeples, so one TTS import scale fits both. Drawn in the 1024-unit design space of a tile
 landmark,seed_offset,0,change to reroll every landmark
 landmark,margin,40,gap between the landmark's base and the bottom edge (design units)
+landmark_class,small,525,height px on the 1536 canvas = short meeples. Gathering nodes
+landmark_class,base,656,= base meeples. Tier-0 buildings
+landmark_class,big,820,= big meeples. Tier-1 buildings
+landmark_class,special,1000,big enough to house a big meeple. Tier-2 buildings
+landmark_class,capitol,1200,tier-3 buildings: the most special ones
+landmark_tier,guildhall,base|big|special|capitol,class per size slot (like landmark_size); follows the tier in tokens.xlsx landmarks
+landmark_tier,building,base|big|special|capitol,
+landmark_tier,cave,base|big|special|capitol,
+landmark_tier,stone_tower,base|big|special|capitol,
+landmark_tier,knave_camp,big|special,Knave Camp tier 1 | Knave Encampment tier 2
+landmark_tier,alliance_burrow,big,tier 1
+landmark_tier,lizard_garden,big,tier 1
+landmark_tier,otter_tradepost,big,tier 1
+landmark_tier,eyrie_roost,|||capitol,tier 3
+landmark_tier,marquise_keep,|||capitol,tier 3
+landmark_tier,tree,small,gathering node
+landmark_tier,mineral_node,small,
+landmark_tier,fishing_spot,small,
+landmark_tier,herb,small,
+landmark_tier,tracks,small,
 landmark_size,guildhall,380|500|620|720,width at size 1|2|3|4 (design units of the 1024 canvas). Size 3 = the tile centerpiece drawing
 riverside,variants,1,
 riverside,patterns,deadend|corner|straight|tee|cross,

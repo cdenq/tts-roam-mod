@@ -135,7 +135,7 @@ GLOBAL_RANGES = ("falls_size", "pit_size", "pool_size", "mud_size", "spring_size
                  "hole_size", "pond_size", "dam_pond_size",
                  "menhir_size", "stake_size", "rampart_size", "tower_size", "field_width", "field_height", "reed_size")
 # Groups in asset_variables.csv that belong to other generators, not regions.
-OTHER_GROUPS = ("gem", "gem_colour", "landmark", "landmark_size", "landmark_colour", "card",
+OTHER_GROUPS = ("gem", "gem_colour", "landmark", "landmark_size", "landmark_colour", "landmark_class", "landmark_tier", "card",
                 "meeple", "meeple_colour", "meeple_shape", "meeple_skin")
 GLOBAL_NUMBERS = ("out_size", "supersample", "seed", "frame_width", "paper_tint", "back_gem_size",
                   "paper_grain", "vignette", "path_width", "path_wobble")
