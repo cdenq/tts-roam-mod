@@ -5,8 +5,9 @@ faction strongholds) as transparent PNG standees.
 One image per landmark per size 1-4. The SIZE picks how much is drawn (a
 size-4 building has more shapes than a size 1). How TALL it comes out is its
 CLASS, the same idea as meeple size classes: every landmark in a class is the
-same height in pixels, on one shared 1536 canvas (the meeples' canvas), base on
-the bottom row, so one TTS import scale fits meeples and landmarks alike.
+same height in pixels, base on the bottom row of one shared canvas (2048; the
+headroom lets wide ones reach their height). `unit_px` fixes the pixels per
+design unit, so the canvas size never changes how big a landmark is drawn.
 
   class     height px   matches            used for
   small        525      short meeples      gathering nodes
@@ -16,7 +17,8 @@ the bottom row, so one TTS import scale fits meeples and landmarks alike.
   capitol     1200                         tier-3 buildings
 
 (`landmark_class` rows give the heights; `landmark_tier` rows say which class
-each landmark size is.) The height is reached by RE-DRAWING at a fitted width,
+each landmark size is; an optional `landmark_scale` row multiplies one
+landmark's height, e.g. towers x1.25.) The height is reached by RE-DRAWING at a fitted width,
 not by resizing the image, so the ink line is the same weight on every
 landmark. Something too wide to reach its height inside the canvas is drawn
 as tall as fits, and the build says so.
@@ -59,7 +61,7 @@ from PIL import Image, ImageChops, ImageDraw
 
 OUT_DIR = os.path.join(os.path.dirname(ROOT), "assets", "landmarks")
 MANIFEST = os.path.join(OUT_DIR, "manifest.csv")
-LANDMARK_KEYS = ("out_size", "seed_offset", "margin")
+LANDMARK_KEYS = ("out_size", "unit_px", "seed_offset", "margin")
 LANDMARK_COLOURS = ("brick", "brick_dk", "brick_line", "marble", "marble_dk", "lm_cave", "ore", "ore_dk",
                     "ore_lt", "vein", "fish", "fish_dk", "earth", "earth_dk", "flame", "flame_lt", "fey", "fey_dk", "fey_lt",
                     "wisp", "shadow", "otter_banner", "knave_banner",
@@ -1047,8 +1049,8 @@ def parse_landmark(raw):
     if k not in raw:
       die("landmark.%s is missing" % k)
   try:
-    return {"out_size": int(raw["out_size"]), "seed_offset": int(raw["seed_offset"]),
-            "margin": float(raw["margin"])}
+    return {"out_size": int(raw["out_size"]), "unit_px": float(raw["unit_px"]),
+            "seed_offset": int(raw["seed_offset"]), "margin": float(raw["margin"])}
   except ValueError as e:
     die("landmark: bad value %s" % e)
 
@@ -1113,6 +1115,19 @@ def parse_tiers(raw, widths, classes):
   return out
 
 
+def parse_scales(raw, widths):
+  """landmark_scale rows -> {landmark: height multiplier}; missing = 1."""
+  out = {}
+  for name, value in raw.items():
+    if name not in widths:
+      die("landmark_scale.%s: no landmark_size row for it" % name)
+    try:
+      out[name] = float(value)
+    except ValueError:
+      die("landmark_scale.%s: %r is not a number" % (name, value))
+  return out
+
+
 def opaque_box(img):
   """(left, top, right, bottom) of the non-transparent pixels, or None."""
   return img.getchannel("A").point(lambda v: 255 if v >= 128 else 0).getbbox()
@@ -1125,9 +1140,10 @@ def fit_width(lm, name, size, width, target_px):
   Returns (width, capped): capped = it could not reach the height without
   running off the sides."""
   keep = bm.R, bm.U
-  bm.R, bm.U = 1024, 1.0  # measure in design units: fast, and the geometry is the same
-  target = target_px * 1024.0 / lm["out_size"]
-  max_w = 1024 - 2 * SIDE_MARGIN
+  units = int(round(lm["out_size"] / lm["unit_px"]))  # the canvas, in design units
+  bm.R, bm.U = units, 1.0  # measure in design units: fast, and the geometry is the same
+  target = target_px / lm["unit_px"]
+  max_w = units - 2 * SIDE_MARGIN
   capped = False
   try:
     for _ in range(FIT_TRIES):
@@ -1136,7 +1152,7 @@ def fit_width(lm, name, size, width, target_px):
       if box is None:
         die("%s size %d draws nothing" % (name, size))
       w, h = box[2] - box[0], box[3] - box[1]
-      if h > 0.9 * 1024 or w > max_w:  # running off the canvas: measure again smaller
+      if h > 0.9 * units or w > max_w:  # running off the canvas: measure again smaller
         width *= 0.7
         continue
       f = target / h
@@ -1238,9 +1254,10 @@ def main():
   widths = parse_widths(groups.get("landmark_size", {}))
   classes = parse_classes(groups.get("landmark_class", {}))
   tiers = parse_tiers(groups.get("landmark_tier", {}), widths, classes)
-  # same 1024-unit design space as a tile, so ink weighs the same at out_size 1024
+  scales = parse_scales(groups.get("landmark_scale", {}), widths)
+  # unit_px pixels per design unit whatever the canvas: a bigger canvas adds room, not size
   bm.R = lm["out_size"] * bm.G["supersample"]
-  bm.U = bm.R / 1024.0
+  bm.U = lm["unit_px"] * bm.G["supersample"]
   for name in args.landmark:
     if name not in widths:
       sys.exit("unknown landmark %r (have: %s)" % (name, " ".join(widths)))
@@ -1260,9 +1277,9 @@ def main():
     for size in sizes:
       file = "%s_s%d.png" % (name, size)
       cls = tiers[name][size - 1]
-      width, capped = fit_width(lm, name, size, widths[name][size - 1], classes[cls])
+      width, capped = fit_width(lm, name, size, widths[name][size - 1], classes[cls] * scales.get(name, 1.0))
       img = draw_landmark(lm, name, size, width).resize((lm["out_size"], lm["out_size"]), Image.LANCZOS)
-      area = (lm["out_size"] / 1024) ** 2
+      area = lm["unit_px"] ** 2  # MIN_PIECE / MAX_HOLE are in design units squared
       # place AFTER the clean-up, so a dropped mote cannot pull it off centre
       ground_on_bottom(solid_alpha(img, MIN_PIECE * area, MAX_HOLE * area)).save(os.path.join(OUT_DIR, file))
       rows.append({"name": file[:-4], "landmark": name, "size": size, "class": cls, "width": "%.1f" % width,

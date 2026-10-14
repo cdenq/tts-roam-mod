@@ -250,10 +250,11 @@ guildhall,outer_icons,tree:5:80-105|pine:3:85-110|bush:2:60-80,
 guildhall,outer_spacing,90,
 guildhall,centerpiece,statue,optional. one feature just behind the plaza: none guildhall windmill statue
 guildhall,centerpiece_size,280,optional. centerpiece size (design units; width for buildings, height for the statue)
-landmark,out_size,1536,px of each landmark PNG (square; transparent background). Same canvas as the meeples, so one TTS import scale fits both. Drawn in the 1024-unit design space of a tile
+landmark,out_size,2048,px of each landmark PNG (square; transparent). Room only: unit_px decides how big things are drawn
+landmark,unit_px,1.5,px per design unit on the PNG. 1.5 = landmark heights match the meeples' 1536 canvas; keep it there
 landmark,seed_offset,0,change to reroll every landmark
 landmark,margin,40,gap between the landmark's base and the bottom edge (design units)
-landmark_class,small,525,height px on the 1536 canvas = short meeples. Gathering nodes
+landmark_class,small,525,height px = short meeples. Gathering nodes
 landmark_class,base,656,= base meeples. Tier-0 buildings
 landmark_class,big,820,= big meeples. Tier-1 buildings
 landmark_class,special,1000,big enough to house a big meeple. Tier-2 buildings
@@ -273,6 +274,11 @@ landmark_tier,mineral_node,small,
 landmark_tier,fishing_spot,small,
 landmark_tier,herb,small,
 landmark_tier,tracks,small,
+landmark_scale,fishing_spot,0.85,height multiplier on top of the class (optional; 1 = class height)
+landmark_scale,tracks,0.85,hunting node
+landmark_scale,tree,1.25,forestry node
+landmark_scale,knave_camp,1.15,both knave camps
+landmark_scale,stone_tower,1.25,every tower size
 landmark_size,guildhall,380|500|620|720,width at size 1|2|3|4 (design units of the 1024 canvas). Size 3 = the tile centerpiece drawing
 riverside,variants,1,
 riverside,patterns,deadend|corner|straight|tee|cross,
