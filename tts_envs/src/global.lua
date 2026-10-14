@@ -117,6 +117,7 @@ SPAWN_SOURCES = {
   {key = "items", bag = "c98e54", label = "item"},
   {key = "status", bag = "72ed8a", label = "status"},
   {key = "meeple", bag = "ccfa1b", label = "meeple"},
+  {key = "landmark", bag = "6a6425", label = "landmark"},
   {key = "card", bag = "32e095", label = "card"},
 }
 GOLD_BAG = "f0d3ab"

@@ -21,7 +21,7 @@ advanced/hireling_bat.png,advanced,bat,base,hireling_bat,bat,481,716
 advanced/hireling_bird.png,advanced,bird,base,hireling_bird,#2c73c8,604,697
 advanced/hireling_cat.png,advanced,cat,base,hireling_cat,marquise,613,722
 advanced/hireling_crow.png,advanced,crow,base,hireling_crow,#7b509c,662,686
-advanced/hireling_duck.png,advanced,duck,short,hireling_duck,denizen,499,556
+advanced/hireling_duck.png,advanced,duck,base,hireling_duck,denizen,626,697
 advanced/hireling_frog.png,advanced,frog,base,hireling_frog,#b09806,621,680
 advanced/hireling_lizard.png,advanced,lizard,base,hireling_lizard,cult,621,714
 advanced/hireling_mole.png,advanced,mole,short,hireling_mole,duchy,572,559
@@ -29,11 +29,11 @@ advanced/hireling_otter.png,advanced,otter_trio,special,hireling_otter,riverfolk
 advanced/hireling_porcupine.png,advanced,porcupine,short,hireling_porcupine,porcupine,563,585
 advanced/hireling_rat.png,advanced,rat,short,hireling_rat,hundreds,560,564
 advanced/hireling_stoat.png,advanced,stoat,short,hireling_stoat,stoat,659,563
-advanced/hireling_wa.png,advanced,rabbit,base,hireling_wa,alliance,528,720
-custom/custom_beaver.png,custom,beaver,base,custom_beaver,beaver,799,676
-custom/custom_bristle.png,custom,hedgehog,base,custom_bristle,bristle,646,714
-custom/custom_redpanda.png,custom,red_panda,base,custom_redpanda,redpanda,655,679
-custom/custom_squirrel.png,custom,squirrel,base,custom_squirrel,squirrel,546,749
+advanced/hireling_wa.png,advanced,rabbit,short,hireling_wa,alliance,423,577
+custom/custom_beaver.png,custom,beaver,base,custom_beaver,riverfolk,799,676
+custom/custom_bristle.png,custom,hedgehog,base,custom_bristle,ink,646,714
+custom/custom_redpanda.png,custom,red_panda,base,custom_redpanda,ink,655,679
+custom/custom_squirrel.png,custom,squirrel,base,custom_squirrel,alliance,546,749
 special/special_boar.png,special,boar,big,special_boar,boar,707,855
 special/special_guildmaster.png,special,guildmaster,big,special_guildmaster,guildmaster,1047,1148
 special/special_penguin.png,special,penguin,short,special_penguin,penguin,641,552
@@ -74,7 +74,7 @@ denizens/denizen_hireling_bat.png,denizens,bat,base,hireling_bat,denizen,481,716
 denizens/denizen_hireling_bird.png,denizens,bird,base,hireling_bird,denizen,604,697
 denizens/denizen_hireling_cat.png,denizens,cat,base,hireling_cat,denizen,613,722
 denizens/denizen_hireling_crow.png,denizens,crow,base,hireling_crow,denizen,662,686
-denizens/denizen_hireling_duck.png,denizens,duck,short,hireling_duck,denizen,499,556
+denizens/denizen_hireling_duck.png,denizens,duck,base,hireling_duck,denizen,626,697
 denizens/denizen_hireling_frog.png,denizens,frog,base,hireling_frog,denizen,621,680
 denizens/denizen_hireling_lizard.png,denizens,lizard,base,hireling_lizard,denizen,621,714
 denizens/denizen_hireling_mole.png,denizens,mole,short,hireling_mole,denizen,572,559
@@ -82,7 +82,7 @@ denizens/denizen_hireling_otter.png,denizens,otter_trio,special,hireling_otter,d
 denizens/denizen_hireling_porcupine.png,denizens,porcupine,short,hireling_porcupine,denizen,563,585
 denizens/denizen_hireling_rat.png,denizens,rat,short,hireling_rat,denizen,560,564
 denizens/denizen_hireling_stoat.png,denizens,stoat,short,hireling_stoat,denizen,659,563
-denizens/denizen_hireling_wa.png,denizens,rabbit,base,hireling_wa,denizen,528,720
+denizens/denizen_hireling_wa.png,denizens,rabbit,short,hireling_wa,denizen,423,577
 denizens/denizen_custom_beaver.png,denizens,beaver,base,custom_beaver,denizen,799,676
 denizens/denizen_custom_bristle.png,denizens,hedgehog,base,custom_bristle,denizen,646,714
 denizens/denizen_custom_redpanda.png,denizens,red_panda,base,custom_redpanda,denizen,655,679

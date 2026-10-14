@@ -8,7 +8,7 @@ Sheets read (tools/build/scaffold_maptile_xlsx.py creates and tops them up):
   <deck> x5            biome, pattern, orientation, density, image, file, url
   backs                deck, name, image, file, url
   biome_descriptions   biome, deck, name, effect, flavor  -> [effect], blank line, "flavor"
-  maptile_table        gmnotes + spawn cells (spawnN, spawnmeepleN, spawngold)
+  maptile_table        gmnotes + spawn cells (spawnN, spawnmeepleN, spawnlandmarkN, spawngold)
   density              density, explorations
   weights              param, pool        ("a|b|b": b is twice as likely)
   tiers                biome, tier, gmnotes, tileset
@@ -34,8 +34,8 @@ import io, os, re, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/: datasets, spawn_cells, lua_inline
-from datasets import ROOT, MAPTILES, load, read_rows, item_names, token_names
-from spawn_cells import staged_path, read_spawn, referenced_names
+from datasets import ROOT, MAPTILES, load, read_rows, item_names, token_names, landmark_names
+from spawn_cells import staged_path, read_spawn, referenced_names, SPAWN_CATEGORIES
 
 MANAGER_GUID = "b77050"
 SRC = os.path.join(ROOT, "src", "maptile_manager.lua")
@@ -60,8 +60,8 @@ def lua_list(items):
 
 def lua_spawn(spawn):
   """A read_spawn() table in the shape global.lua's rollSpawn() expects."""
-  parts = ["%s = {%s}" % (k, ", ".join(lua_list(slot) for slot in spawn[k]))
-           for k in ("items", "status", "meeple") if k in spawn]
+  parts = ["%s = {%s}" % (c["key"], ", ".join(lua_list(slot) for slot in spawn[c["key"]]))
+           for c in SPAWN_CATEGORIES if c["key"] in spawn]
   if "gold" in spawn:
     parts.append("gold = {%d, %d}" % spawn["gold"])
   return "{" + ", ".join(parts) + "}"
@@ -223,7 +223,9 @@ def main():
       weights[param] = list(values)
 
   # maptile_table: what Render spawns, in the shared spawn-cell grammar
-  items, meeples = item_names(), token_names()
+  # landmarks now come from their own bag, so a meeple cell may only name a meeple
+  items, landmarks = item_names(), landmark_names()
+  meeples = token_names() - landmarks
   table = {}
   for r in read_rows(MAPTILES, "maptile_table", "gmnotes", wb):
     if r["gmnotes"] not in biomes:
@@ -232,8 +234,13 @@ def main():
       if ref not in items:
         sys.exit("%s: %r is not an item in tiles.xlsx" % (r["_where"], ref))
     for ref in referenced_names(r, keys=("meeple",)):
+      if ref in landmarks:
+        sys.exit("%s: %r is a landmark -- put it in a spawnlandmarkN column" % (r["_where"], ref))
       if ref not in meeples:
-        sys.exit("%s: %r is not a token or landmark in tokens.xlsx" % (r["_where"], ref))
+        sys.exit("%s: %r is not a meeple in tokens.xlsx" % (r["_where"], ref))
+    for ref in referenced_names(r, keys=("landmark",)):
+      if ref not in landmarks:
+        sys.exit("%s: %r is not a landmark in tokens.xlsx (landmarks sheet)" % (r["_where"], ref))
     spawn = read_spawn(r)
     if spawn:
       table[r["gmnotes"]] = spawn

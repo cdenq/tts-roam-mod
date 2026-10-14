@@ -46,7 +46,8 @@ SHEETS = {
   "backs": ["deck", "name", "image", "file", "url"],
   "biome_descriptions": ["biome", "deck", "name", "effect", "flavor"],
   # spawn-cell grammar (tools/spawn_cells.py); any spawnN / spawnmeepleN column may be added
-  "maptile_table": ["gmnotes", "spawnmeeple1", "spawnmeeple2", "spawn1", "spawn2", "spawngold", "notes"],
+  "maptile_table": ["gmnotes", "spawnmeeple1", "spawnmeeple2", "spawn1", "spawn2", "spawngold", "spawnlandmark1",
+                    "spawnlandmark2", "spawnlandmark3", "notes"],
   # draft -- see plans/auto_TODO.md "Explore action"; no sync reads it yet
   "exploration": ["biome", "spawn1", "spawn2", "spawn3", "spawnmeeple1", "spawngold", "notes"],
   "density": ["density", "explorations", "notes"],

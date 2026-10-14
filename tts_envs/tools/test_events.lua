@@ -445,6 +445,21 @@ check(#CLONED == 1 and CLONED[1].name == "For Winter", "the named card is spawne
 check(cbag._takes == 1 and ibag2._takes == 0, "it comes from bag 32e095, not the item bag")
 EVENT_DATA.F1_sneak_fail.spawn = nil
 
+print("\n== spawnlandmark pulls from the landmark bag ==")
+objects = {}
+CLONED = {}
+local mbag = makeBag("ccfa1b", {"Cave"})
+local lbag = makeBag("6a6425", {"Cave", "Eyrie Roost"})
+EVENT_DATA.F1_sneak_fail.spawn = {landmark = {{"Eyrie Roost"}}}
+local lc = makeCard("landmarkcard", "F1")
+lc.getPosition = function() return {x = 0, y = 0, z = 0} end
+setMemory(lc, {at = "F1_sneak_fail",
+               picks = {{node = "F1", option = 2, label = "Sneak", outcome = "F1_sneak_fail"}}})
+spawnClick(lc)
+check(#CLONED == 1 and CLONED[1].name == "Eyrie Roost", "the named landmark is spawned")
+check(lbag._takes == 1 and mbag._takes == 0, "it comes from bag 6a6425, not the meeple bag")
+EVENT_DATA.F1_sneak_fail.spawn = nil
+
 print("\n== gold: fewest coins ==")
 -- the split itself, independent of any bag
 local counts, short = splitGold(17, {5, 1})

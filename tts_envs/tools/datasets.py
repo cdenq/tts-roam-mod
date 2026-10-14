@@ -202,6 +202,14 @@ def item_names():
   return {r["name"] for r in read_rows(TILES, ITEM_SHEETS, "name")}
 
 
+def landmark_names():
+  """Every landmark name in tokens.xlsx (landmarks sheet), for spawnlandmark cross-checks."""
+  wb = load(TOKENS)
+  if LANDMARK_SHEET not in wb.sheetnames:
+    return set()
+  return {r["name"] for r in read_rows(TOKENS, LANDMARK_SHEET, "name", wb)}
+
+
 def token_names():
   """Every meeple and landmark name in tokens.xlsx, for spawnmeeple cross-checks."""
   wb = load(TOKENS)

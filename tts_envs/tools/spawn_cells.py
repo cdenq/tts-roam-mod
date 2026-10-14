@@ -31,6 +31,8 @@ SPAWN_CATEGORIES = [
   {"key": "status", "prefix": "spawnstatus", "count": 3},
   # A sheet only needs the columns it uses: origins carry spawnmeeple1 alone.
   {"key": "meeple", "prefix": "spawnmeeple", "count": 12},
+  # Landmarks (caves, shrines, camps) have their own bag; maptile_table uses them.
+  {"key": "landmark", "prefix": "spawnlandmark", "count": 3},
   # One unnumbered column: spawncard. Cards come out of their own bag by exact name.
   {"key": "card", "prefix": "spawncard", "count": 1, "single": True},
 ]

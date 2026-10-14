@@ -409,7 +409,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Owl Vagabond"}},
+      meeple = {{"vb Adventurer"}},
     },
   },
   ["OR43"] = {
@@ -419,7 +419,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Badger Vagabond"}},
+      meeple = {{"vb Arbiter"}},
     },
   },
   ["OR44"] = {
@@ -429,7 +429,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Weasel Vagabond"}},
+      meeple = {{"vb Cheat"}},
     },
   },
   ["OR45"] = {
@@ -439,7 +439,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Goose Vagabond"}},
+      meeple = {{"vb Gladiator"}},
     },
   },
   ["OR46"] = {
@@ -449,7 +449,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Squirrel Vagabond"}},
+      meeple = {{"vb Harrier"}},
     },
   },
   ["OR47"] = {
@@ -459,7 +459,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Boar Vagabond"}},
+      meeple = {{"vb Jailor"}},
     },
   },
   ["OR48"] = {
@@ -469,7 +469,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Wolf Vagabond"}},
+      meeple = {{"vb Ranger"}},
     },
   },
   ["OR49"] = {
@@ -479,7 +479,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Tanuki Vagabond"}},
+      meeple = {{"vb Ronin"}},
     },
   },
   ["OR50"] = {
@@ -489,7 +489,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Cat Vagabond"}},
+      meeple = {{"vb Scoundrel"}},
     },
   },
   ["OR51"] = {
@@ -499,7 +499,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Racoon Vagabond"}},
+      meeple = {{"vb Thief"}},
     },
   },
   ["OR52"] = {
@@ -509,7 +509,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Beaver Vagabond"}},
+      meeple = {{"vb Tinker"}},
     },
   },
   ["OR53"] = {
@@ -519,7 +519,7 @@ ORIGIN_DATA = {
     effect = "Select this species and meeple for your character.",
     flavor = "",
     spawn = {
-      meeple = {{"Opossum Vagabond"}},
+      meeple = {{"vb Vagrant"}},
     },
   },
 }

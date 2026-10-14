@@ -249,7 +249,8 @@ the bag.
   | `!Key\|!Key\|Box` | Key 2/3 TAKEN from bag (unique), Box 1/3 cloned |
 
 - `spawngold`: flat (`5`) or range (`1-5`); blank = none
-- columns `spawn1..5`, `spawnstatus1..3`, `spawnmeepleN`, `spawncard`; one roll per cell
+- columns `spawn1..5`, `spawnstatus1..3`, `spawnmeepleN`, `spawnlandmark1..3`, `spawncard`; one roll per cell
+- `spawnlandmarkN`: a landmark from bag `6a6425` by exact name, checked against tokens.xlsx `landmarks`
 - `spawncard` (scenario_outcomes): a card from bag `32e095` by exact name; same grammar (`A|B`, `!` = take
   the card out instead of cloning it). Not checked at sync: the names live only in that bag
 - every name checked against `tiles.xlsx` / `tokens.xlsx` at sync
@@ -476,7 +477,7 @@ Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + me
 | `settlement` `woodland` `opencountry` `waterside` `scarred` | image of that deck | `biome` `pattern` `orientation` `density` `image` `file` **`url`** |
 | `backs` | deck | `deck` `name` `image` `file` **`url`** |
 | `biome_descriptions` | biome | `biome` `deck` `name` `effect` `flavor` |
-| `maptile_table` | biome (GMNotes) | `gmnotes` + spawn cells (`spawnN`, `spawnmeepleN`, `spawngold`); names checked against tiles/tokens |
+| `maptile_table` | biome (GMNotes) | `gmnotes` + spawn cells (`spawnN`, `spawnmeepleN`, `spawnlandmark1..3`, `spawngold`); names checked against tiles/tokens. Landmarks go in `spawnlandmarkN` (bag `6a6425`), not `spawnmeepleN` -- the sync fails on a landmark in a meeple cell |
 | `exploration` | biome | draft spawn cells for Explore; no sync reads it yet |
 | `tiers` | biome + tier | `biome` `tier` `gmnotes` `tileset` -- gmnotes = the biome the tile becomes (needs its own `biome_descriptions` row, kept out of the pools); tileset = whose images it uses; a tileset that is not a biome has image rows only |
 | `density` | density stage | `density` `explorations` |
