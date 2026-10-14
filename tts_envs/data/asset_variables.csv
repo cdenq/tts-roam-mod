@@ -130,7 +130,7 @@ global,reed_size,45-65,reeds placed along river banks and lake shores
 global,hole_count,12,feature holes (slagworks): max number of holes
 global,hole_size,30-70,feature holes: radius range
 global,lake_land,150,feature lake (lakeshore): width of the land strip along each road; the rest is one lake
-global,pond_size,140-340,feature ponds (lilypond): radius range; one pond per corner that fits
+global,pond_size,100-220,feature ponds (lilypond): radius range; ponds go in 1-4 of the corners that fit
 global,wharf_land,190,feature wharf: the same as lake_land for the wharf's lake (wider, room for the docks' cargo)
 global,dam_pond_size,110-190,feature dam: radius range of the pond behind the dam
 global,cliff_width,80,feature cliffs: half-width of the ledge each road runs on

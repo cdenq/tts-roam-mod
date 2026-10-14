@@ -529,8 +529,8 @@ Code-drawn storybook tiles. Manual step, not part of `master_sync.cmd`.
     `pit` (terraced quarry pit), `lake` (one continuous lake over
     everything but a `lake_land` strip along the roads; the roads run through it as causeways), `canyon` (ravine +
     rope bridges; the river rule mirrored to the east side), `falls` (corner cliff + waterfall + pool), `mud`
-    (battlefield), `springs` (steaming stone-ringed pools), `ponds` (a separate lily-covered pond
-    in every corner that fits, `pond_size`), `wharf` (the `lake` with a wider `wharf_land` strip, a
+    (battlefield), `springs` (steaming stone-ringed pools), `ponds` (lily-covered ponds in 1-4 of
+    the corners that fit, each a random size up to `pond_size`), `wharf` (the `lake` with a wider `wharf_land` strip, a
     jetty, a barge and a raft), `flood` (the ground colour is the
     water: ripples, floating leaves, roads become boardwalks), `millrace` (river + watermill on the
     bank), `dam` (river + stick dam, pond and lodge upstream), `holes` (dug pits with spoil rims),

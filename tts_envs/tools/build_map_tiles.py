@@ -2293,7 +2293,11 @@ def draw_tile(region, seed, edges, density):
   elif region["feature"] == "ponds":
     ponds = []
     lo, hi = G["pond_size"]
-    for (pcx, pcy), pr in fit_corners(clear_of, u(hi), u(lo), squash=0.8):
+    fits = fit_corners(clear_of, u(hi), u(lo), squash=0.8)
+    rng.shuffle(fits)
+    keep = min(len(fits), int(rng.choice([1, 2, 2, 3, 3, 4])))  # not every corner gets a pond
+    for (pcx, pcy), pr in fits[:keep]:
+      pr = rng.uniform(max(u(lo), pr * 0.6), pr)  # any size up to the largest that fits
       pry = pr * 0.8
       blob(img, pcx, pcy, pr, pry, rng, G["water"], G["water_dk"], G["water_lt"], amp=6)
       ponds.append((pcx, pcy, pr, pry))
