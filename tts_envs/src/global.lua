@@ -111,7 +111,7 @@ LAYOUT = {
 
 Every category works the same way: a weighted name list per slot, looked up by
 exact object name inside one bag. Adding a category means adding a row here and
-the matching columns on scenario_outcomes -- no new code.
+the matching columns on event_outcomes -- no new code.
 ]]
 SPAWN_SOURCES = {
   {key = "items", bag = "c98e54", label = "item"},
@@ -202,6 +202,8 @@ function renderCard(obj)
 
   local nodeId = currentNode(obj)
   if not nodeId then return false end
+  -- generic cards are art only: no id, title, text or buttons over the image
+  if EVENT_DATA[nodeId].generic then return false end
   local mem = getMemory(obj)
   -- `review` means: showing a node this card has already resolved, so the
   -- options are history, not live choices.

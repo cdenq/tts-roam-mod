@@ -3,7 +3,7 @@
 EVENT_DATA = {
   ["EV1"] = {
     title = "The Bell Line",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "Where the old road narrows between two great trees, a pair of Dynasty guards have strung a line of bells. Every traveler pays to cross. Ahead of you, a cat refugee who can't afford the toll is tearfully offering them a family heirloom.",
     effect = "",
     options = {
@@ -78,7 +78,7 @@ EVENT_DATA = {
   },
   ["EV2"] = {
     title = "For Winter",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "An old tree has split open with age, and the hollow inside glistens with honeycomb. Nailed to the bark is a board in careful, shaky letters: FOR WINTER. There are no tracks nearby, and the moss on the sign is thick.",
     effect = "",
     options = {
@@ -143,7 +143,7 @@ EVENT_DATA = {
   },
   ["EV3"] = {
     title = "The Straight Road",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "Ahead, the trees simply stop. A Marquisate felling crew has cut a road through the wood, straight as a ruler, and the stumps still weep sap. The foreman, a tabby with a ledger, is hiring. The pay is good, and the road leads where you're going.",
     effect = "",
     options = {
@@ -202,7 +202,7 @@ EVENT_DATA = {
   },
   ["EV4"] = {
     title = "The Lantern Fen",
-    template = "wilderness_template",
+    template = "event_water_template",
     flavor = "The path sinks onto soft, wet ground, and someone has set lanterns on posts to mark the safe way. Most are lit. One, halfway across, is lit on the wrong side of the path, and an otter on a stump is watching to see which way you go.",
     effect = "",
     options = {
@@ -277,7 +277,7 @@ EVENT_DATA = {
   },
   ["EV5"] = {
     title = "A Wedding in the Clover",
-    template = "wilderness_template",
+    template = "event_open_template",
     flavor = "In a patch of clover by the road, two mice are about to be married, and the officiant hasn't come. The bride's mother is eyeing your party. Someone has to speak the words, someone has to hold the rings, and someone, she says firmly, has to stop Uncle Bram from singing.",
     effect = "",
     options = {
@@ -352,7 +352,7 @@ EVENT_DATA = {
   },
   ["EV6"] = {
     title = "The Resin Camp",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "A squirrel's resin camp sits empty under the trees, buckets still hanging from the cuts. Supper is cold in the pot. Pinned under a stone by the fire is a map with one tree circled twice, and the circle is fresh.",
     effect = "",
     options = {
@@ -430,7 +430,7 @@ EVENT_DATA = {
   },
   ["EV7"] = {
     title = "The Burned Mile",
-    template = "wilderness_template",
+    template = "event_scar_template",
     flavor = "The fire was two summers ago. Fireweed has come up purple through the black, and whatever still stands is hollow as a chimney. Halfway across, a Marquisate banner hangs from one of them, scorched but upright, and beneath it someone has built a small stone cairn.",
     effect = "",
     options = {
@@ -495,7 +495,7 @@ EVENT_DATA = {
   },
   ["EV8"] = {
     title = "Paid Through Autumn",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "Beneath a low bough, a magnificently rotund mole sleeps beneath a blanket of ferns and mushrooms. Pinned to his coat is a tag: NO WAKE. PAID THROUGH AUTUMN. His pack, just out of reach, is unbuttoned.",
     effect = "",
     options = {
@@ -573,7 +573,7 @@ EVENT_DATA = {
   },
   ["EV9"] = {
     title = "Two Ferries",
-    template = "wilderness_template",
+    template = "event_water_template",
     flavor = "Where the water is too wide to wade, two ferries wait on the near bank. One flies a Marquisate pennant and charges coin. The other is a large heron who'll carry you across for an amazing story, though she warns that she's heard most of them.",
     effect = "",
     options = {
@@ -635,7 +635,7 @@ EVENT_DATA = {
   },
   ["EV10"] = {
     title = "The Lit Window",
-    template = "wilderness_template",
+    template = "event_sett_template",
     flavor = "Set back from the rest, one house has been left to go wild. Its garden has gone to seed, and the fruit is rotting where it falls. One window is lit, and every few minutes a shadow crosses it, carrying something heavy.",
     effect = "",
     options = {
@@ -700,7 +700,7 @@ EVENT_DATA = {
   },
   ["EV11"] = {
     title = "The Painted Paw",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "Among the trees, a young mouse is painting a sign on a tree: a circumscribed paw, raised and curled into a fist. She freezes when she sees you. Her brush is still dripping. Down the path, you can hear Marquisate boots.",
     effect = "",
     options = {
@@ -765,7 +765,7 @@ EVENT_DATA = {
   },
   ["EV12"] = {
     title = "The Floating Market",
-    template = "wilderness_template",
+    template = "event_water_template",
     flavor = "Six otter barges are lashed together across the water, making a market and a bridge at once. Everything is for sale, including passage. A sign at the gangplank lists prices for crossing, for news, and, in smaller letters, for not mentioning that you crossed.",
     effect = "",
     options = {
@@ -831,7 +831,7 @@ EVENT_DATA = {
   },
   ["EV13"] = {
     title = "The Garden of Let-Go Things",
-    template = "wilderness_template",
+    template = "event_scar_template",
     flavor = "Among the rubble, someone has made a garden out of things the war left behind: broken lanterns, a cracked shield, a child's shoe, all planted in neat rows. A lizard in a gray hood is watering them. She asks if you have anything you'd like to let go of.",
     effect = "",
     options = {
@@ -915,7 +915,7 @@ EVENT_DATA = {
   },
   ["EV14"] = {
     title = "Four Cards on a Stump",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "At a crossroads under the trees, a crow is laying four cards face down on a stump. He says one is a gift, one a debt, one a warning, and one is none of your business. He'll let you turn one over. He doesn't say what happens if you don't.",
     effect = "",
     options = {
@@ -1005,7 +1005,7 @@ EVENT_DATA = {
   },
   ["EV15"] = {
     title = "The Hundred Pass By",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "The undergrowth ahead has been trampled flat in a line a hundred paws wide. Rats are marching through it under a banner of stitched-together flags, singing. At the back, a small rat with a large sack collects anything the marchers drop. He has spotted your packs.",
     effect = "",
     options = {
@@ -1089,7 +1089,7 @@ EVENT_DATA = {
   },
   ["EV16"] = {
     title = "Cliffracers",
-    template = "wilderness_template",
+    template = "event_open_template",
     flavor = "The path swings wide, and you realize the road has been climbing all morning. To your left, the ground drops away so steeply it's nearly a cliff. To your right, a battered but eager mouse is dragging two wooden sleds toward you. \"Last one down is a rotten egg!\"",
     effect = "",
     options = {
@@ -1173,7 +1173,7 @@ EVENT_DATA = {
   },
   ["EV17"] = {
     title = "The Survey Stakes",
-    template = "wilderness_template",
+    template = "event_open_template",
     flavor = "Little flags on stakes run across the open ground in a perfect line, each stamped with the Duchy's seal. Where they cross your path, the ground is soft and freshly turned. A mole in spectacles surfaces beside a stake, looks at you, and asks you not to step there.",
     effect = "",
     options = {
@@ -1239,7 +1239,7 @@ EVENT_DATA = {
   },
   ["EV18"] = {
     title = "The Keepers' Dig",
-    template = "wilderness_template",
+    template = "event_scar_template",
     flavor = "At the bottom of a fresh pit among old stones, three badgers in iron caps are digging around something huge and green with age. Their leader leans on her shovel and looks you over. \"It's a relic,\" she says, \"and it's stuck, and you look like you've got arms.\"",
     effect = "",
     options = {
@@ -1305,7 +1305,7 @@ EVENT_DATA = {
   },
   ["EV19"] = {
     title = "The Lily Town",
-    template = "wilderness_template",
+    template = "event_water_template",
     flavor = "The trail ends at still water, and the water is full of frogs. They've built a town on the lilypads, rope bridges and all, and the only way across is through it. A frog in a reed hat is collecting names at the first pad. He looks very tired of collecting names.",
     effect = "",
     options = {
@@ -1371,7 +1371,7 @@ EVENT_DATA = {
   },
   ["EV20"] = {
     title = "Sideways Rain",
-    template = "wilderness_template",
+    template = "event_open_template",
     flavor = "The horizon goes gray before the wind reaches you. Then the rain comes sideways. There's a cut in the bank big enough for maybe half of you, and somewhere off the road, a light that might be a window.",
     effect = "",
     options = {
@@ -1430,7 +1430,7 @@ EVENT_DATA = {
   },
   ["EV21"] = {
     title = "The Lightning Oak",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "The oldest tree in sight has been split by lightning and is burning slowly from the inside, hissing in the rain. In the hollow at its heart, past the flames, something metal is catching the light.",
     effect = "",
     options = {
@@ -1502,7 +1502,7 @@ EVENT_DATA = {
   },
   ["EV22"] = {
     title = "Something Circling",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "Your fire is down to coals when you hear it: footsteps, circling the camp, just past the light. They stop when you stop talking. They start again when you do.",
     effect = "",
     options = {
@@ -1574,7 +1574,7 @@ EVENT_DATA = {
   },
   ["EV23"] = {
     title = "The Beaver Dam",
-    template = "wilderness_template",
+    template = "event_water_template",
     flavor = "A beaver dam has backed the stream up over the road. On top of it, an old beaver is shouting instructions at a young one, who is shouting back. Neither of them is fixing the leak spraying out of the middle.",
     effect = "",
     options = {
@@ -1646,7 +1646,7 @@ EVENT_DATA = {
   },
   ["EV24"] = {
     title = "Moss Helmets",
-    template = "wilderness_template",
+    template = "event_scar_template",
     flavor = "The ground here is quiet and overgrown. It takes a moment to see that the mounds under the moss are helmets, hundreds of them, cat and bird alike. Someone has been here recently. A path is worn between the mounds, and a few have been pried open.",
     effect = "",
     options = {
@@ -1711,7 +1711,7 @@ EVENT_DATA = {
   },
   ["EV25"] = {
     title = "The Harvest Tug",
-    template = "wilderness_template",
+    template = "event_sett_template",
     flavor = "Two villages are holding their harvest fair in the same field, which nobody planned. Now there's a rope across the stubble, both sides are short a few haulers, and both mayors are looking at you. The prize is a wheel of cheese the size of a cart.",
     effect = "",
     options = {
@@ -1783,7 +1783,7 @@ EVENT_DATA = {
   },
   ["EV26"] = {
     title = "The Voice in the Fog",
-    template = "wilderness_template",
+    template = "event_scar_template",
     flavor = "The fog comes up out of the ground until you can barely see your own paws. Somewhere ahead, someone is calling one of your names. It's the right name, said the right way, in a voice none of you know.",
     effect = "",
     options = {
@@ -1855,7 +1855,7 @@ EVENT_DATA = {
   },
   ["EV27"] = {
     title = "The Deserter",
-    template = "wilderness_template",
+    template = "event_scar_template",
     flavor = "A young Marquisate soldier is hiding in a ditch, armor half off, shaking. He begs you not to call out. Up the hill, his old company is breaking camp, and they're counting heads.",
     effect = "",
     options = {
@@ -1921,7 +1921,7 @@ EVENT_DATA = {
   },
   ["EV28"] = {
     title = "A Broken Wing",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "A young Eyrie messenger lies in the ferns with one wing bent wrong, clutching a sealed letter to his chest. He's conscious, barely. The wax is red, and the ribbon is the kind only the Roost uses.",
     effect = "",
     options = {
@@ -1981,7 +1981,7 @@ EVENT_DATA = {
   },
   ["EV29"] = {
     title = "Tea in the Hollow",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "A hare has set up a table in a hollow stump, with five mismatched cups already poured. She says she's been expecting you. When you've finished, she'll read your leaves. The tea smells of mint and something else.",
     effect = "",
     options = {
@@ -2040,7 +2040,7 @@ EVENT_DATA = {
   },
   ["EV30"] = {
     title = "The Sinkhole",
-    template = "wilderness_template",
+    template = "event_open_template",
     flavor = "The path ahead has fallen in. At the bottom of a fresh sinkhole, a cart lies on its side, and a hedgehog driver is pinned under the wheel, very politely asking for help.",
     effect = "",
     options = {
@@ -2106,7 +2106,7 @@ EVENT_DATA = {
   },
   ["EV31"] = {
     title = "Three on a Log",
-    template = "wilderness_template",
+    template = "event_wood_template",
     flavor = "Three rabbit kits are sitting in a row on a fallen log, holding paws. The middle one tells you very seriously that they are not lost, they are waiting. They've been waiting since yesterday. None of them knows the way home, but all of them know it's past the big stone.",
     effect = "",
     options = {
@@ -2166,7 +2166,7 @@ EVENT_DATA = {
   },
   ["EV32"] = {
     title = "The Weasel's Wager",
-    template = "wilderness_template",
+    template = "event_sett_template",
     flavor = "At a crossroads, a weasel has turned a barrel into a gaming table: three cups, one pebble, and a small crowd that keeps losing. He grins at your purses. \"One round,\" he says. \"Friendly stakes.\"",
     effect = "",
     options = {
@@ -2232,7 +2232,7 @@ EVENT_DATA = {
   },
   ["EV33"] = {
     title = "Frost Morning",
-    template = "wilderness_template",
+    template = "event_open_template",
     flavor = "You wake to frost on everything: blankets, packs, the fire's last coals. The waterskins have frozen solid. A little way off, another traveler's camp is just as white, and the traveler in it hasn't moved.",
     effect = "",
     options = {
@@ -2298,7 +2298,7 @@ EVENT_DATA = {
   },
   ["EV34"] = {
     title = "The Wishing Pool",
-    template = "wilderness_template",
+    template = "event_water_template",
     flavor = "Where the water stills into a clear, deep pool, the bottom glitters with coins. A painted sign on a rock reads FOR WISHES ONLY, and someone has added a line underneath: WE ARE WATCHING.",
     effect = "",
     options = {
@@ -2351,7 +2351,7 @@ EVENT_DATA = {
   },
   ["EV35"] = {
     title = "Smoke on the Ridge",
-    template = "wilderness_template",
+    template = "event_open_template",
     flavor = "Smoke is pouring over the ridge, and everything that lives up there is pouring down ahead of it: mice, hares, a family of foxes carrying their kits. Where the path turns, a mouse's cart is stuck in the rut, and she's shouting for anyone.",
     effect = "",
     options = {
@@ -2423,7 +2423,7 @@ EVENT_DATA = {
   },
   ["EV36"] = {
     title = "The Crossroads Stone",
-    template = "wilderness_template",
+    template = "event_scar_template",
     flavor = "Where the crossroads meet stands a waystone older than anyone can say. Four animal faces are carved into the rock, and three seem to have been claimed recently: a cat's paw scratched into one, a feather tied to another, and a paw-and-circle painted on the third. The fourth face is still bare.",
     effect = "",
     options = {
@@ -2489,7 +2489,7 @@ EVENT_DATA = {
   },
   ["EV37"] = {
     title = "A Traveling Caravan",
-    template = "wilderness_template",
+    template = "event_open_template",
     flavor = "The old ruts in the road turn fresh: new wagon tracks, a scatter of bootprints. From the top of the rise you see them, two wagons not far ahead, too far to hail but not too far to catch. Only one guard walks beside them.",
     effect = "",
     options = {
@@ -2534,137 +2534,152 @@ EVENT_DATA = {
     effect = "",
     options = {},
   },
-  ["CB1"] = {
-    title = "Spell 0",
+  ["spell0_template"] = {
+    title = "SPELL-0-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell0_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell0_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB2"] = {
-    title = "Spell 1",
+  ["spell1_template"] = {
+    title = "SPELL-1-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell1_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell1_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB3"] = {
-    title = "Spell 2",
+  ["spell2_template"] = {
+    title = "SPELL-2-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell2_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell2_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB4"] = {
-    title = "Spell 3",
+  ["spell3_template"] = {
+    title = "SPELL-3-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell3_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell3_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB5"] = {
-    title = "Origin",
+  ["origin_template"] = {
+    title = "ORIGIN-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/origin_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/origin_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB6"] = {
-    title = "Side Quest",
+  ["quest0_template"] = {
+    title = "QUEST-0-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_side_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_side_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB7"] = {
-    title = "Minor Quest",
+  ["quest1_template"] = {
+    title = "QUEST-1-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_minor_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_minor_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB8"] = {
-    title = "Major Quest",
+  ["quest2_template"] = {
+    title = "QUEST-2-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_major_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_major_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB9"] = {
-    title = "Story Quest",
+  ["quest3_template"] = {
+    title = "QUEST-3-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_story_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_story_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB10"] = {
-    title = "Passive",
+  ["spellp_template"] = {
+    title = "SPELL-PASSIVE-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/passive_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/passive_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB11"] = {
-    title = "Settlement",
+  ["event_sett_template"] = {
+    title = "EVENT-SETTLEMENT-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/settlement_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/settlement_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB12"] = {
-    title = "Woodland",
+  ["event_wood_template"] = {
+    title = "EVENT-WOODLAND-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/woodland_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/woodland_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB13"] = {
-    title = "Open Country",
+  ["event_open_template"] = {
+    title = "EVENT-OPENCOUNTRY-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/opencountry_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/opencountry_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB14"] = {
-    title = "Waterside",
+  ["event_water_template"] = {
+    title = "EVENT-WATERSIDE-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/waterside_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/waterside_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
   },
-  ["CB15"] = {
-    title = "Scarred",
+  ["event_scar_template"] = {
+    title = "EVENT-SCARRED-TEMPLATE",
     template = "generic_card_template",
     face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/scarred_front.png",
     back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/scarred_back.png",
+    generic = true,
     flavor = "",
     effect = "",
     options = {},
@@ -2678,7 +2693,7 @@ CARD_SETS = {
   ["opencountry"] = {"EV5", "EV16", "EV17", "EV20", "EV30", "EV33", "EV35", "EV37"},
   ["scarred"] = {"EV7", "EV13", "EV18", "EV24", "EV26", "EV27", "EV36"},
   ["settlement"] = {"EV10", "EV25", "EV32"},
-  ["generic"] = {"CB1", "CB2", "CB3", "CB4", "CB5", "CB6", "CB7", "CB8", "CB9", "CB10", "CB11", "CB12", "CB13", "CB14", "CB15"},
+  ["generic"] = {"spell0_template", "spell1_template", "spell2_template", "spell3_template", "origin_template", "quest0_template", "quest1_template", "quest2_template", "quest3_template", "spellp_template", "event_sett_template", "event_wood_template", "event_open_template", "event_water_template", "event_scar_template"},
 }
 
 -- Region names in sheet order -- drives the importer's button grid.
@@ -2798,7 +2813,7 @@ LAYOUT = {
 
 Every category works the same way: a weighted name list per slot, looked up by
 exact object name inside one bag. Adding a category means adding a row here and
-the matching columns on scenario_outcomes -- no new code.
+the matching columns on event_outcomes -- no new code.
 ]]
 SPAWN_SOURCES = {
   {key = "items", bag = "c98e54", label = "item"},
@@ -2889,6 +2904,8 @@ function renderCard(obj)
 
   local nodeId = currentNode(obj)
   if not nodeId then return false end
+  -- generic cards are art only: no id, title, text or buttons over the image
+  if EVENT_DATA[nodeId].generic then return false end
   local mem = getMemory(obj)
   -- `review` means: showing a node this card has already resolved, so the
   -- options are history, not live choices.

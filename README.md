@@ -36,8 +36,7 @@ ROAM/
 │   └── objects/              # staging; OVERWRITTEN by Ctrl+Alt+L
 └── tts_envs/                 # EDIT IN HERE
     ├── data/                 # every authored dataset
-    │   ├── cards.xlsx        # scenario_intro, generic, scenario_options, scenario_outcomes
-    │   ├── origins.xlsx      # origins
+    │   ├── cards.xlsx        # generic, origins, event_intro, event_options, event_outcomes, _values
     │   ├── tiles.xlsx        # items, skills, statuses, lootbox_table, _values
     │   ├── tokens.xlsx       # tokens, landmarks, factions, loot_table, stats_table, _values
     │   ├── shops.xlsx        # shops, stock
@@ -80,7 +79,7 @@ Never hand-edit `generated/`, `.tts/objects/`, `master_reload.lua`, `debug.lua`.
 | change | file |
 | --- | --- |
 | event cards, generic (art-only) cards | `data/cards.xlsx` |
-| origin cards | `data/origins.xlsx` |
+| origin cards | `data/cards.xlsx` `origins` |
 | items / skills / statuses | `data/tiles.xlsx` |
 | lootbox contents | `data/tiles.xlsx` `lootbox_table` |
 | meeples, factions, enemy loot | `data/tokens.xlsx` |
@@ -102,7 +101,7 @@ Never hand-edit `generated/`, `.tts/objects/`, `master_reload.lua`, `debug.lua`.
 
 | changed | push with |
 | --- | --- |
-| `src/global.lua`, `cards.xlsx`, `origins.xlsx`, lootboxes | focus `master_reload.lua` + `Ctrl+Shift+E` |
+| `src/global.lua`, `cards.xlsx`, lootboxes | focus `master_reload.lua` + `Ctrl+Shift+E` |
 | one object's script | focus its `.tts/objects/*.lua` -> `TTS Editor: Update Object` |
 | both, or unsure | `Ctrl+Alt+S` Save and Play (save the game first) |
 
@@ -128,6 +127,7 @@ Never hand-edit `generated/`, `.tts/objects/`, `master_reload.lua`, `debug.lua`.
 
 - `sync_gold` first — writes `base_gold`/`spawngold` INTO `data/`
 - `sync_origin_text` — rewrites "Gain N gold." prose to match `spawngold`
+- `sync_card_templates` — writes `template` INTO `event_intro` + `origins` from `generic` `template_for`
 - `sync_events_data` — rebuilds Global from `src/global.lua` + cards.xlsx
 - `sync_card_importer`, `sync_items_data`, `sync_lootbox_data`,
   `sync_landmark_data`, `sync_origins_data`, `sync_change_converter`, `sync_merchant_board`
@@ -255,7 +255,7 @@ the bag.
 - `spawngold`: flat (`5`) or range (`1-5`); blank = none
 - columns `spawn1..5`, `spawnstatus1..3`, `spawnmeepleN`, `spawnlandmark1..3`, `spawncard`; one roll per cell
 - `spawnlandmarkN`: a landmark from bag `6a6425` by exact name, checked against tokens.xlsx `landmarks`
-- `spawncard` (scenario_outcomes): a card from bag `32e095` by exact name; same grammar (`A|B`, `!` = take
+- `spawncard` (event_outcomes): a card from bag `32e095` by exact name; same grammar (`A|B`, `!` = take
   the card out instead of cloning it). Not checked at sync: the names live only in that bag
 - every name checked against `tiles.xlsx` / `tokens.xlsx` at sync
 
@@ -266,27 +266,33 @@ every click.
 
 | sheet | one row per | key |
 | --- | --- | --- |
-| `scenario_intro` | card: `template`, `region`, `title`, `flavor`, `face_url`, `back_url` | `scenario_id` (`EV1`) |
-| `generic` | art-only card: `template`, `set` (= region), `title`, `description` (= flavor), `face_url`, `back_url`; no options needed | `id` (`CB1`) |
-| `scenario_options` | button: `label`, `tooltip`, `outcomes` | `scenario_id` + `option` |
-| `scenario_outcomes` | landing: `title`, `flavor`, `effect`, spawns | `scenario_id` + `outcome_key` |
+| `generic` | art-only card AND template: `template`, `template_for`, `set` (= region), `title`, `description` (= flavor), `face_url`, `back_url`; no options needed | `id` (`event_wood_template`) |
+| `event_intro` | card: `template` (derived), `region` (dropdown), `title`, `flavor`, `face_url`, `back_url` | `event_id` (`EV1`) |
+| `event_options` | button: `label`, `tooltip`, `outcomes` | `event_id` + `option` |
+| `event_outcomes` | landing: `title`, `flavor`, `effect`, spawns | `event_id` + `outcome_key` |
 
-- node id = `<scenario_id>_<outcome_key>` (`EV1_pay_through`), built by sync
+- node id = `<event_id>_<outcome_key>` (`EV1_pay_through`), built by sync
 - `outcomes` = `|`-separated keys, repeats raise odds
 - `region` = the event deck (`settlement` `woodland` `opencountry` `waterside`
   `scarred`, see `internal/agent/taxonomy.md` "Event decks"): one importer button per
   deck, and the biomes that draw from it. Map-tile biomes (`forest`, `marsh`...)
-  are a different list
+  are a different list. Dropdown from `_values` `region`; sync fails on any
+  other value. A new region = a `_values` row + a `generic` row for its template
+- `template` on `event_intro` and `origins` is DERIVED, never authored:
+  `sync_card_templates` writes the id of the `generic` row whose
+  `template_for` is the row's region (or `origins`). Import the `generic` set
+  first: those cards are the templates the other sets clone
 - `face_url` / `back_url`: replace the template's art at import (empty = keep
   it). `generic` rows point at `assets/cards/` on GitHub
   (`https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/<file>`)
 - `generic` rows use `set` `generic` -> one importer button for the set
-- GMNotes = `scenario_id` (permanent); memo = current node (empty = intro)
+- generic cards render nothing: no id, title, text or buttons over the art (`generic = true` in `EVENT_DATA`)
+- GMNotes = `event_id` (permanent); memo = current node (empty = intro)
 - object name is cosmetic; GMNotes is authoritative
 - `EVENT_DATA` lives in Global -> text fix = edit, sync, push; cards on the
   table re-render without re-import
-- push BOTH Global and the bag after a scenario change (or `Ctrl+Alt+S`)
-- sync fails on: unknown `scenario_id`, duplicate key, option -> missing
+- push BOTH Global and the bag after an event change (or `Ctrl+Alt+S`)
+- sync fails on: unknown `event_id`, duplicate key, option -> missing
   outcome, intro with no options (generic rows exempt), tab/newline in a
   title, whitespace in a url. Warns on
   unreachable outcomes
@@ -297,7 +303,7 @@ every click.
 
 ## Origins
 
-- `origins.xlsx`, one row per origin card; ids `O…` (must not collide with `EV…`)
+- `cards.xlsx` `origins`, one row per origin card; ids `O…` (must not collide with `EV…`)
 - renders like an event card; one button spawns everything it grants
   (`spawn*`, `spawngold`, `spawnmeeple1`); card is NOT consumed
 - `gold_tier` -> `spawngold` computed by `sync_gold`; prose rewritten to match

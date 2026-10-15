@@ -11,7 +11,7 @@ generated/, while this one writes INTO data/ --
                                                 header, like stat
   tiles.xlsx  lootbox_table        spawngold   a "lo-hi" range around the
                                                 tier midpoint
-  origins.xlsx                       spawngold   from the gold_tier column
+  cards.xlsx origins                       spawngold   from the gold_tier column
   generated/economy_data.lua   ECONOMY -- margins + rep bands, for Global
 
 A hand-typed value survives: an item whose base_gold does not match what the
@@ -27,7 +27,7 @@ import csv, math, os, re, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/: datasets, spawn_cells, lua_inline
-from datasets import (ROOT, GOLD, TILES, ORIGINS, ITEM_SHEETS, LOOTBOX_SHEET,
+from datasets import (ROOT, GOLD, TILES, CARDS, ITEM_SHEETS, LOOTBOX_SHEET,
                       ORIGINS_SHEET, load, read_rows, write_back, save)
 
 OUT = os.path.join(ROOT, "generated", "economy_data.lua")
@@ -457,12 +457,12 @@ def price_sheet(ws, rules, check, force, rows):
 def sync_origins(rules, check, force):
   """spawngold comes from the origin's gold_tier. Drift against the prose
   "Gain N gold." is reported, since this tool is what causes it."""
-  wb = load(ORIGINS, data_only=False)
-  rows = read_rows(ORIGINS, ORIGINS_SHEET, "origin_id", wb)
+  wb = load(CARDS, data_only=False)
+  rows = read_rows(CARDS, ORIGINS_SHEET, "origin_id", wb)
   if not rows:
     return 0, []
   if "gold_tier" not in rows[0]:
-    warn("origins.xlsx has no gold_tier column -- add one (1-5) and re-run; "
+    warn("cards.xlsx origins has no gold_tier column -- add one (1-5) and re-run; "
          "spawngold left untouched")
     return 0, []
 
@@ -473,7 +473,7 @@ def sync_origins(rules, check, force):
     raw = (r.get("gold_tier") or "").strip()
     pct = rules["origin_tier"].get(raw) if raw else None
     if raw and pct is None:
-      warn("origins.xlsx %s: unknown gold_tier %r" % (r["origin_id"], raw))
+      warn("cards.xlsx origins %s: unknown gold_tier %r" % (r["origin_id"], raw))
       out.append((r["origin_id"], r.get("name", ""), None))
       continue
     if pct is None:
@@ -491,13 +491,13 @@ def sync_origins(rules, check, force):
     # The effect text names a number the player reads on the card.
     said = re.search(r"Gain (\d+) gold", r.get("effect") or "")
     if said and int(said.group(1)) != value:
-      warn("origins.xlsx %s (%s): text says %s gold, rules give %d"
+      warn("cards.xlsx origins %s (%s): text says %s gold, rules give %d"
            % (r["origin_id"], r.get("name", ""), said.group(1), value))
     out.append((r["origin_id"], r.get("name", ""), value))
 
   if not check and changed:
     write_back(wb, ORIGINS_SHEET, rows, ("spawngold",))
-    save(wb, ORIGINS)
+    save(wb, CARDS)
   return changed, out
 
 

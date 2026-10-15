@@ -32,7 +32,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/: datasets, spawn_cells, lua_inline
 from spawn_cells import staged_path, referenced_names, read_spawn
-from datasets import (ROOT, TILES, ITEM_SHEETS, CARDS, SCENARIO_OUTCOMES,
+from datasets import (ROOT, TILES, ITEM_SHEETS, CARDS, EVENT_OUTCOMES,
                       TOKENS, TOKEN_SHEET, LANDMARK_SHEET, LANDMARK_ROLE,
                       FACTIONS_SHEET, LOOT_TABLE_SHEET,
                       STATS_TABLE_SHEET, SHOP_ROLE, COMBAT_ROLE, SHOPS,
@@ -867,8 +867,8 @@ def main():
   known = set(seen_names)
   if os.path.exists(CARDS):
     # Only outcomes spawn; intros have no spawn columns.
-    for r in read_rows(CARDS, SCENARIO_OUTCOMES, "outcome_key"):
-      nid = outcome_id(r.get("scenario_id", ""), r["outcome_key"])
+    for r in read_rows(CARDS, EVENT_OUTCOMES, "outcome_key"):
+      nid = outcome_id(r.get("event_id", ""), r["outcome_key"])
       # items only: statuses come from their own bag and are not in tiles.xlsx.
       seen_missing = set()
       for nm in referenced_names(r, keys=("items",)):

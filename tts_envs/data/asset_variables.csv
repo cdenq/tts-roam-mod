@@ -837,16 +837,16 @@ deck_settlement,name,Settlement,tile back for this event deck: the text on the r
 deck_settlement,gem,topaz_heart1,gem image from assets/gems/ (.png optional)
 deck_settlement,colour,#4a4440,back colour
 deck_woodland,name,Woodland,
-deck_woodland,gem,amethyst_cushion1,
+deck_woodland,gem,topaz_cushion1,
 deck_woodland,colour,#55703a,
 deck_opencountry,name,Open Country,
-deck_opencountry,gem,amethyst_cabochon1,
+deck_opencountry,gem,topaz_cabochon1,
 deck_opencountry,colour,#a8913f,
 deck_waterside,name,Waterside,
-deck_waterside,gem,amethyst_pear1,
+deck_waterside,gem,topaz_pear1,
 deck_waterside,colour,#3f6f86,
 deck_scarred,name,Scarred,
-deck_scarred,gem,amethyst_trillion1,
+deck_scarred,gem,topaz_trillion1,
 deck_scarred,colour,#8c5a44,
 meeple,canvas,1536,"px; every meeple PNG is this square, feet on the bottom row (tools/build/build_meeples.py)"
 meeple,brush_strength,2.6,brush-pen warp on brush=yes shapes (build_meeple_shapes.py); 0 = off

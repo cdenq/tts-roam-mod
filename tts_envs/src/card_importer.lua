@@ -1,4 +1,4 @@
---[[ Card Importer: clone one card per scenario intro, generic card and origin.
+--[[ Card Importer: clone one card per event intro, generic card and origin.
 
 Unlike the Tile/Token Importer, this script holds NO data. Cards are dumb
 objects that carry only an id in GMNotes; Global owns EVENT_DATA, renders every
@@ -16,7 +16,9 @@ CARD_SETS and CARD_SET_ORDER are read from Global at load time -- they are
 generated into Global by tools/sync/sync_events_data.py alongside EVENT_DATA.
 
 Templates sit loose in this bag, each a Card whose GMNotes is the value the
-`template` column names (scenario_intro, generic, origins) -- any value works.
+`template` column names (event_intro, generic, origins) -- any value works.
+event_intro and origins templates are generic cards (sync_card_templates.py),
+so import the generic set first and keep those cards in this bag.
 A row with face_url / back_url gets that art instead of the template's.
 They are never consumed: the importer takes one out, clones from it, and puts
 it straight back. "Take out all" skips them. See src/lib/template_import.lua.

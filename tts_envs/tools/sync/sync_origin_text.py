@@ -19,7 +19,7 @@ import os, re, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/: datasets, spawn_cells, lua_inline
-from datasets import ORIGINS, ORIGINS_SHEET, load, read_rows, write_back, save
+from datasets import CARDS, ORIGINS_SHEET, load, read_rows, write_back, save
 
 GOLD_SENTENCE = re.compile(r"Gain (\d+) gold\b")
 
@@ -31,13 +31,13 @@ def warn(msg):
 
 
 def main():
-  wb = load(ORIGINS, data_only=False)
-  rows = read_rows(ORIGINS, ORIGINS_SHEET, "origin_id", wb)
+  wb = load(CARDS, data_only=False)
+  rows = read_rows(CARDS, ORIGINS_SHEET, "origin_id", wb)
   if not rows:
-    sys.exit("no origins in " + ORIGINS)
+    sys.exit("no origins in " + CARDS)
   for col in ("effect", "spawngold"):
     if col not in rows[0]:
-      sys.exit("origins.xlsx has no %s column" % col)
+      sys.exit("cards.xlsx origins has no %s column" % col)
 
   edits = []
   for r in rows:
@@ -79,7 +79,7 @@ def main():
 
   if edits:
     write_back(wb, ORIGINS_SHEET, rows, ("effect",))
-    save(wb, ORIGINS)
+    save(wb, CARDS)
 
   for oid, name, was, now in edits:
     print("  %s (%s): %s -> %d gold" % (oid, name, was, now))

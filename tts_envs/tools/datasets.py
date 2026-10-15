@@ -10,11 +10,12 @@ is one edit here instead of a hunt through every tool.
                             loot_table               what a token drops when killed
                             stats_table              a token's combat numbers
                             landmarks                places on the map: caves, shrines, camps
-  data/cards.xlsx           scenario_intro           one row per event card
-                            generic                  one row per art-only card (same headers)
-                            scenario_options         the buttons on each card
-                            scenario_outcomes        what each button can lead to
-  data/origins.xlsx         origins                  one row per origin card
+  data/cards.xlsx           generic                  one row per art-only card; the templates
+                            origins                  one row per origin card
+                            event_intro              one row per event card
+                            event_options            the buttons on each card
+                            event_outcomes           what each button can lead to
+                            _values                  allowed regions (event_intro dropdown)
   data/gold_variables.csv
   data/shops.xlsx
   data/asset_variables.csv  art knobs for tools/build/build_map_tiles.py + build_gems.py + build_landmarks.py + build_meeples.py
@@ -31,7 +32,6 @@ DATA = os.path.join(ROOT, "data")
 TILES = os.path.join(DATA, "tiles.xlsx")
 TOKENS = os.path.join(DATA, "tokens.xlsx")
 CARDS = os.path.join(DATA, "cards.xlsx")
-ORIGINS = os.path.join(DATA, "origins.xlsx")
 GOLD = os.path.join(DATA, "gold_variables.csv")
 SHOPS = os.path.join(DATA, "shops.xlsx")
 ASSET_VARS = os.path.join(DATA, "asset_variables.csv")
@@ -60,25 +60,31 @@ COMBAT_ROLE = "combat"
 ORIGINS_SHEET = "origins"
 
 
-#[[ A scenario is an intro card, its options, and the outcomes those options
+#[[ An event is an intro card, its options, and the outcomes those options
 # roll. Region is a column on the intro, not a sheet, so every region shares
-# these three. An outcome is keyed by scenario_id + outcome_key; outcome_id()
+# these three. An outcome is keyed by event_id + outcome_key; outcome_id()
 # joins them into the node id the game stores ("EV1_pay_through").
-SCENARIO_INTRO = "scenario_intro"
-SCENARIO_OPTIONS = "scenario_options"
-SCENARIO_OUTCOMES = "scenario_outcomes"
+EVENT_INTRO = "event_intro"
+EVENT_OPTIONS = "event_options"
+EVENT_OUTCOMES = "event_outcomes"
 #[[ generic: art-only cards, a card per row but no options or outcomes. Its
-# own headers (id, set, description) map onto scenario_intro's (scenario_id,
+# own headers (id, set, description) map onto event_intro's (event_id,
 # region, flavor) in intro_rows(). face_url / back_url (on both sheets) replace
 # the template's art at import; empty keeps it.
 GENERIC_SHEET = "generic"
-GENERIC_COLUMNS = {"id": "scenario_id", "set": "region", "description": "flavor"}
+GENERIC_COLUMNS = {"id": "event_id", "set": "region", "description": "flavor"}
+#[[ A generic card is also the TEMPLATE other cards clone: its id is the GMNotes
+# the importer looks for. template_for names the region (or "origins") whose
+# rows get that id written into their template column by sync_card_templates.
+TEMPLATE_FOR = "template_for"
+ORIGINS_TEMPLATE_FOR = "origins"
+CARD_VALUES_SHEET = "_values"
 
 
 def intro_rows(wb=None):
-  """Every card row: scenario_intro, then generic renamed to its headers."""
+  """Every card row: event_intro, then generic renamed to its headers."""
   wb = wb or load(CARDS)
-  rows = read_rows(CARDS, SCENARIO_INTRO, "scenario_id", wb)
+  rows = read_rows(CARDS, EVENT_INTRO, "event_id", wb)
   if GENERIC_SHEET in wb.sheetnames:
     for r in read_rows(CARDS, GENERIC_SHEET, "id", wb):
       for src, dst in GENERIC_COLUMNS.items():
@@ -87,8 +93,30 @@ def intro_rows(wb=None):
   return rows
 
 
-def outcome_id(scenario_id, outcome_key):
-  return "%s_%s" % (scenario_id, outcome_key)
+def region_values(wb=None):
+  """The region list on cards.xlsx _values: the event_intro dropdown's source."""
+  wb = wb or load(CARDS)
+  if CARD_VALUES_SHEET not in wb.sheetnames:
+    sys.exit("cards.xlsx has no %s sheet" % CARD_VALUES_SHEET)
+  ws = wb[CARD_VALUES_SHEET]
+  col = header_index(ws).get("region")
+  if col is None:
+    sys.exit("cards.xlsx %s has no region column" % CARD_VALUES_SHEET)
+  return [cell_text(r[0]) for r in ws.iter_rows(min_row=2, min_col=col, max_col=col, values_only=True)
+          if cell_text(r[0])]
+
+
+def generic_ids(wb=None):
+  """Generic card ids. They are templates by design, so the template-collision
+  checks let a template name one."""
+  wb = wb or load(CARDS)
+  if GENERIC_SHEET not in wb.sheetnames:
+    return set()
+  return {r["id"] for r in read_rows(CARDS, GENERIC_SHEET, "id", wb)}
+
+
+def outcome_id(event_id, outcome_key):
+  return "%s_%s" % (event_id, outcome_key)
 
 
 def load(path, data_only=True):
@@ -206,12 +234,12 @@ def save(wb, path):
              % os.path.basename(path))
 
 
-def scenario_node_ids():
+def event_node_ids():
   """Every node id the game can see: intros and their outcomes."""
   wb = load(CARDS)
-  ids = {r["scenario_id"] for r in intro_rows(wb)}
-  ids |= {outcome_id(r["scenario_id"], r["outcome_key"])
-          for r in read_rows(CARDS, SCENARIO_OUTCOMES, "outcome_key", wb)}
+  ids = {r["event_id"] for r in intro_rows(wb)}
+  ids |= {outcome_id(r["event_id"], r["outcome_key"])
+          for r in read_rows(CARDS, EVENT_OUTCOMES, "outcome_key", wb)}
   return ids
 
 
