@@ -34,6 +34,11 @@ custom/custom_beaver.png,custom,beaver,base,custom_beaver,riverfolk,799,676
 custom/custom_bristle.png,custom,hedgehog,base,custom_bristle,ink,646,714
 custom/custom_redpanda.png,custom,red_panda,base,custom_redpanda,ink,655,679
 custom/custom_squirrel.png,custom,squirrel,base,custom_squirrel,alliance,546,749
+custom/guild_wa_bird.png,custom,bird,base,faction_wa_bird,guild,606,746
+custom/guild_wa_fox.png,custom,fox,base,faction_wa_fox,guild,661,735
+custom/guild_wa_mouse.png,custom,mouse,short,faction_wa_mouse,guild,540,539
+custom/guild_wa_rabbit.png,custom,rabbit,base,faction_wa_rabbit,guild,494,701
+special/special_guildmaster_guild.png,special,guildmaster,big,special_guildmaster,guild,1047,1148
 special/special_boar.png,special,boar,big,special_boar,boar,707,855
 special/special_guildmaster.png,special,guildmaster,big,special_guildmaster,guildmaster,1047,1148
 special/special_penguin.png,special,penguin,short,special_penguin,penguin,641,552

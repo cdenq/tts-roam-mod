@@ -12,6 +12,8 @@ python tools/sync/sync_events_data.py || exit /b 1
 python tools/sync/sync_card_importer.py || exit /b 1
 python tools/sync/sync_items_data.py || exit /b 1
 python tools/sync/sync_lootbox_data.py || exit /b 1
+REM Landmark kinds (maptile.xlsx landmark_table) -> LANDMARK_DATA in Global.
+python tools/sync/sync_landmark_data.py || exit /b 1
 python tools/sync/sync_origins_data.py || exit /b 1
 REM Hand-written object script: no generated data, but staged here so a
 REM Ctrl+Alt+L cannot silently revert it, and checked for Lua 5.3+ syntax
@@ -29,4 +31,5 @@ REM Global.lua from src/global.lua and would wipe an earlier splice.
 python tools/sync/sync_gold.py --splice-only || exit /b 1
 python tools/refresh_master_reload.py || exit /b 1
 python tools/debug.py || exit /b 1
+"%~dp0tools/bin/lua54.exe" tools/test_change_converter.lua src/change_converter.lua || exit /b 1
 "%~dp0tools/bin/lua54.exe" tools/test_events.lua

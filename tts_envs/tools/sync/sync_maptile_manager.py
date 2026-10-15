@@ -8,7 +8,12 @@ Sheets read (tools/build/scaffold_maptile_xlsx.py creates and tops them up):
   <deck> x5            biome, pattern, orientation, density, image, file, url
   backs                deck, name, image, file, url
   biome_descriptions   biome, deck, name, effect, flavor  -> [effect], blank line, "flavor"
-  maptile_table        gmnotes + spawn cells (spawnN, spawnmeepleN, spawnlandmarkN, spawngold)
+  maptile_table        gmnotes + spawn cells (spawnN, spawnmeepleN, spawnlandmarkN, spawngold); optional
+                       <spawncol>_gmnotes / <spawncol>_memo stamp that slot's copy ("{biome}" = the row's biome)
+  explore_outcomes     outcome, category (resource / poi / event), kind (landmark / nothing), name,
+                       landmarks ("a|b|b"), gmnotes + memo (stamped on the spawned landmark; "{biome}" =
+                       the tile's biome), flavor ("line|line": one is announced)
+  exploration          biome + one weight column per resource / poi outcome  (blank / 0 = never)
   density              density, explorations
   weights              param, pool        ("a|b|b": b is twice as likely)
   tiers                biome, tier, gmnotes, tileset
@@ -35,13 +40,15 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/: datasets, spawn_cells, lua_inline
 from datasets import ROOT, MAPTILES, load, read_rows, item_names, token_names, landmark_names
-from spawn_cells import staged_path, read_spawn, referenced_names, SPAWN_CATEGORIES
+from spawn_cells import staged_path, read_spawn, read_stamps, referenced_names, SPAWN_CATEGORIES
 
 MANAGER_GUID = "b77050"
 SRC = os.path.join(ROOT, "src", "maptile_manager.lua")
 BEGIN = "--[[ BEGIN GENERATED MAPTILE DATA -- do not edit ]]"
 END = "--[[ END GENERATED MAPTILE DATA ]]"
 GUILDHALL = "guildhall"
+EXPLORE_KINDS = ("landmark", "nothing")
+EXPLORE_CATEGORIES = ("resource", "poi", "event")  # event = the Experiences choice: flavor only, no weights
 DRIVE_PAGE = re.compile(r"https?://drive\.google\.com/(?:file/d/([\w-]+)|open\?id=([\w-]+))")
 
 
@@ -64,6 +71,11 @@ def lua_spawn(spawn):
            for c in SPAWN_CATEGORIES if c["key"] in spawn]
   if "gold" in spawn:
     parts.append("gold = {%d, %d}" % spawn["gold"])
+  if spawn.get("stamps"):
+    parts.append("stamps = {%s}" % ", ".join(
+      "%s = {%s}" % (key, ", ".join("[%d] = {%s}" % (i, ", ".join("%s = %s" % (f, lua_str(v)) for f, v in st.items()))
+                                    for i, st in slots.items()))
+      for key, slots in spawn["stamps"].items()))
   return "{" + ", ".join(parts) + "}"
 
 
@@ -242,8 +254,59 @@ def main():
       if ref not in landmarks:
         sys.exit("%s: %r is not a landmark in tokens.xlsx (landmarks sheet)" % (r["_where"], ref))
     spawn = read_spawn(r)
+    stamps = read_stamps(r, fill=lambda text, b=r["gmnotes"]: text.replace("{biome}", b))
+    if stamps:
+      spawn["stamps"] = stamps
     if spawn:
       table[r["gmnotes"]] = spawn
+
+  # explore_outcomes: what each outcome does; exploration: per-biome weight per resource / poi outcome
+  outcomes = {}
+  for r in read_rows(MAPTILES, "explore_outcomes", "outcome", wb):
+    where, category = r["_where"], r.get("category", "")
+    if category not in EXPLORE_CATEGORIES:
+      sys.exit("%s: category %r (use: %s)" % (where, category, ", ".join(EXPLORE_CATEGORIES)))
+    kind = r.get("kind") or "nothing"
+    if kind not in EXPLORE_KINDS:
+      sys.exit("%s: kind %r (use: %s)" % (where, kind, ", ".join(EXPLORE_KINDS)))
+    pool = [v.strip() for v in r.get("landmarks", "").split("|") if v.strip()]
+    for name in pool:
+      if name not in landmarks:
+        sys.exit("%s: %r is not a landmark in tokens.xlsx (landmarks sheet)" % (where, name))
+    if kind == "landmark" and not pool:
+      warn("%s: %s has no landmarks yet -- give it weight only once it does" % (where, r["outcome"]))
+    outcomes[r["outcome"]] = {"category": category, "kind": kind, "name": r.get("name") or r["outcome"].title(),
+                              "landmarks": pool, "gmnotes": r.get("gmnotes", ""), "memo": r.get("memo", ""),
+                              "flavor": [v.strip() for v in r.get("flavor", "").split("|") if v.strip()]}
+  if "event" not in outcomes:
+    warn("explore_outcomes has no 'event' row -- Experiences is announced without flavor")
+  exploration = {}
+  for r in read_rows(MAPTILES, "exploration", "biome", wb):
+    if r["biome"] not in biomes:
+      sys.exit("%s: biome %r is not on biome_descriptions" % (r["_where"], r["biome"]))
+    rows = {}
+    for col, v in r.items():
+      if col in ("biome", "notes") or col.startswith("_") or v == "":
+        continue
+      o = outcomes.get(col)
+      if o is None or o["category"] == "event":
+        sys.exit("%s: column %r is not a resource / poi outcome on explore_outcomes" % (r["_where"], col))
+      try:
+        weight = int(float(v))
+      except ValueError:
+        sys.exit("%s: %s weight %r must be a whole number" % (r["_where"], col, v))
+      if weight < 0:
+        sys.exit("%s: %s weight must not be negative" % (r["_where"], col))
+      if weight and o["kind"] == "landmark" and not o["landmarks"]:
+        sys.exit("%s: %s has weight but no landmarks on explore_outcomes" % (r["_where"], col))
+      if weight:
+        rows.setdefault(o["category"], []).append((col, weight))
+    if rows:
+      exploration[r["biome"]] = rows
+  unexplorable = sorted(set(biomes) - set(exploration))
+  if unexplorable:
+    warn("%d biomes have no exploration weights (Explore finds nothing): %s"
+         % (len(unexplorable), ", ".join(unexplorable)))
 
   # ---- Lua
   L = [BEGIN, "-- GENERATED by tools/sync/sync_maptile_manager.py from data/maptile.xlsx", "MAPTILE = {",
@@ -276,6 +339,17 @@ def main():
   for gm, row in table.items():
     L.append("    [%s] = %s," % (lua_str(gm), lua_spawn(row)))
   L.append("  },")
+  L.append("  outcomes = {")
+  for o, v in outcomes.items():
+    L.append("    [%s] = {category = %s, kind = %s, name = %s, landmarks = %s, gmnotes = %s, memo = %s, flavor = %s}," % (
+      lua_str(o), lua_str(v["category"]), lua_str(v["kind"]), lua_str(v["name"]), lua_list(v["landmarks"]),
+      lua_str(v["gmnotes"]), lua_str(v["memo"]), lua_list(v["flavor"])))
+  L.append("  },")
+  L.append("  exploration = {")
+  for b, rows in exploration.items():
+    L.append("    [%s] = {%s}," % (lua_str(b), ", ".join(
+      "%s = {%s}" % (cat, ", ".join("{%s, %d}" % (lua_str(o), w) for o, w in row)) for cat, row in rows.items())))
+  L.append("  },")
   L.append("  images = {")
   for key, url in images.items():
     L.append("    [%s] = %s," % (lua_str(key), lua_str(url)))
@@ -292,9 +366,9 @@ def main():
   out = staged_path(MANAGER_GUID)
   with io.open(out, "w", encoding="utf-8", newline="\n") as f:
     f.write(script)
-  print("wrote %s (%d bytes): %d decks, %d biomes, %d/%d images have a url, %d biomes render something"
-        % (os.path.relpath(out, os.path.dirname(ROOT)), len(script), len(decks), len(biomes),
-           total - missing, total, len(table)))
+  print("wrote %s (%d bytes): %d decks, %d biomes, %d/%d images have a url, %d biomes render something, "
+        "%d explorable" % (os.path.relpath(out, os.path.dirname(ROOT)), len(script), len(decks), len(biomes),
+                           total - missing, total, len(table), len(exploration)))
   if missing:
     warn("%d images have no url yet -- they cannot be drawn until data/maptile.xlsx has them" % missing)
   if converted:

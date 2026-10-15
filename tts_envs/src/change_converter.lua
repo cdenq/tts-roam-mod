@@ -111,9 +111,6 @@ COINS = {
 -- Only objects carrying this tag are treated as money.
 GOLD_TAG = "Gold"
 
--- Where coins are drawn from when the converter has to hand one back.
-GOLD_BAG = "f0d3ab"
-
 -- value -> how many of this coin are in the bag. Rebuilt by recount().
 COUNTS = {}
 
@@ -397,9 +394,11 @@ inside is destroyed first, so a plan is absolute, not a delta -- the converter
 ends up empty and the player picks their change up off the table.
 ]]
 function applyPlan(plan, value, before)
-  local bag = getObjectFromGUID(GOLD_BAG)
+  -- Global owns the gold bag's GUID; this script has no copy to fall out of step.
+  local guid = Global.getVar("GOLD_BAG")
+  local bag = guid and getObjectFromGUID(guid)
   if bag == nil then
-    broadcastToAll("Gold bag " .. GOLD_BAG .. " not found.", {1, 0.5, 0.5})
+    broadcastToAll("Gold bag " .. tostring(guid) .. " not found.", {1, 0.5, 0.5})
     busy = false
     return
   end

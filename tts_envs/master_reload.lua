@@ -2671,6 +2671,7 @@ SPAWN_SOURCES = {
   {key = "landmark", bag = "6a6425", label = "landmark"},
   {key = "card", bag = "32e095", label = "card"},
 }
+-- The one copy: the Change Converter reads it with Global.getVar.
 GOLD_BAG = "f0d3ab"
 
 -- Where spawned objects land, as a world offset from the card.
@@ -3151,14 +3152,16 @@ function rollSpawn(spawn)
   local plan = {picks = {}, gold = 0}
   if not spawn then return plan end
 
+  -- spawn.stamps[key][slot] = {gm_notes =, memo =}: written onto that slot's copy (maptile Render)
+  local stamps = spawn.stamps or {}
   for _, src in ipairs(SPAWN_SOURCES) do
-    for _, slot in ipairs(spawn[src.key] or {}) do
+    for i, slot in ipairs(spawn[src.key] or {}) do
       local picked = rollSlot(slot)
       if picked ~= nil and picked ~= "" then
         local name, unique = parseSpawnEntry(picked)
         table.insert(plan.picks,
                      {category = src.key, bag = src.bag, name = name,
-                      unique = unique})
+                      unique = unique, stamp = (stamps[src.key] or {})[i]})
       end
     end
   end
@@ -3252,8 +3255,19 @@ bag, never at the world origin.
 
 `done` is called with true/false once the copy exists, so callers can sequence
 several spawns without them racing each other.
+
+`stamp` ({gm_notes =, memo =}, optional) is written onto the copy, so a spawner
+can mark what this copy is (a cave's level, a node's biome) without a re-import.
 ]]
-function spawnCopyFromBag(bagGuid, name, position, done, unique)
+function stampObject(obj, stamp)
+  if obj == nil or stamp == nil then return end
+  if stamp.gm_notes ~= nil and stamp.gm_notes ~= "" then obj.setGMNotes(stamp.gm_notes) end
+  if stamp.memo ~= nil and stamp.memo ~= "" then obj.memo = stamp.memo end
+  -- onObjectSpawn may already have run on the unstamped copy; draw for the new kind.
+  renderLandmark(obj)
+end
+
+function spawnCopyFromBag(bagGuid, name, position, done, unique, stamp)
   local bag = getObjectFromGUID(bagGuid)
   if not bag then
     printToAll("Spawn bag "..bagGuid.." not found.", {1, 0.5, 0.5})
@@ -3283,7 +3297,10 @@ function spawnCopyFromBag(bagGuid, name, position, done, unique)
       guid = entry.guid,
       position = position,
       smooth = false,
-      callback_function = function() if done then done(true) end end
+      callback_function = function(obj)
+        stampObject(obj, stamp)
+        if done then done(true) end
+      end
     })
     return
   end
@@ -3297,7 +3314,7 @@ function spawnCopyFromBag(bagGuid, name, position, done, unique)
   -- Wait for the original to finish spawning before cloning it.
   Wait.condition(
     function()
-      original.clone({position = position, snap_to_grid = false})
+      stampObject(original.clone({position = position, snap_to_grid = false}), stamp)
       -- and put the original straight back so the bag keeps its stock
       Wait.frames(function()
         bag.putObject(original)
@@ -3356,7 +3373,7 @@ function spawnPlanStep(obj, plan, index, placed, report)
     Wait.frames(function()
       spawnPlanStep(obj, plan, index + 1, placed, report)
     end, 3)
-  end, pick.unique)
+  end, pick.unique, pick.stamp)
 end
 
 --[[ Announce what a spawn produced, then hand back to the caller.
@@ -3615,7 +3632,7 @@ REP = REP or {}
 
 --[[ Where a faction starts before anything has happened.
 
-FACTIONS is generated from the factions sheet of data/shops.xlsx by
+FACTIONS is generated from the factions sheet of data/tokens.xlsx by
 tools/sync/sync_merchant_board.py: the two great powers tolerate vagabonds,
 everyone else assumes you work for one of them.
 ]]
@@ -3804,9 +3821,10 @@ local function replyTo(args)
   end
 end
 
+-- args.category ("landmark", ...) names a SPAWN_SOURCES bag, so callers need no GUID copy.
 function spawnCopyFromBagFor(args)
-  spawnCopyFromBag(args.bag or SPAWN_SOURCES[1].bag, args.name, args.position,
-                   replyTo(args), args.unique)
+  local bag = args.bag or (args.category and spawnSourceBag(args.category)) or SPAWN_SOURCES[1].bag
+  spawnCopyFromBag(bag, args.name, args.position, replyTo(args), args.unique, args.stamp)
 end
 
 -- spawnFrom for an object script: {guid = the object to spawn above, spawn = a spawn table}.
@@ -3959,19 +3977,100 @@ function onLoad(script_state)
   for _, obj in ipairs(getAllObjects()) do
     renderCard(obj)
     renderLootbox(obj)
+    renderLandmark(obj)
   end
 end
 
 function onObjectSpawn(obj)
   renderCard(obj)
   renderLootbox(obj)
+  renderLandmark(obj)
 end
 
 function onObjectLeaveContainer(container, obj)
   Wait.frames(function()
     renderCard(obj)
     renderLootbox(obj)
+    renderLandmark(obj)
   end, 1)
+end
+
+-- ------------------------------------------------------------ landmarks ---
+
+--[[ A landmark's GMNotes is its KIND ("cave", "fishing_node"), shared by every
+landmark that behaves alike. LANDMARK_DATA, generated from maptile.xlsx
+landmark_table by tools/sync/sync_landmark_data.py, maps a kind to the actions
+it gets; LANDMARK_ACTIONS says what each action is. A new kind is a sheet row;
+only a new ACTION needs code.
+
+Spawn, reload and leaving a bag all land in renderLandmark, so Render, Explore
+and a hand drag out of the bag are all covered.
+
+The memo is read, never written here: a landmark that keeps state owns its
+own format, and most keep none. ]]
+
+--[[ Every action a landmark_table row may name. TTS calls a button back by
+function NAME with (obj, playerColor, altClick) and no hint of which button
+fired, so each action has its own global click function. The sync reads this
+table's keys to validate the sheet. ]]
+LANDMARK_ACTIONS = {
+  inspect = {label = "Inspect", tooltip = "Describe this landmark.",
+             click = "landmarkInspectClick"},
+}
+
+-- Buttons stack outward from the landmark's near edge, in its local units.
+LANDMARK_BUTTON = {
+  LIFT = 0.1,
+  FIRST_Z = 1.3,
+  STEP_Z = 0.45,
+  FONT = 160,
+  WIDTH = 900,
+  HEIGHT = 300,
+  SCALE = 0.35,
+  COLOR = {0.2, 0.2, 0.22},
+  TEXT = {1, 0.95, 0.85},
+}
+
+-- The landmark_table row for an object, its kind, and its memo ("" if none).
+function landmarkFor(obj)
+  if obj == nil or LANDMARK_DATA == nil or obj.getGMNotes == nil then return nil end
+  local kind = obj.getGMNotes() or ""
+  local row = LANDMARK_DATA[kind]
+  if row == nil then return nil end
+  return row, kind, obj.memo or ""
+end
+
+-- Draw a landmark's action buttons. Harmless on anything else.
+function renderLandmark(obj)
+  local row = landmarkFor(obj)
+  if row == nil then return false end
+
+  local B = LANDMARK_BUTTON
+  local k = LAYOUT.SHARPNESS
+  obj.clearButtons()
+  for i, id in ipairs(row.actions) do
+    local action = LANDMARK_ACTIONS[id]
+    if action ~= nil then
+      obj.createButton({
+        click_function = action.click, function_owner = Global,
+        label = action.label, tooltip = action.tooltip or "",
+        position = {0, B.LIFT, B.FIRST_Z + (i - 1) * B.STEP_Z},
+        scale = {B.SCALE / k, B.SCALE / k, B.SCALE / k},
+        width = B.WIDTH * k, height = B.HEIGHT * k, font_size = B.FONT * k,
+        color = B.COLOR, font_color = B.TEXT
+      })
+    end
+  end
+  return true
+end
+
+-- Placeholder action: proves the plumbing end to end (row -> button -> click -> memo).
+function landmarkInspectClick(obj, playerColor)
+  local _, kind, memo = landmarkFor(obj)
+  if kind == nil then return end
+  local line = plainName(obj.getName() or "") .. " (" .. kind .. ")"
+  if memo ~= "" then line = line .. ": " .. memo end
+  printToColor(line, playerColor, {0.9, 0.85, 0.6})
 end
 
 -- ------------------------------------------------------------ lootboxes ---
@@ -4201,6 +4300,14 @@ LOOTBOX = {
   },
 }
 --[[ END GENERATED LOOTBOX DATA ]]
+
+--[[ BEGIN GENERATED LANDMARK DATA -- do not edit ]]
+-- GENERATED by tools/sync/sync_landmark_data.py -- do not edit by hand
+--
+-- Keyed by landmark KIND (its GMNotes).
+LANDMARK_DATA = {
+}
+--[[ END GENERATED LANDMARK DATA ]]
 
 --[[ BEGIN GENERATED ORIGIN DATA -- do not edit ]]
 -- GENERATED by tools/sync/sync_origins_data.py -- do not edit by hand

@@ -122,6 +122,35 @@ def read_spawn(row):
   return spawn
 
 
+STAMP_FIELDS = (("gmnotes", "gm_notes"), ("memo", "memo"))
+
+
+def read_stamps(row, fill=None):
+  """Per-slot stamps from `<spawncol>_gmnotes` / `<spawncol>_memo` columns, or {}.
+
+  Keyed like read_spawn: {"landmark": {1: {"gm_notes": "cave", "memo": "level=0"}}},
+  where 1 is the slot's index in read_spawn's list (blank columns are skipped
+  there, so the index is counted the same way here). `fill` maps the text, e.g.
+  to substitute "{biome}". A stamp on an empty spawn column is an error.
+  """
+  stamps = {}
+  for cat in SPAWN_CATEGORIES:
+    index = 0
+    for col in category_columns(cat):
+      has_names = bool(weighted_list(row.get(col)))
+      index += has_names
+      stamp = {}
+      for suffix, field in STAMP_FIELDS:
+        text = (row.get("%s_%s" % (col, suffix)) or "").strip()
+        if text:
+          stamp[field] = fill(text) if fill else text
+      if stamp and not has_names:
+        sys.exit("%s: %s has a stamp but %s is empty" % (row.get("_where", "row"), col, col))
+      if stamp:
+        stamps.setdefault(cat["key"], {})[index] = stamp
+  return stamps
+
+
 def spawn_gives_anything(spawn):
   """True when a spawn table can actually hand something out.
 

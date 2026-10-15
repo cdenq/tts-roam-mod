@@ -645,6 +645,8 @@ def main():
   # The vocabularies Excel enforces, read from the same sheet the dropdowns
   # use -- so extending a list means adding a row there, nothing here.
   vocab = read_values(TILES)
+  faction_ids = {f["faction_id"]
+                 for f in read_rows(TOKENS, FACTIONS_SHEET, "faction_id")}
 
   for r in rows:
     where = r["_where"]
@@ -800,6 +802,18 @@ def main():
       memo_parts.append("Use: %d" % uses)
     memo = " | ".join(memo_parts)
 
+    #[[ Contraband is tagged so the merchant board can refuse it without a
+    # lookup, and its gmnotes names the one faction that buys it -- a
+    # contraband buyer of that faction is the only merchant who takes it.
+    gmnotes = normalise_newlines(r.get("gmnotes"),
+                                 "%s (%s) gmnotes" % (where, name))
+    if subtype == "contraband":
+      tags.append("Contraband")
+      if gmnotes not in faction_ids:
+        sys.exit("%s (%s): contraband gmnotes must be the faction_id that "
+                 "buys it (tokens.xlsx factions), got %r"
+                 % (where, name, gmnotes))
+
     items.append({
       "id": iid,
       "name": name,
@@ -835,8 +849,7 @@ def main():
                                    "%s (%s) effect" % (where, name)),
       "description": normalise_newlines(r.get("flavor"),
                                         "%s (%s) flavor" % (where, name)),
-      "gmnotes": normalise_newlines(r.get("gmnotes"),
-                                    "%s (%s) gmnotes" % (where, name)),
+      "gmnotes": gmnotes,
     })
 
   tokens = read_tokens(seen_names, template_types)

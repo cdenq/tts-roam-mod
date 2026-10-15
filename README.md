@@ -127,9 +127,9 @@ Never hand-edit `generated/`, `.tts/objects/`, `master_reload.lua`, `debug.lua`.
 - `sync_origin_text` — rewrites "Gain N gold." prose to match `spawngold`
 - `sync_events_data` — rebuilds Global from `src/global.lua` + scenarios
 - `sync_card_importer`, `sync_items_data`, `sync_lootbox_data`,
-  `sync_origins_data`, `sync_change_converter`, `sync_merchant_board`
+  `sync_landmark_data`, `sync_origins_data`, `sync_change_converter`, `sync_merchant_board`
 - `sync_gold --splice-only` — re-splices `ECONOMY` (events sync wiped it)
-- `refresh_master_reload`, `debug`, then `test_events.lua`
+- `refresh_master_reload`, `debug`, then `test_change_converter.lua`, `test_events.lua`
 - any failure stops the chain
 
 # Offline Generation
@@ -185,7 +185,7 @@ python tools/build/build_landmarks.py <landmark ..> --size <1-4 ..>
 
 | arg | sets | values | omitted = |
 | --- | --- | --- | --- |
-| `landmark` | which landmark types | any `landmark_size` key: `guildhall` `building` `cave` `tree` `mineral_node` `fishing_spot` `herb` `tracks` `marquise_keep` `eyrie_roost` `otter_tradepost` `knave_camp` `alliance_burrow` `lizard_garden` `stone_tower` (space-separated) | every landmark |
+| `landmark` | which landmark types | any `landmark_size` key: `guildhall` `building` `cave` `tree` `mineral_node` `fishing_spot` `herb` `tracks` `marquise_keep` `eyrie_roost` `otter_tradepost` `knave_camp` `alliance_burrow` `lizard_garden` `guild_tower` `caravan` `beehive` `shrine` `warehouse` `bank` `eyrie_tower` `marquise_barracks` `alliance_barracks` `otter_barracks` (space-separated) | every landmark |
 | `--size` | which sizes | `1` `2` `3` `4` (space-separated) | every size with a width in the CSV |
 | `--prune` | cleanup | — | off |
 
@@ -312,13 +312,14 @@ TileToken Importer `85a721`. Data is inlined into the bag's own script.
 
 - **derived, never authored** (sheet formulas + `sync_items_data.py`):
   `stat`, `damage_range`, `damage_type`, `base_gold`, `Item-Cooldown` /
-  `Item-Uses` tags, memo seed
+  `Item-Uses` tags, `Contraband` tag (subtype `contraband`), memo seed
 - weapon `subsubtype` must start `1H`/`2H`; hands are read from it
 - `cooldown` / `uses`: any item may carry them. Memo seed `CD: 0 | Use: 5`
   (CD counts time remaining; fresh = 0)
 - `description` composed from fields + `effect`/`flavor`; `\n` = line break
   (`/n` caught as typo)
-- `gmnotes` -> GMNotes, `memo` -> memo
+- `gmnotes` -> GMNotes, `memo` -> memo. On contraband = the buyer's
+  `faction_id` (required; sync fails otherwise)
 - blank `image_front`/`image_back` = inherit template image; tokens ignore back
 - clone keeps template thickness/scale/tint
 - templates: `TEMPLATE_TILE` (Custom Tile), `TEMPLATE_TOKEN` (Custom Token);
@@ -375,10 +376,12 @@ the two sheets.
 | `faction` | `faction_id`; blank = `none` |
 | `tier` | 0–3 |
 | `effect` | composed into the description |
-| `gmnotes` | -> GMNotes |
+| `gmnotes` | -> GMNotes. The landmark's KIND (`cave`, `fishing_node`), shared by landmarks that behave alike; keys `maptile.xlsx` `landmark_table` |
 | `image_front` | the token's face |
 
 - imports as role `landmark`; description: `Landmark` / faction / `Tier N` / effect
+- behaviour: Global `renderLandmark` (on spawn, reload, leaving a bag, and after a spawn stamp) looks the GMNotes kind
+  up in `LANDMARK_DATA` and draws its action buttons. Memo is read, never written. No row = left alone
 - like tokens, move imported landmarks into the meeple bag `ccfa1b` by hand
 
 ## Shops (Merchant Board)
@@ -390,13 +393,16 @@ Board `ecde97` ("Shop"). `shops.xlsx` inlined into the board by
 - shop `tier` + `faction` come from that meeple's token row (exactly one
   per shop)
 - `shops`: `shop_id`, `shop_role_display` (blank = placeholder row),
-  `adjustment_buy`, `adjustment_sell`
+  `adjustment_buy`, `adjustment_sell`, `contraband_buyer` (`yes` / blank)
 - `stock`: `shop_id`, `item` (name or spawn cell), `qty` (`2`, `1-3`;
   `0-1` = sometimes absent)
 - 16 slots (2x8). Restock rolls every row, fills in sheet order, extras
   dropped. Spammable, stateless
 - Zone A = buying (buy price), Zone B = offering (sell price). Reconcile when
   A <= B, change paid in coins
+- Zone B refusals (named, left in place): ordinary merchants refuse
+  `Contraband`-tagged items; a contraband buyer takes only gold + contraband
+  whose GMNotes = its faction
 - `TBD:<tier> <kind>` in `stock` = placeholder; warned, never shown
 - prices: `base x pct x rep x party x adjustment` (buy and sell separate);
   rep and pricing live in Global
@@ -464,10 +470,19 @@ A drawn tile is a copy of the bag's template (Custom Tile, GMNotes
 | tags | `Maptile`, `Region:<deck>`, `Biome:<biome>` (ids, e.g. `Region:woodland`, `Biome:forest`; a tiered city is tagged by its GMNotes, `Biome:town`) |
 
 Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + memo):
-- `Explore: N` -- N from the `density` sheet; click = N-1; the button is removed at 0. The exploration itself is a stub
+- `Explore: N` -- N from the `density` sheet. Click = swap it for four choices (spends nothing); picking one
+  spends 1 and brings `Explore: N-1` back (gone at 0). Each choice announces itself with a flavor line:
+  - `Resources` / `Points of interest` -- roll the biome's `exploration` weights for that category; a `landmark`
+    outcome clones one from its pool out of bag `6a6425` onto the tile's centre, memo stamped from
+    `explore_outcomes` (GMNotes left as the landmark's own kind)
+  - `Experiences` -- takes the top card of the tile's region bag (`EVENT_BAGS` in `src/maptile_manager.lua`:
+    woodland `570544`, waterside `524231`, opencountry `3546e2`, settlement `8bce91`, scarred `f608d7`) face up
+    onto the tile. Bags hold single cards, never decks; never shuffled by script; a drawn card leaves its bag
+  - `Wander` -- one of the other three at random
+  - untouched for 5 s (`EXPLORE.CHOICE_TIMEOUT`), the choices close and `Explore: N` returns. Not saved: a reload shows `Explore: N` again
 - `?` -- toggles the tile's hover tooltip (name + description). Tiles spawn with it off; grey text =
   off, black = on. State is the object's own `tooltip`, saved by TTS, not the memo
-- `Render` -- once; spawns the biome's `maptile_table` row onto the tile through Global
+- `Render` -- once (memo `rendered=1` removes the button); spawns the biome's `maptile_table` row onto the tile's centre, each slot's copy stamped from its `_gmnotes` / `_memo` columns, through Global
   (`Global.call("spawnFromFor", {guid, spawn})` -> `spawnFrom`, same bags as every other spawn)
 
 ### `data/maptile.xlsx`
@@ -477,8 +492,10 @@ Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + me
 | `settlement` `woodland` `opencountry` `waterside` `scarred` | image of that deck | `biome` `pattern` `orientation` `density` `image` `file` **`url`** |
 | `backs` | deck | `deck` `name` `image` `file` **`url`** |
 | `biome_descriptions` | biome | `biome` `deck` `name` `effect` `flavor` |
-| `maptile_table` | biome (GMNotes) | `gmnotes` + spawn cells (`spawnN`, `spawnmeepleN`, `spawnlandmark1..3`, `spawngold`); names checked against tiles/tokens. Landmarks go in `spawnlandmarkN` (bag `6a6425`), not `spawnmeepleN` -- the sync fails on a landmark in a meeple cell |
-| `exploration` | biome | draft spawn cells for Explore; no sync reads it yet |
+| `maptile_table` | biome (GMNotes) | `gmnotes` + spawn cells (`spawnN`, `spawnmeepleN`, `spawnlandmark1..3`, `spawngold`); names checked against tiles/tokens. Landmarks go in `spawnlandmarkN` (bag `6a6425`), not `spawnmeepleN` -- the sync fails on a landmark in a meeple cell | `<spawncol>_gmnotes` / `<spawncol>_memo` (e.g. `spawnlandmark1_memo`) stamp that slot's copy; blank = keep its own, `{biome}` = the row's biome. A stamp on an empty spawn column fails the sync |
+| `explore_outcomes` | Explore outcome | `outcome` `category` (`resource` / `poi` / `event`) `kind` (`landmark` / `nothing`) `name` `landmarks` (pool, `a\|b\|b`; checked against tokens.xlsx `landmarks`) `gmnotes` `memo` (stamped on the spawned landmark, blank = leave; `{biome}` = the tile's biome) `flavor` (`line\|line`, one is announced). The `event` row = Experiences' flavor |
+| `exploration` | biome | `biome` + one weight column per resource / poi outcome (`fishing` ... `resource_none`, `camp` ... `poi_none`); relative odds within each category, blank/0 = never. A new outcome = a new row there + a new column here; weight on a landmark outcome with no landmarks fails the sync |
+| `landmark_table` | landmark kind (GMNotes) | `gmnotes` (lowercase snake_case) `actions` (`inspect\|enter`: keys of `LANDMARK_ACTIONS` in `src/global.lua`, which hold each action's label + click function) `notes`. `sync_landmark_data.py` -> `LANDMARK_DATA` in Global; warns on a kind no landmark carries, or one carried with no row. New kind = a row; new action = code |
 | `tiers` | biome + tier | `biome` `tier` `gmnotes` `tileset` -- gmnotes = the biome the tile becomes (needs its own `biome_descriptions` row, kept out of the pools); tileset = whose images it uses; a tileset that is not a biome has image rows only |
 | `density` | density stage | `density` `explorations` |
 | `weights` | roll | `param` `pool` -- `deck`, `biome:<deck>`, `pattern`, `orientation:<pattern>`, `density`, `guildhall:*`, `tier:<biome>`; repeat an entry to make it likelier (`1\|1\|2\|2\|3`) |
@@ -693,11 +710,17 @@ How to run: see [Offline Generation](#offline-generation).
   | `guildhall` | 1-4 | lodge -> gabled hall -> winged hall -> towers + clock |
   | `building` | 1-4 | straw hut, log cabin, stone town house, capital hall (stone + brick) |
   | `cave` | 1-4 | burrow -> outcrop -> fanged crag -> cliff with torches + eyes |
-  | `tree` `mineral_node` `fishing_spot` `herb` `tracks` | 1 | gathering nodes |
+  | `tree` `mineral_node` `fishing_spot` `herb` `tracks` `beehive` | 1 | gathering nodes |
   | `marquise_keep` `eyrie_roost` | 4 | faction strongholds |
   | `otter_tradepost` `alliance_burrow` `lizard_garden` | 1 | faction outposts: stilt stall over water, hill burrow, walled shrine garden |
   | `knave_camp` | 1-2 | bandit camp: one patched tent -> two tents, fence, strongbox |
-  | `stone_tower` | 1-4 | lookout -> crenellated -> slate spire -> + side turret |
+  | `guild_tower` | 1-4 | Guild tower in guildhall materials (stone base, timber-framed plaster, slate, teal banners): lookout -> crenellated -> slate spire -> + side turret |
+  | `eyrie_tower` | 1-4 | Eyrie tree-tower: stump hut -> braced deck + perch -> slim tower + banners -> + side turret, nest |
+  | `marquise_barracks` | 1-4 | Marquisate: guardhouse -> timber-framed hall -> + watchtower -> two towers + portcullis gatehouse |
+  | `alliance_barracks` | 1-4 | Alliance guerrilla post, dug in: hatch in a turf mound -> log-revetted dugout -> + dead-tree lookout, stakes -> two dugouts, thatched hide |
+  | `otter_barracks` | 1-4 | Riverfolk mercenary hall on a dock: kiosk + price board -> pavilion + boat -> + upper floor, wide board -> + coin tower, wings |
+  | `caravan` `shrine` | 1 | base class: covered wagon + waymark post (fast travel); wayside shrine to a nameless god |
+  | `warehouse` `bank` | 1 | big class: plank storehouse with hoist; stone counting house with vault door + coin sign |
 
 - new landmark = a painter in `build_landmarks.py` `PAINTERS` + a `landmark_size` row
 - deterministic; reroll everything with `landmark.seed_offset`
@@ -706,6 +729,8 @@ How to run: see [Offline Generation](#offline-generation).
 
 - `tools/test_events.lua`, run last by `master_sync.cmd`: stubs TTS, runs the
   real built Global (rendering, branching, rolls, spawning, card index)
+- `tools/test_change_converter.lua`, run by `master_sync.cmd` before it: cash-up,
+  break-down, `checkBreakdowns`, coin counting, against `src/change_converter.lua`
 - Global looks broken -> check `.tts/objects/Global.lua` byte size; a stale
   pull is the usual cause
 - harness is Lua 5.4, TTS is 5.2 (MoonSharp): 5.3+ syntax passes tests and

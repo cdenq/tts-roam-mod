@@ -262,7 +262,7 @@ landmark_class,capitol,1200,tier-3 buildings: the most special ones
 landmark_tier,guildhall,base|big|special|capitol,class per size slot (like landmark_size); follows the tier in tokens.xlsx landmarks
 landmark_tier,building,base|big|special|capitol,
 landmark_tier,cave,base|big|special|capitol,
-landmark_tier,stone_tower,base|big|special|capitol,
+landmark_tier,guild_tower,base|big|special|capitol,
 landmark_tier,knave_camp,big|special,Knave Camp tier 1 | Knave Encampment tier 2
 landmark_tier,alliance_burrow,big,tier 1
 landmark_tier,lizard_garden,big,tier 1
@@ -274,11 +274,21 @@ landmark_tier,mineral_node,small,
 landmark_tier,fishing_spot,small,
 landmark_tier,herb,small,
 landmark_tier,tracks,small,
+landmark_tier,caravan,base,fast-travel stop
+landmark_tier,shrine,base,
+landmark_tier,warehouse,big,
+landmark_tier,bank,big,
+landmark_tier,beehive,small,gathering node
+landmark_tier,eyrie_tower,base|big|special|capitol,Eyrie tree-tower tiers 0-3
+landmark_tier,marquise_barracks,base|big|special|capitol,Marquisate barracks tiers 0-3
+landmark_tier,alliance_barracks,base|big|special|capitol,Woodland Alliance guerrilla post tiers 0-3
+landmark_tier,otter_barracks,base|big|special|capitol,Riverfolk mercenary hall tiers 0-3
 landmark_scale,fishing_spot,0.85,height multiplier on top of the class (optional; 1 = class height)
 landmark_scale,tracks,0.85,hunting node
-landmark_scale,tree,1.25,forestry node
+landmark_scale,tree,1.5,forestry node
 landmark_scale,knave_camp,1.15,both knave camps
-landmark_scale,stone_tower,1.25,every tower size
+landmark_scale,guild_tower,1.5,every tower size
+landmark_scale,eyrie_tower,1.5,every size (matches guild_tower)
 landmark_size,guildhall,380|500|620|720,width at size 1|2|3|4 (design units of the 1024 canvas). Size 3 = the tile centerpiece drawing
 riverside,variants,1,
 riverside,patterns,deadend|corner|straight|tee|cross,
@@ -627,12 +637,24 @@ landmark_size,otter_tradepost,620,Riverfolk trading post. Size 1 only
 landmark_size,knave_camp,480|700,Knaves of the Deepwood bandit camp. 1 one tent | 2 two tents + fence + strongbox
 landmark_size,alliance_burrow,620,Woodland Alliance burrow (hill with a round door). Size 1 only
 landmark_size,lizard_garden,640,Lizard Cult garden shrine. Size 1 only
-landmark_size,stone_tower,300|340|380|420,1 lookout | 2 crenellated | 3 slate spire + balcony | 4 + side turret
+landmark_size,guild_tower,300|340|380|420,Guild tower (guildhall materials). 1 lookout | 2 crenellated | 3 slate spire + balcony | 4 + side turret
+landmark_size,caravan,720,Guild caravan stop: covered wagon + waymark post. Size 1 only
+landmark_size,beehive,620,gathering node: apiary (two straw skeps on a bench)
+landmark_size,shrine,460,wayside shrine to a nameless god. Size 1 only
+landmark_size,warehouse,640,storehouse: plank barn + hoist + lean-to. Size 1 only
+landmark_size,bank,620,counting house: stone strongroom + vault door + coin sign. Size 1 only
+landmark_size,eyrie_tower,300|340|380|440,1 hut on a stump deck | 2 + braces + perch branch | 3 slim tower + railed deck | 4 + side turret + nest
+landmark_size,marquise_barracks,340|500|640|760,1 guardhouse | 2 timber-framed hall | 3 + watchtower | 4 two towers + gatehouse
+landmark_size,alliance_barracks,440|560|700|800,1 hatch in a turf mound | 2 log-revetted dugout | 3 + dead-tree lookout + stakes | 4 two dugouts + thatched hide
+landmark_size,otter_barracks,420|560|620|820,1 dock kiosk + easel board | 2 three-bay pavilion + boat | 3 + upper floor + price board | 4 + coin tower + wings
 landmark_colour,otter_banner,#4fa3b3,Riverfolk Company
 landmark_colour,knave_banner,#7a3b4a,Knaves of the Deepwood
 landmark_colour,alliance_banner,#5f8f3a,Woodland Alliance
 landmark_colour,lizard_banner,#d8b23a,Lizard Cult
 landmark_colour,lm_smoke,#cfc8bb,chimney + brazier smoke
+landmark_colour,honey,#d99a2b,beehive honey
+landmark_colour,honey_dk,#a8701c,
+landmark_colour,chalkboard,#3f4a44,Riverfolk price boards (slate)
 lilypond,variants,1,
 lilypond,patterns,deadend|corner|straight|tee|cross,
 lilypond,seed_offset,0,
@@ -841,6 +863,7 @@ meeple_colour,bat,#964b2d,bats
 meeple_colour,frog,#b09804,frogs
 meeple_colour,keepers,#c6c7c9,Keepers in Iron (badgers); badger shapes add their tone sheen
 meeple_colour,guildmaster,#643421,special_guildmaster
+meeple_colour,guild,#4c5d70,Guild slate (guildhall roof): Guild-coloured variants
 meeple_colour,boar,#806848,special_boar
 meeple_colour,snake,#ca3c6b,special_snake
 meeple_colour,penguin,#379fb3,special_penguin
@@ -939,6 +962,11 @@ meeple_skin,custom/custom_beaver,body=riverfolk,
 meeple_skin,custom/custom_bristle,body=ink ink=white accent1=white accent2=ink,accent1 = iris; accent2 = pupil (pupils are always black)
 meeple_skin,custom/custom_redpanda,body=ink ink=white accent1=white accent2=ink,accent1 = iris; accent2 = pupil (pupils are always black)
 meeple_skin,custom/custom_squirrel,body=alliance,
+meeple_skin,custom/guild_wa_bird,shape=faction_wa_bird body=guild,
+meeple_skin,custom/guild_wa_fox,shape=faction_wa_fox body=guild,
+meeple_skin,custom/guild_wa_mouse,shape=faction_wa_mouse body=guild,
+meeple_skin,custom/guild_wa_rabbit,shape=faction_wa_rabbit body=guild,
+meeple_skin,special/special_guildmaster_guild,shape=special_guildmaster body=guild,
 meeple_skin,special/special_boar,body=boar,
 meeple_skin,special/special_guildmaster,body=guildmaster,
 meeple_skin,special/special_penguin,body=penguin,

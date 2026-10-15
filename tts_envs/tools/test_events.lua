@@ -317,8 +317,11 @@ function makeBag(guid, names)
         o.isDestroyed = function() return false end
         o.clone = function(cp)
           o._clones = o._clones + 1
-          table.insert(CLONED, {name = e.name, position = cp.position})
-          return {}
+          local copy = {memo = ""}
+          copy.setGMNotes = function(g) copy.gm_notes = g end
+          copy.getGMNotes = function() return copy.gm_notes or "" end
+          table.insert(CLONED, {name = e.name, position = cp.position, object = copy})
+          return copy
         end
         return o
       end
@@ -459,6 +462,22 @@ spawnClick(lc)
 check(#CLONED == 1 and CLONED[1].name == "Eyrie Roost", "the named landmark is spawned")
 check(lbag._takes == 1 and mbag._takes == 0, "it comes from bag 6a6425, not the meeple bag")
 EVENT_DATA.F1_sneak_fail.spawn = nil
+
+print("\n== spawn stamps write GMNotes / memo onto the slot's copy ==")
+objects = {}
+CLONED = {}
+makeBag("6a6425", {"Cave", "Eyrie Roost"})
+makeBag("ccfa1b", {"Squirrel"})
+local st = {x = 0, y = 0, z = 0}
+local stampHost = {getPosition = function() return st end, getGMNotes = function() return "forest" end}
+spawnFrom(stampHost, {landmark = {{"Cave"}, {"Eyrie Roost"}}, meeple = {{"Squirrel"}},
+                      stamps = {landmark = {[2] = {gm_notes = "roost", memo = "biome=forest"}}}})
+local byName = {}
+for _, c in ipairs(CLONED) do byName[c.name] = c.object end
+check(byName["Eyrie Roost"].gm_notes == "roost" and byName["Eyrie Roost"].memo == "biome=forest",
+      "slot 2's stamp lands on slot 2's copy")
+check(byName["Cave"].gm_notes == nil and byName["Cave"].memo == "", "an unstamped slot keeps its own GMNotes and memo")
+check(byName["Squirrel"].gm_notes == nil, "stamps are per category: the meeple is untouched")
 
 print("\n== gold: fewest coins ==")
 -- the split itself, independent of any bag
@@ -1002,6 +1021,41 @@ check(find(priceSummary({faction = "none"}).buy_tooltip,
       "a party buff shows as the Party Adjustment line")
 PARTY_PRICE_MODS = {}
 REP = {}
+
+print("\n== landmarks: GMNotes kind -> buttons ==")
+check(type(LANDMARK_DATA) == "table", "LANDMARK_DATA is spliced into Global")
+local savedLandmarks = LANDMARK_DATA
+LANDMARK_DATA = {cave = {actions = {"inspect"}}, bare = {actions = {}}}
+local told = {}
+function printToColor(msg) table.insert(told, msg) end
+
+local cave = makeCard("lm-cave", "cave")
+cave.tag, cave.type = "Generic", "Generic"
+cave._name = "Burrow"
+check(renderLandmark(cave) == true and #cave._buttons == 1,
+      "a known kind gets one button per action")
+check(cave._buttons[1].click_function == "landmarkInspectClick"
+      and cave._buttons[1].function_owner == Global,
+      "the button calls Global's click function for that action")
+landmarkInspectClick(cave, "Red")
+check(told[#told] == "Burrow (cave)", "Inspect names the landmark and its kind")
+cave.memo = "biome=forest"
+landmarkInspectClick(cave, "Red")
+check(told[#told] == "Burrow (cave): biome=forest", "the memo is read when present")
+check(cave.memo == "biome=forest", "the memo is never written")
+
+local bare = makeCard("lm-bare", "bare")
+check(renderLandmark(bare) == true and #bare._buttons == 0,
+      "a kind with no actions draws nothing")
+local stranger = makeCard("lm-none", "not_a_kind")
+stranger._buttons = {{label = "keep"}}
+check(renderLandmark(stranger) == false and #stranger._buttons == 1,
+      "an unknown kind is left alone (its buttons survive)")
+
+local stamped = makeCard("lm-stamp", "")
+stampObject(stamped, {gm_notes = "cave", memo = "biome=marsh"})
+check(#stamped._buttons == 1, "a stamp that sets a kind draws its buttons at once")
+LANDMARK_DATA = savedLandmarks
 
 print(string.format("\n%d/%d checks passed", checks - fails, checks))
 os.exit(fails == 0 and 0 or 1)

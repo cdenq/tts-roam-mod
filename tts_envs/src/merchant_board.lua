@@ -162,6 +162,7 @@ ZONE_EXTRA_HEIGHT = 1.5
 zoneHeights = {}
 
 GOLD_TAG = "Gold"
+CONTRABAND_TAG = "Contraband"
 
 --[[ The board only ever touches an object carrying EVERY tag of one of these
 sets: Clear deletes nothing else, and the trading zones count nothing else.
@@ -172,9 +173,8 @@ TRACKED_TAGS = {
   {"Gold", "Object"},
 }
 
--- Where cloned stock and change come from.
+-- Where cloned stock comes from. Change comes from Global's gold bag.
 ITEM_BAG = "c98e54"
-GOLD_BAG = "f0d3ab"
 
 CONFIRM_SECONDS = 3
 
@@ -463,6 +463,22 @@ function tracked(obj)
   return false
 end
 
+--[[ Whether this merchant will take an offered object.
+
+An ordinary merchant refuses contraband. A contraband buyer takes only gold
+and contraband whose GMNotes names its own faction. ]]
+function accepts(obj, shop)
+  local contraband = obj.hasTag(CONTRABAND_TAG)
+  if not (shop and shop.contraband_buyer) then return not contraband end
+  if obj.hasTag(GOLD_TAG) then return true end
+  return contraband and trim(obj.getGMNotes()) == shop.faction
+end
+
+function displayName(obj)
+  local name = obj.getName() or ""
+  return name ~= "" and name or obj.getGUID()
+end
+
 --[[ What everything in a zone is worth, at buy or sell prices.
 
 Only tracked objects count; anything else in the zone is ignored.
@@ -471,14 +487,21 @@ Returns the total and a list of the objects counted, plus a list of anything
 it could NOT price. An unpriceable object is never silently worth 0 -- that
 is how a player loses a sword to a typo'd name -- so the caller reports it
 and refuses to trade.
+
+When selling, a fourth list holds what the merchant refuses (accepts()).
+Refused objects are left where they are: not counted, never destroyed.
 ]]
 function zoneValue(role, buying, shop)
   local zone = zoneFor(role)
-  local total, counted, unpriced = 0, {}, {}
-  if zone == nil then return total, counted, unpriced end
+  local total, counted, unpriced, refused = 0, {}, {}, {}
+  if zone == nil then return total, counted, unpriced, refused end
 
   for _, obj in ipairs(zone.getObjects()) do
-    if obj ~= self and not obj.isDestroyed() and tracked(obj) then
+    if obj == self or obj.isDestroyed() or not tracked(obj) then
+      -- not part of the trade
+    elseif not buying and not accepts(obj, shop) then
+      table.insert(refused, displayName(obj))
+    else
       local price = Global.call("priceObject", {
         object = obj, faction = shop and shop.faction or "none",
         buying = buying,
@@ -486,15 +509,14 @@ function zoneValue(role, buying, shop)
         adjustment_sell = shop and shop.adjustment_sell or 0
       })
       if price == nil then
-        local name = obj.getName() or ""
-        table.insert(unpriced, name ~= "" and name or obj.getGUID())
+        table.insert(unpriced, displayName(obj))
       else
         total = total + price
         table.insert(counted, {object = obj, price = price})
       end
     end
   end
-  return total, counted, unpriced
+  return total, counted, unpriced, refused
 end
 
 
@@ -789,7 +811,11 @@ function reconcileClick(obj, playerColor)
   end
 
   local a, aItems, aBad = zoneValue("a", true, shop)
-  local b, bItems, bBad = zoneValue("b", false, shop)
+  local b, bItems, bBad, bRefused = zoneValue("b", false, shop)
+  if #bRefused > 0 then
+    broadcastToColor(shop.role .. " will not take: " ..
+                     table.concat(bRefused, ", "), playerColor, {1, 0.8, 0.3})
+  end
   -- Nothing tracked in either zone: not a trade, so not worth a message.
   if #aItems + #aBad + #bItems + #bBad == 0 then return end
   if #aBad > 0 or #bBad > 0 then

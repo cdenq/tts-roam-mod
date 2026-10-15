@@ -91,6 +91,16 @@ def adjustment(s, col, where):
     raise SystemExit("%s: %s %r is not a number" % (where, col, raw))
 
 
+def flag(s, col, where):
+  """A yes/no column. Blank means no."""
+  raw = text(s.get(col)).lower()
+  if raw in ("", "no", "false", "0"):
+    return False
+  if raw in ("yes", "true", "1", "x"):
+    return True
+  raise SystemExit("%s: %s %r -- want yes or blank" % (where, col, raw))
+
+
 def check_spread(sid, shop, rules):
   """Warn when a shop pays more for an item than it charges for it.
 
@@ -234,7 +244,9 @@ def main():
                        "adjustment_buy and adjustment_sell")
     by_id[sid] = {"role": role, "tier": tier, "faction": faction,
                   "adjustment_buy": adjustment(s, "adjustment_buy", where),
-                  "adjustment_sell": adjustment(s, "adjustment_sell", where)}
+                  "adjustment_sell": adjustment(s, "adjustment_sell", where),
+                  # Takes only gold and contraband aimed at its own faction.
+                  "contraband_buyer": flag(s, "contraband_buyer", where)}
   for sid in sorted(set(token_of) - set(by_id)):
     raise SystemExit("%s: gmnotes %r is not a shop_id in shops.xlsx"
                      % (token_of[sid]["_where"], sid))
@@ -298,10 +310,12 @@ def main():
   for sid in sorted(by_id, key=idkey):
     s = by_id[sid]
     L.append("  [%s] = {role = %s, tier = %d, faction = %s, "
-             "adjustment_buy = %g, adjustment_sell = %g},"
+             "adjustment_buy = %g, adjustment_sell = %g, "
+             "contraband_buyer = %s},"
              % (lua_str(sid), lua_str(s["role"]), s["tier"],
                 lua_str(s["faction"]), s["adjustment_buy"],
-                s["adjustment_sell"]))
+                s["adjustment_sell"],
+                "true" if s["contraband_buyer"] else "false"))
   L.append("}")
   L.append("")
   L.append("-- What each merchant MAY carry, in slot order. One of items is")

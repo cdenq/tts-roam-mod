@@ -18,7 +18,7 @@ design unit, so the canvas size never changes how big a landmark is drawn.
 
 (`landmark_class` rows give the heights; `landmark_tier` rows say which class
 each landmark size is; an optional `landmark_scale` row multiplies one
-landmark's height, e.g. towers x1.25.) The height is reached by RE-DRAWING at a fitted width,
+landmark's height, e.g. guild_tower x1.5.) The height is reached by RE-DRAWING at a fitted width,
 not by resizing the image, so the ink line is the same weight on every
 landmark. Something too wide to reach its height inside the canvas is drawn
 as tall as fits, and the build says so.
@@ -65,7 +65,7 @@ LANDMARK_KEYS = ("out_size", "unit_px", "seed_offset", "margin")
 LANDMARK_COLOURS = ("brick", "brick_dk", "brick_line", "marble", "marble_dk", "lm_cave", "ore", "ore_dk",
                     "ore_lt", "vein", "fish", "fish_dk", "earth", "earth_dk", "flame", "flame_lt", "fey", "fey_dk", "fey_lt",
                     "wisp", "shadow", "otter_banner", "knave_banner",
-                    "alliance_banner", "lizard_banner", "lm_smoke")
+                    "alliance_banner", "lizard_banner", "lm_smoke", "honey", "honey_dk", "chalkboard")
 SIZES = 4
 # A landmark is a TTS stand-up token, extruded from its alpha outline: anything
 # thinner than this (design units = px at 1024) becomes a sliver or breaks off.
@@ -963,34 +963,54 @@ def paint_lizard_garden(canvas, ax, ay, s, rng, tier):
     pennant(k, x, 0.08, 0.32, gold, side=1 if x < 0 else -1)
 
 
-# ---------------------------------------------------------------- stone tower
-def paint_stone_tower(canvas, ax, ay, s, rng, tier):
-  """1 stubby lookout under a timber cone, 2 crenellated tower with a flag,
-  3 tall tower with a corbelled parapet, slate spire, balcony and ivy,
-  4 + a side turret, buttresses and more lit windows."""
+# ---------------------------------------------------------------- guild tower
+def guild_emblem(k, x, y, r):
+  """The Guild mark on its teal banners: a gold dot."""
+  k.put(k.oval(x, y, r * 0.55, r * 0.55, amp=0), bm.G["banner_lt"])
+
+
+def paint_guild_tower(canvas, ax, ay, s, rng, tier):
+  """Guild tower, in the guildhall's materials: a stone ground storey under
+  timber-framed plaster, slate roofs, teal banners with the gold dot.
+  1 stubby lookout under a slate cone, 2 crenellated stone cap and a banner,
+  3 corbelled parapet, slate spire, balcony and ivy, 4 + a side turret,
+  buttresses and more lit windows."""
   g, k = bm.G, Sketch(canvas, ax, ay, s, rng, 1.5, 2.3)
   stone, stone_dk = g["stone"], g["stone_dk"]
+  teal = g["banner"]
   w, H = 0.28, (0.6, 0.95, 1.2, 1.35)[tier - 1]
 
-  def body(x, hw, top):
+  def body(x, hw, top, plinth):
     m = k.poly([(x - hw, 0), (x + hw, 0), (x + hw * 0.92, top), (x - hw * 0.92, top)], amp=1.5)
-    k.put(m, stone, stone_dk)
-    masonry(k, m, x - hw, x + hw, 0, top, stone_dk)
+    k.put(m, g["wall"], g["wall_dk"])
+    base = clip(k.box(x - hw - 0.05, -0.05, x + hw + 0.05, plinth, amp=0.8), m)
+    k.put(base, stone, stone_dk)
+    masonry(k, base, x - hw, x + hw, 0, plinth, stone_dk)
+    xs = [x - hw * 0.84, x - hw * 0.3, x + hw * 0.3, x + hw * 0.84]  # timber framing over the plaster
+    segs = [[(fx, plinth), (fx, top)] for fx in xs]
+    rails = [plinth + 0.25 * j for j in range(1, int((top - plinth) / 0.25) + 1)]
+    segs += [[(x - hw, y), (x + hw, y)] for y in [plinth + 0.01] + rails]
+    for y0 in [plinth] + rails:  # braces in the outer bays
+      if y0 + 0.2 < top:
+        segs += [[(xs[0], y0), (xs[1], y0 + 0.2)], [(xs[3], y0), (xs[2], y0 + 0.2)]]
+    k.fill(clip(k.lines(segs, 7), clip(k.box(x - hw - 0.05, plinth, x + hw + 0.05, top + 0.05, amp=0), m)),
+           g["timber"])
     return m
 
-  def cone(x, hw, base, h, colour):
-    k.put(k.poly([(x - hw, base), (x, base + h), (x + hw, base)], amp=1), colour, bm.shade_of(colour, 0.75),
-          lighten(colour, 0.25))
+  def cone(x, hw, base, h):
+    k.put(k.poly([(x - hw, base), (x, base + h), (x + hw, base)], amp=1), g["guild_roof"], g["guild_roof_dk"],
+          lighten(g["guild_roof"], 0.25))
 
   if tier >= 4:  # side turret behind the main tower
     tx = 0.43
-    body(tx, 0.14, 0.95)
+    body(tx, 0.14, 0.95, 0.3)
     k.put(k.box(tx - 0.16, 0.93, tx + 0.16, 0.99, amp=0.5), stone, stone_dk)
-    cone(tx, 0.18, 0.98, 0.32, g["guild_roof"])
-    pennant(k, tx, 1.3, 1.4, g["banner"])
+    cone(tx, 0.18, 0.98, 0.32)
+    pennant(k, tx, 1.3, 1.4, teal)
     k.window(tx - 0.01, 0.45, tx + 0.05, 0.56, arched=True)
     k.window(tx - 0.01, 0.7, tx + 0.05, 0.81, arched=True)
-  body(0, w, H)
+  plinth = (0.28, 0.32, 0.36, 0.36)[tier - 1]
+  body(0, w, H, plinth)
   if tier >= 4:  # buttresses
     for side in (-1, 1):
       k.put(k.poly([(side * w, 0), (side * (w + 0.1), 0), (side * w, 0.3)], amp=0.6), stone, stone_dk)
@@ -998,37 +1018,752 @@ def paint_stone_tower(canvas, ax, ay, s, rng, tier):
   k.line([(0, 0.01), (0, 0.2)], width=3)
   if tier >= 2:
     k.put(k.box(-0.11, -0.01, 0.11, 0.02, amp=0.5), stone, stone_dk)
-  slits = {1: [0.35], 2: [0.42, 0.68], 3: [0.42, 0.7], 4: [0.42, 0.7, 0.98]}[tier]
-  for y in slits:
+  wins = {1: [0.38], 2: [0.5, 0.72], 3: [0.42, 0.7], 4: [0.42, 0.7, 0.98]}[tier]
+  for y in wins:
     if tier >= 3:
       k.window(-0.04, y, 0.04, y + 0.12, arched=True)
     else:
-      k.put(k.box(-0.016, y, 0.016, y + 0.09, amp=0.3), g["lm_cave"])
+      k.window(-0.045, y, 0.045, y + 0.1)
   if tier == 1:
     k.put(k.box(-w - 0.02, H - 0.02, w + 0.02, H + 0.03, amp=0.6), g["timber"])
-    cone(0, w + 0.06, H + 0.02, 0.36, g["roofs"][2])
+    cone(0, w + 0.06, H + 0.02, 0.36)
+    pennant(k, 0, H + 0.37, H + 0.48, teal)
     return
   if tier == 2:
+    cap = k.box(-w * 0.95, H - 0.08, w * 0.95, H, amp=0.8)
+    k.put(cap, stone, stone_dk)
     merlons(k, -w, w, H, stone, stone_dk, w=0.07, h=0.07, gap=0.05)
-    pennant(k, 0.1, H + 0.07, H + 0.3, g["banner"])
+    pennant(k, 0.1, H + 0.07, H + 0.3, teal)
+    hanging_banner(k, 0, 0.44, 0.06, 0.18, teal, guild_emblem)
     return
   # corbelled parapet, then a slate spire
   par = k.box(-w - 0.04, H - 0.02, w + 0.04, H + 0.08, amp=0.8)
   k.put(par, stone, stone_dk)
   for x in [-w - 0.02 + 0.08 * i for i in range(int((2 * w + 0.04) / 0.08) + 1)]:
     k.put(k.poly([(x - 0.025, H - 0.02), (x + 0.025, H - 0.02), (x, H - 0.06)], amp=0.3, sub=1), stone, stone_dk)
-  cone(0, w + 0.02, H + 0.07, 0.55 if tier == 3 else 0.65, g["guild_roof"])
+  cone(0, w + 0.02, H + 0.07, 0.55 if tier == 3 else 0.65)
   top = H + 0.07 + (0.55 if tier == 3 else 0.65)
-  pennant(k, 0, top, top + 0.12, g["banner"])
-  by = 0.68 if tier == 3 else 0.68  # balcony
+  pennant(k, 0, top, top + 0.12, teal)
+  by = 0.68  # balcony
   k.put(k.box(-0.12, by - 0.03, 0.12, by, amp=0.5), stone, stone_dk)
   for x in (-0.1, -0.05, 0.0, 0.05, 0.1):
     k.line([(x, by), (x, by + 0.06)], width=3)
   k.line([(-0.12, by + 0.06), (0.12, by + 0.06)], width=4)
-  vine = [(-w + 0.03 + 0.02 * math.sin(i * 1.4), 0.05 + i * 0.07) for i in range(8 if tier == 3 else 11)]
+  for side in (-1, 1):  # teal banners either side of the door
+    hanging_banner(k, side * 0.17, 0.33, 0.05, 0.17, teal, guild_emblem)
+  vine = [(-w + 0.03 + 0.02 * math.sin(i * 1.4), 0.05 + i * 0.07) for i in range(5)]
   k.line(vine, g["leaf_dk"], 5)
   for i, (x, y) in enumerate(vine[1:]):
     k.put(k.oval(x + (0.022 if i % 2 else -0.022), y, 0.024, 0.016, amp=0.3), g["leaf"])
+
+
+# ---------------------------------------------------------------- faction towers
+def paint_eyrie_tower(canvas, ax, ay, s, rng, tier):
+  """Eyrie tree-tower. 1 a plaster lookout hut on a deck in a tree stump, rope
+  ladder, blue cone. 2 taller, braces, a perch branch, feather banner.
+  3 a slim tower with a railed deck, perches, three banners. 4 + a side turret
+  on its own branch, a woven nest on the spire, a lantern."""
+  g, k = bm.G, Sketch(canvas, ax, ay, s, rng, 1.6, 2.2)
+  blue = g["bird_banner"]
+  blue_dk, blue_lt = bm.shade_of(blue, 0.72), lighten(blue, 0.3)
+  bark, bark_dk = g["trunk"], bm.shade_of(g["trunk"], 0.72)
+  i = tier - 1
+  T, B, hw, R = (0.3, 0.42, 0.48, 0.52)[i], (0.24, 0.36, 0.52, 0.68)[i], (0.15, 0.17, 0.19, 0.19)[i], \
+      (0.28, 0.32, 0.4, 0.42)[i]
+  dw = hw + (0.05 if tier == 1 else 0.1)
+  top = T + 0.02 + B
+
+  def cone(x, half, base, h):
+    k.put(k.poly([(x - half, base), (x, base + h), (x + half, base)], amp=1), blue, blue_dk, blue_lt)
+
+  if tier >= 2:  # perch branch with a leaf tuft
+    bm._ink_line(canvas, [k.at(-0.06, T * 0.6), k.at(-0.3, T * 0.78), k.at(-0.44, T * 0.72)], bark, bm.u(10))
+    k.put(k.oval(-0.46, T * 0.74, 0.07, 0.045, amp=1), g["oak"], g["oak_dk"], g["oak_lt"])
+  if tier >= 3:
+    bm._ink_line(canvas, [k.at(0.06, T * 0.35), k.at(0.26, T * 0.45), k.at(0.38, T * 0.4)], bark, bm.u(10))
+    k.put(k.oval(0.4, T * 0.42, 0.06, 0.04, amp=1), g["oak"], g["oak_dk"], g["oak_lt"])
+  if tier >= 4:  # side turret on its own branch
+    ty = T * 0.95
+    bm._ink_line(canvas, [k.at(0.06, T * 0.7), k.at(0.3, ty - 0.04), k.at(0.44, ty - 0.02)], bark, bm.u(12))
+    k.put(k.box(0.32, ty - 0.02, 0.56, ty + 0.02, amp=0.6), g["palisade"], g["palisade_dk"])
+    k.put(k.box(0.37, ty + 0.02, 0.51, ty + 0.26), g["wall"], g["wall_dk"])
+    k.window(0.415, ty + 0.1, 0.465, ty + 0.2, arched=True)
+    cone(0.44, 0.1, ty + 0.25, 0.22)
+    pennant(k, 0.44, ty + 0.47, ty + 0.57, blue)
+  trunk = k.poly([(-0.24, 0), (-0.12, 0.05), (-0.09, T * 0.5), (-0.1, T), (0.1, T), (0.09, T * 0.5), (0.12, 0.05),
+                  (0.24, 0), (0.08, 0.02), (0, 0.0), (-0.08, 0.02)], amp=2)
+  k.put(trunk, bark, bark_dk)
+  k.fill(clip(k.lines([[(-0.05, 0.05), (-0.03, T * 0.9)], [(0.03, 0.1), (0.05, T * 0.88)]], 3), trunk), bark_dk)
+  k.put(k.oval(0.01, T * 0.4, 0.035, 0.045, amp=0.5), g["lm_cave"])  # knot hole
+  if tier >= 2:  # braces under the deck
+    for side in (-1, 1):
+      bm._ink_line(canvas, [k.at(side * 0.08, T * 0.55), k.at(side * (dw - 0.03), T - 0.02)], g["timber"], bm.u(7))
+  lx = -dw + 0.06  # rope ladder down from the deck
+  for x in (lx - 0.03, lx + 0.03):
+    k.pole([(x, 0.0), (x, T)], g["hay_dk"])
+  for y in [0.05 + 0.07 * j for j in range(int((T - 0.05) / 0.07) + 1)]:
+    k.line([(lx - 0.03, y), (lx + 0.03, y)], g["palisade"], 6)
+  deck = k.box(-dw, T - 0.03, dw, T + 0.03, amp=1)
+  k.put(deck, g["palisade"], g["palisade_dk"])
+  k.fill(clip(k.lines([[(x, T - 0.03), (x, T + 0.03)] for x in [-dw + 0.06 * j for j in range(int(2 * dw / 0.06) + 1)]],
+                      3), deck), g["palisade_dk"])
+  if tier >= 3:  # solid plank parapet either side of the tower (open balusters would cut pinholes)
+    for side in (-1, 1):
+      x0, x1 = sorted((side * (hw - 0.01), side * (dw - 0.01)))
+      k.put(k.box(x0, T + 0.02, x1, T + 0.08, amp=0.6), g["palisade"], g["palisade_dk"])
+  body = k.box(-hw, T + 0.02, hw, top)
+  k.put(body, g["wall"], g["wall_dk"])
+  for f in (-1, 1):
+    k.line([(f * (hw - 0.03), T + 0.03), (f * (hw - 0.03), top - 0.01)], g["timber"], 6)
+  if tier >= 3:
+    k.fill(clip(k.lines([[(-hw, T + 0.18), (hw, T + 0.18)]], 6), body), g["timber"])
+  k.put(k.arch(-0.05, 0.05, T + 0.03, T + 0.16), g["timber"])
+  k.line([(0, T + 0.04), (0, T + 0.15)], width=3)
+  for j in range(tier - 1):
+    y = T + 0.21 + 0.15 * j
+    k.window(-0.035, y, 0.035, y + 0.1, arched=True)
+  if tier >= 3:  # perches off the top floor
+    for side in ((1,) if tier == 3 else (-1, 1)):
+      k.pole([(side * hw, top - 0.1), (side * (hw + 0.13), top - 0.07)], bark)
+  cone(0, hw + 0.06, top - 0.01, R)
+  peak = top - 0.01 + R
+  if tier >= 4:  # woven nest crowning the spire
+    nest = k.oval(0, peak + 0.02, 0.13, 0.065, amp=2, a0=math.pi, a1=2 * math.pi)
+    nest = ImageChops.lighter(nest, k.box(-0.13, peak + 0.015, 0.13, peak + 0.045, amp=1.5))
+    k.put(nest, g["hay_dk"], bm.shade_of(g["hay_dk"], 0.75))
+    k.fill(clip(k.lines([[(-0.12 + 0.05 * j, peak + 0.04), (-0.08 + 0.05 * j, peak - 0.03)] for j in range(5)], 3),
+                nest), g["palisade_dk"])
+    pennant(k, 0.02, peak + 0.04, peak + 0.16, blue)
+    k.pole([(dw - 0.04, T + 0.03), (dw - 0.04, T + 0.16)], g["timber"])  # deck lantern
+    glow(k, dw - 0.04, T + 0.18, 0.02, g["window"], halo=2.4, alpha=0.3)
+  else:
+    pennant(k, 0, peak - 0.01, peak + 0.11, blue)
+  if tier >= 2:
+    hanging_banner(k, 0, T - 0.03, 0.045, 0.16, blue, feather_emblem)
+  if tier >= 3:
+    for side in (-1, 1):
+      hanging_banner(k, side * (dw - 0.06), T - 0.03, 0.035, 0.13, blue, feather_emblem)
+
+
+def paint_marquise_barracks(canvas, ax, ay, s, rng, tier):
+  """Marquisate barracks. 1 a stone guardhouse under an orange roof, spear
+  rack. 2 a long stone-and-timber hall, chimney, archery target. 3 + a
+  crenellated watchtower with a cat flag. 4 two towers, a portcullis gatehouse,
+  braziers."""
+  g, k = bm.G, Sketch(canvas, ax, ay, s, rng, 1.4, 1.5)
+  orange = g["cat_banner"]
+  roof, roof_dk = bm.shade_of(orange, 0.9), bm.shade_of(orange, 0.68)
+  stone, stone_dk = g["stone"], g["stone_dk"]
+
+  def tiled_roof(pts):
+    m = k.poly(pts, amp=1.5)
+    k.put(m, roof, roof_dk)
+    ys = [p[1] for p in pts]
+    k.fill(clip(k.lines([[(-0.6, y), (0.6, y)] for y in [min(ys) + 0.06 * (j + 1) for j in range(int((max(ys) -
+                                                                                                    min(ys)) / 0.06))]],
+                        3), m), roof_dk)
+
+  def spear_rack(x):
+    for dx in (-0.05, 0.05):
+      k.pole([(x + dx, 0), (x + dx, 0.15)], g["timber"])
+    for dx in (-0.035, 0.0, 0.035):
+      k.pole([(x + dx - 0.015, 0), (x + dx + 0.01, 0.3)], g["palisade"])
+      k.put(k.poly([(x + dx - 0.006, 0.29), (x + dx + 0.012, 0.36), (x + dx + 0.026, 0.29)], amp=0.3, sub=1),
+            g["rock_lt"], g["rock_dk"])
+    k.line([(x - 0.08, 0.13), (x + 0.08, 0.13)], g["timber"], 7)
+
+  def target(x):
+    for dx in (-0.04, 0.04):
+      k.pole([(x + dx, 0), (x, 0.2)], g["timber"])
+    for r, c in ((0.08, g["hay"]), (0.055, g["stem"]), (0.03, orange)):
+      k.put(k.oval(x, 0.2, r, r, amp=0.5), c, bm.shade_of(c, 0.8) if r > 0.07 else None)
+    k.pole([(x - 0.02, 0.21), (x + 0.07, 0.26)], g["palisade"])  # an arrow in the straw
+
+  def tower(x0, x1, h):
+    m = k.box(x0, 0, x1, h)
+    k.put(m, stone, stone_dk)
+    masonry(k, m, x0, x1, 0, h, stone_dk)
+    merlons(k, x0, x1, h, stone, stone_dk, w=0.05, h=0.055, gap=0.03)
+    xm = (x0 + x1) / 2
+    for y in (h * 0.35, h * 0.62):  # arrow slits
+      k.put(k.box(xm - 0.013, y, xm + 0.013, y + 0.07, amp=0.3), g["lm_cave"])
+    pennant(k, xm, h + 0.05, h + 0.2, orange, side=1 if xm < 0 else -1)
+
+  def door(x, h=0.24):
+    k.put(k.arch(x - 0.07, x + 0.07, 0, h), g["timber"])
+    k.line([(x, 0.01), (x, h - 0.01)], width=3)
+    k.put(k.box(x - 0.09, h + 0.01, x + 0.09, h + 0.035, amp=0.4), orange, roof_dk)  # lintel stripe
+
+  if tier == 1:
+    k.put(k.box(-0.08, 0.36, -0.02, 0.56), stone, stone_dk)  # chimney
+    body = k.box(-0.22, 0, 0.22, 0.34)
+    k.put(body, stone, stone_dk)
+    masonry(k, body, -0.22, 0.22, 0, 0.34, stone_dk)
+    tiled_roof([(-0.3, 0.32), (0, 0.6), (0.3, 0.32)])
+    pennant(k, 0, 0.58, 0.72, orange)
+    door(-0.06)
+    hanging_banner(k, 0.13, 0.3, 0.045, 0.16, orange, cat_emblem)
+    spear_rack(0.37)
+    crate(k, -0.38, 0, -0.26, 0.1)
+    return
+  hx0, hx1 = {2: (-0.36, 0.3), 3: (-0.2, 0.42), 4: (-0.36, 0.36)}[tier]
+  k.put(k.box(hx1 - 0.16, 0.6, hx1 - 0.09, 0.82), stone, stone_dk)  # chimney
+  ground = k.box(hx0, 0, hx1, 0.3)
+  k.put(ground, stone, stone_dk)
+  masonry(k, ground, hx0, hx1, 0, 0.3, stone_dk)
+  upper = k.box(hx0, 0.3, hx1, 0.5)
+  k.put(upper, g["wall"], g["wall_dk"])
+  posts = [hx0 + 0.02 + (hx1 - hx0 - 0.04) * j / 4 for j in range(5)]
+  segs = [[(x, 0.3), (x, 0.5)] for x in posts] + [[(hx0, 0.31), (hx1, 0.31)]]
+  segs += [[(posts[j], 0.31), (posts[j + 1], 0.49)] for j in (0, 3)]  # braces in the end bays
+  k.fill(clip(k.lines(segs, 7), upper), g["timber"])
+  for j in (1, 2):
+    xm = (posts[j] + posts[j + 1]) / 2
+    k.window(xm - 0.04, 0.35, xm + 0.04, 0.45)
+  tiled_roof([(hx0 - 0.06, 0.48), (hx0 + 0.07, 0.72), (hx1 - 0.07, 0.72), (hx1 + 0.06, 0.48)])
+  mid = (hx0 + hx1) / 2
+  for x in (hx0 + 0.08, hx1 - 0.08):  # ground-floor windows
+    k.window(x - 0.035, 0.1, x + 0.035, 0.2)
+  if tier == 4:  # gatehouse with a raised portcullis
+    gate = k.box(-0.12, 0, 0.12, 0.42)
+    k.put(gate, stone, stone_dk)
+    masonry(k, gate, -0.12, 0.12, 0, 0.42, stone_dk)
+    merlons(k, -0.12, 0.12, 0.42, stone, stone_dk, w=0.04, gap=0.02)
+    arch = k.arch(-0.075, 0.075, 0, 0.27)
+    k.put(arch, g["lm_cave"])
+    grid = [[(x, 0.12), (x, 0.3)] for x in (-0.045, -0.015, 0.015, 0.045)] + [[(-0.08, y), (0.08, y)] for y in (0.16, 0.22)]
+    k.fill(clip(k.lines(grid, 4), arch), g["rock_dk"])
+    k.put(k.box(-0.13, 0.31, 0.13, 0.34, amp=0.4), orange, roof_dk)
+  else:
+    door(mid)
+  for x in (mid - 0.15, mid + 0.15) if tier < 4 else (-0.23, 0.23):
+    hanging_banner(k, x, 0.29, 0.04, 0.15, orange, cat_emblem)
+  if tier >= 3:
+    tower(-0.47, -0.21, 0.88) if tier == 3 else tower(-0.52, -0.34, 0.95)
+  if tier >= 4:
+    tower(0.34, 0.52, 0.95)
+    for side in (-1, 1):  # braziers by the gate
+      x = side * 0.15
+      k.pole([(x, 0), (x, 0.09)], g["rock_dk"])
+      k.put(k.oval(x, 0.1, 0.035, 0.022, amp=0.4, a0=math.pi, a1=2 * math.pi), g["rock_dk"])
+      flame(k, x, 0.1, 0.016)
+  if tier == 2:
+    target(0.42)
+    k.put(k.box(-0.47, 0, -0.39, 0.06, amp=0.6), g["palisade"], g["palisade_dk"])  # woodpile
+    for x in (-0.45, -0.41):
+      k.put(k.oval(x, 0.085, 0.02, 0.02, amp=0.3), g["stump_top"])
+  if tier == 3:
+    spear_rack(0.5)
+  if tier == 4:
+    spear_rack(-0.63)
+    target(0.64)
+
+
+def sprout_emblem(k, x, y, r):
+  """Woodland Alliance mark: a sprout, two leaves off one stem."""
+  g = bm.G
+  m = k.box(x - r * 0.12, y - r, x + r * 0.12, y + r * 0.5, amp=0)
+  for side in (-1, 1):
+    leaf = rotate([(r * 0.3 * math.sin(math.pi * t / 6), r * 0.9 * t / 6) for t in range(7)] +
+                  [(-r * 0.3 * math.sin(math.pi * t / 6), r * 0.9 * t / 6) for t in range(5, 0, -1)],
+                  -side * 55, x, y)
+    m = ImageChops.lighter(m, k.poly(leaf, amp=0))
+  k.fill(m, g["stem"])
+
+
+def paint_alliance_barracks(canvas, ax, ay, s, rng, tier):
+  """Woodland Alliance guerrilla post, dug in and hidden, never a home.
+  1 a camouflaged hatch in a turf mound, a marker stake with a green rag.
+  2 a log-revetted dugout under camouflage brush, a signal pole, a hooded
+  lantern. 3 + a hollow dead-tree lookout with a slit and a rope ladder,
+  sharpened stakes, a sprout banner. 4 a second dugout, a thatched hide on the
+  lookout, stakes both sides, more banners."""
+  g, k = bm.G, Sketch(canvas, ax, ay, s, rng, 1.4, 1.6)
+  green = g["alliance_banner"]
+  i = tier - 1
+  mw, mh = (0.38, 0.44, 0.5, 0.58)[i], (0.2, 0.28, 0.33, 0.38)[i]  # turf mound half-width, height
+  mx = (0.0, 0.0, 0.12, 0.1)[i]
+
+  def stakes(x0, n, side):
+    """Sharpened stakes angled outward (abatis)."""
+    for j in range(n):
+      x = x0 + side * 0.06 * j
+      tip = (x + side * 0.07, 0.17 + 0.02 * (j % 2))
+      k.pole([(x, 0), tip], g["palisade"])
+      k.put(k.poly([(tip[0] - 0.012, tip[1] - 0.01), (tip[0] + side * 0.03, tip[1] + 0.035),
+                     (tip[0] + 0.012, tip[1] + 0.012)], amp=0.2, sub=1), g["stump_top"])
+
+  def dugout(x, w, h):
+    """Log-framed bunker mouth cut into the earth, steps going down."""
+    k.put(k.poly([(x - w - 0.07, 0), (x - w - 0.03, h + 0.06), (x + w + 0.03, h + 0.06), (x + w + 0.07, 0)], amp=1.5),
+          g["earth"], g["earth_dk"])
+    k.put(k.box(x - w, 0, x + w, h, amp=0.6), g["lm_cave"])
+    for j, y in enumerate((0.03, 0.065, 0.1)):  # steps down into the dark
+      k.line([(x - w + 0.02 + j * 0.01, y), (x + w - 0.02 - j * 0.01, y)], bm.shade_of(g["earth_dk"], 0.6), 4)
+    for side in (-1, 1):
+      k.put(k.box(x + side * w - 0.02, 0, x + side * w + 0.02, h, amp=0.5), g["palisade"], g["palisade_dk"])
+    k.put(k.box(x - w - 0.05, h - 0.01, x + w + 0.05, h + 0.04, amp=0.6), g["palisade"], g["palisade_dk"])
+    for side in (-1, 1):
+      k.put(k.oval(x + side * (w + 0.05), h + 0.015, 0.025, 0.025, amp=0.3), g["stump_top"])
+
+  def lookout(x, h):
+    """Hollow dead tree with a broken crown and a watch slit."""
+    trunk = k.poly([(x - 0.15, 0), (x - 0.09, 0.08), (x - 0.08, h * 0.7), (x - 0.07, h - 0.04), (x - 0.04, h),
+                    (x - 0.01, h - 0.06), (x + 0.02, h + 0.02), (x + 0.05, h - 0.05), (x + 0.08, h * 0.7),
+                    (x + 0.09, 0.08), (x + 0.15, 0)], amp=1.5)
+    k.put(trunk, g["deadwood"], bm.shade_of(g["deadwood"], 0.72))
+    k.fill(clip(k.lines([[(x - 0.04, 0.05), (x - 0.03, h * 0.8)], [(x + 0.03, 0.1), (x + 0.04, h * 0.75)]], 3), trunk),
+           bm.shade_of(g["deadwood"], 0.72))
+    k.put(k.box(x - 0.045, h * 0.72, x + 0.045, h * 0.76, amp=0.4), g["lm_cave"])  # watch slit
+    glow(k, x - 0.012, h * 0.74, 0.007, g["flame_lt"], halo=2, ink=False)
+    glow(k, x + 0.012, h * 0.74, 0.007, g["flame_lt"], halo=2, ink=False)
+    for xs in (x + 0.09, x + 0.15):  # rope ladder up the trunk
+      k.pole([(xs, 0), (xs, h * 0.66)], g["hay_dk"])
+    for y in [0.06 + 0.08 * j for j in range(int(h * 0.62 / 0.08))]:
+      k.line([(x + 0.09, y), (x + 0.15, y)], g["palisade"], 6)
+
+  if tier >= 3:
+    lx, lh = (-0.36, 0.72) if tier == 3 else (-0.44, 0.8)
+    lookout(lx, lh)
+    if tier >= 4:  # thatched hide on top of the lookout
+      k.put(k.box(lx - 0.12, lh - 0.02, lx + 0.12, lh + 0.03, amp=0.8), g["palisade"], g["palisade_dk"])
+      k.put(k.poly([(lx - 0.16, lh + 0.02), (lx - 0.04, lh + 0.2), (lx + 0.06, lh + 0.2), (lx + 0.16, lh + 0.02)],
+                   amp=2.5), g["oak"], g["oak_dk"], g["oak_lt"])
+      for j in range(5):
+        x = lx - 0.12 + j * 0.06
+        k.line([(x, lh + 0.035), (x - 0.005, lh + 0.0)], g["oak_dk"], 3)
+      pennant(k, lx, lh + 0.19, lh + 0.32, green)
+    else:
+      pennant(k, lx + 0.02, lh, lh + 0.13, green)
+  if tier >= 2:  # signal pole behind the mound
+    px = mx + mw * 0.55
+    k.pole([(px, mh * 0.5), (px, mh + 0.32)])
+    k.put(k.poly([(px, mh + 0.32), (px - 0.12, mh + 0.3), (px - 0.1, mh + 0.27), (px - 0.13, mh + 0.24),
+                  (px, mh + 0.25)], amp=0.5, sub=1), green, bm.shade_of(green, 0.75))
+  mound = k.poly([(mx - mw, 0)] + [(mx + math.cos(a) * mw, math.sin(a) * mh) for a in
+                                   [math.pi * (1 - j / 10) for j in range(1, 10)]] + [(mx + mw, 0)], amp=3)
+  k.put(mound, g["hill"], g["hill_dk"], g["hill_lt"])
+  for x in (mx - mw * 0.6, mx - mw * 0.1, mx + mw * 0.4):
+    y = mh * math.sqrt(max(0.0, 1 - ((x - mx) / mw) ** 2)) - 0.03
+    for d in (-1, 0, 1):
+      k.line([(x + d * 0.012, y), (x + d * 0.018, y + 0.03)], g["hill_dk"], 3)
+  if tier == 1:  # trapdoor hatch, its lid propped open
+    k.put(k.poly([(-0.14, 0), (-0.12, 0.11), (0.08, 0.11), (0.1, 0)], amp=1), g["earth"], g["earth_dk"])
+    k.put(k.box(-0.09, 0, 0.05, 0.08, amp=0.5), g["lm_cave"])
+    lid = k.poly([(-0.1, 0.08), (0.06, 0.08), (0.1, 0.22), (-0.06, 0.24)], amp=0.6)
+    k.put(lid, g["palisade"], g["palisade_dk"])
+    k.fill(clip(k.lines([[(x, 0.07), (x + 0.04, 0.25)] for x in (-0.05, 0.0, 0.05)], 3), lid), g["palisade_dk"])
+    k.pole([(-0.02, 0.08), (0.0, 0.16)], g["timber"])
+    k.pole([(0.3, 0), (0.3, 0.48)])  # marker stake with a green rag
+    k.put(k.poly([(0.3, 0.46), (0.4, 0.43), (0.37, 0.4), (0.41, 0.36), (0.3, 0.38)], amp=0.5, sub=1), green,
+          bm.shade_of(green, 0.75))
+    bm.paint_bush(canvas, *k.at(-0.28, 0), s * 0.2, rng)
+    crate(k, 0.14, 0, 0.24, 0.08)
+    return
+  wall = k.box(mx - mw * 0.75, 0, mx + mw * 0.75, 0.17, amp=1)  # log revetment
+  k.put(wall, g["palisade"], g["palisade_dk"])
+  k.fill(clip(k.lines([[(mx - mw, y), (mx + mw, y)] for y in (0.045, 0.09, 0.135)], 4), wall), g["palisade_dk"])
+  for y in (0.0225, 0.0675, 0.1125, 0.1575):
+    for side in (-1, 1):
+      k.put(k.oval(mx + side * mw * 0.75, y, 0.022, 0.022, amp=0.3), g["stump_top"])
+  doors = [mx] if tier < 4 else [mx - 0.17, mx + 0.17]
+  for x in doors:
+    dugout(x, 0.075, 0.2)
+  for x, sz in ((mx - mw * 0.5, 0.18), (mx + mw * 0.15, 0.2), (mx + mw * 0.65, 0.15)):  # camouflage brush on top
+    y = mh * math.sqrt(max(0.0, 1 - ((x - mx) / mw) ** 2)) - 0.04
+    bm.paint_bush(canvas, *k.at(x, y), s * sz, rng)
+  hx = mx + mw * 0.75 + 0.06  # hooded lantern
+  k.pole([(hx, 0), (hx, 0.2)])
+  k.put(k.box(hx - 0.03, 0.2, hx + 0.03, 0.26, amp=0.4), g["timber"])
+  glow(k, hx, 0.215, 0.012, g["glow"], halo=2.2, alpha=0.3)
+  k.put(k.poly([(hx - 0.045, 0.255), (hx, 0.29), (hx + 0.045, 0.255)], amp=0.3, sub=1), g["rock_dk"])
+  if tier >= 3:
+    hanging_banner(k, doors[0] - 0.2 if tier == 3 else mx, 0.17, 0.045, 0.15, green, sprout_emblem)
+    stakes(mx + mw - 0.08, 3, 1)  # rooted in the mound's foot so they join the cut-out
+  if tier >= 4:
+    stakes(mx - mw + 0.08, 2, -1)
+    hanging_banner(k, lx, lh * 0.6, 0.045, 0.15, green, sprout_emblem)  # on the lookout trunk
+  if tier == 2:
+    crate(k, -0.48, 0, -0.37, 0.09)
+    crate(k, -0.45, 0.09, -0.36, 0.17)
+
+
+def chalkboard(k, x0, y0, x1, y1, kind):
+  """Company slate board, chalked with shapes, never words: 'bars' a rising
+  bar chart + arrow, 'ticks' rows of figures with coin marks, 'wage' a coin
+  above a sword with tally marks."""
+  g = bm.G
+  k.put(k.box(x0, y0, x1, y1, amp=0.5), g["timber"])
+  board = k.box(x0 + 0.012, y0 + 0.012, x1 - 0.012, y1 - 0.012, amp=0.3)
+  k.fill(board, g["chalkboard"])
+  w, h = x1 - x0, y1 - y0
+  chalk = g["foam"]
+  if kind == "bars":
+    n = 4
+    for j in range(n):
+      bx = x0 + w * (0.18 + 0.17 * j)
+      k.fill(k.box(bx, y0 + h * 0.15, bx + w * 0.1, y0 + h * (0.3 + 0.13 * j), amp=0), chalk)
+    k.line([(x0 + w * 0.15, y0 + h * 0.55), (x0 + w * 0.5, y0 + h * 0.7), (x0 + w * 0.82, y0 + h * 0.86)], chalk, 3)
+    k.line([(x0 + w * 0.72, y0 + h * 0.86), (x0 + w * 0.84, y0 + h * 0.87), (x0 + w * 0.8, y0 + h * 0.74)], chalk, 3)
+  elif kind == "ticks":
+    for j in range(3):
+      y = y0 + h * (0.75 - 0.25 * j)
+      k.put(k.oval(x0 + w * 0.14, y, w * 0.05, w * 0.05, amp=0), g["banner_lt"])
+      k.line([(x0 + w * 0.26, y), (x0 + w * (0.55 + 0.1 * (j % 2)), y)], chalk, 3)
+      k.line([(x0 + w * 0.72, y - h * 0.06), (x0 + w * 0.8, y + h * 0.06)], chalk, 3)
+      k.line([(x0 + w * 0.8, y + h * 0.06), (x0 + w * 0.88, y - h * 0.02)] if j != 1 else
+             [(x0 + w * 0.8, y + h * 0.06), (x0 + w * 0.88, y + h * 0.1)], chalk, 3)
+  else:  # wage
+    k.put(k.oval(x0 + w * 0.3, y0 + h * 0.66, w * 0.12, w * 0.12, amp=0), g["banner_lt"])
+    k.line([(x0 + w * 0.22, y0 + h * 0.2), (x0 + w * 0.4, y0 + h * 0.45)], chalk, 4)  # a sword, chalked
+    k.line([(x0 + w * 0.24, y0 + h * 0.34), (x0 + w * 0.32, y0 + h * 0.26)], chalk, 3)
+    for j in range(4):
+      x = x0 + w * (0.58 + 0.07 * j)
+      k.line([(x, y0 + h * 0.25), (x, y0 + h * 0.7)], chalk, 3)
+    k.line([(x0 + w * 0.55, y0 + h * 0.3), (x0 + w * 0.82, y0 + h * 0.62)], chalk, 3)
+
+
+def coin_emblem(k, x, y, r):
+  k.put(k.oval(x, y, r * 0.7, r * 0.7, amp=0), bm.G["banner_lt"])
+  k.put(k.oval(x, y, r * 0.25, r * 0.25, amp=0), bm.shade_of(bm.G["banner_lt"], 0.7))
+
+
+def paint_otter_barracks(canvas, ax, ay, s, rng, tier):
+  """Riverfolk Company mercenary hall: a varnished wooden pavilion on a dock
+  at the water's edge, crisp teal-and-cream company banners, chalkboards of
+  prices, trade values and wages. 1 a kiosk and one easel board. 2 a three-bay
+  pavilion, two boards, a moored boat. 3 + an upper floor with a balcony and a
+  wide price board, banner masts. 4 + a central tower with a gold coin, wings,
+  three masts."""
+  g, k = bm.G, Sketch(canvas, ax, ay, s, rng, 1.5, 1.6)
+  otter = g["otter_banner"]
+  otter_dk, otter_lt = bm.shade_of(otter, 0.75), lighten(otter, 0.3)
+  wood, wood_dk, wood_lt = g["palisade"], g["palisade_dk"], lighten(g["palisade"], 0.35)  # varnished: lit edge
+  gold = g["banner_lt"]
+  i = tier - 1
+  hw = (0.2, 0.32, 0.3, 0.3)[i]  # pavilion half-width
+  D = 0.12  # deck height
+
+  def mast(x, h, side=1):
+    """Company banner: crossbar flag, teal with a cream stripe and a coin."""
+    k.pole([(x, D), (x, h)], gold)
+    k.put(k.oval(x, h + 0.012, 0.018, 0.018, amp=0.2), gold)
+    k.line([(x - 0.06, h - 0.02), (x + 0.06, h - 0.02)], g["timber"], 5)
+    flag = k.box(x - 0.055, h - 0.2, x + 0.055, h - 0.02, amp=0.4)
+    k.put(flag, otter, otter_dk, otter_lt)
+    k.fill(clip(k.box(x - 0.1, h - 0.17, x + 0.1, h - 0.15, amp=0), flag), g["stem"])
+    coin_emblem(k, x, h - 0.1, 0.05)
+
+  def pavilion(x, w, base, h, roof_h):
+    for px in [x - w + 0.03 + (2 * w - 0.06) * j / 3 for j in range(4)] if w > 0.22 else (x - w + 0.03, x + w - 0.03):
+      k.put(k.box(px - 0.02, base, px + 0.02, base + h, amp=0.4), wood, wood_dk, wood_lt)
+    k.put(k.box(x - w - 0.02, base + h - 0.01, x + w + 0.02, base + h + 0.035, amp=0.5), wood, wood_dk, wood_lt)
+    k.line([(x - w, base + h + 0.012), (x + w, base + h + 0.012)], gold, 4)  # gilt trim
+    roof = k.poly([(x - w - 0.06, base + h + 0.03), (x - w * 0.35, base + h + roof_h), (x + w * 0.35, base + h + roof_h),
+                   (x + w + 0.06, base + h + 0.03)], amp=1)
+    k.put(roof, otter, otter_dk, otter_lt)
+    k.fill(clip(k.lines([[(px, base + h), (px + 0.02, base + h + roof_h)] for px in
+                         [x - w + 0.06 * j for j in range(int(2 * w / 0.06) + 2)]], 10), roof), g["stem"])  # striped
+    k.line([(x - w * 0.35, base + h + roof_h), (x + w * 0.35, base + h + roof_h)], gold, 5)
+    return base + h + roof_h
+
+  k.put(k.oval(0.02, 0.05, 0.56, 0.06, amp=1.5, n=28), g["water"], g["water_dk"], g["water_lt"])
+  for x, w in ((-0.4, 0.05), (0.05, 0.07), (0.38, 0.05)):
+    k.line([(x - w, 0.04), (x + w, 0.04)], g["water_lt"], 3)
+  dw = hw + (0.12 if tier < 4 else 0.36)
+  for x in [-dw + 0.04 + (2 * dw - 0.08) * j / max(1, int(dw / 0.12)) for j in range(int(dw / 0.12) + 1)]:
+    k.put(k.box(x - 0.016, 0.03, x + 0.016, D, amp=0.4), g["timber"])  # pilings
+  deck = k.box(-dw, D - 0.04, dw, D + 0.005, amp=0.8)
+  k.put(deck, wood, wood_dk, wood_lt)
+  k.fill(clip(k.lines([[(x, D - 0.04), (x, D)] for x in [-dw + 0.05 * j for j in range(int(2 * dw / 0.05) + 1)]], 3), deck),
+         wood_dk)
+  if tier >= 4:  # central tower with a big gold coin, behind the hall
+    tw = 0.1
+    k.put(k.box(-tw, D, tw, 1.02, amp=0.8), wood, wood_dk, wood_lt)
+    k.fill(clip(k.lines([[(-tw, y), (tw, y)] for y in [D + 0.06 * j for j in range(16)]], 3),
+                k.box(-tw, D, tw, 1.02, amp=0)), wood_dk)
+    k.put(k.oval(0, 0.91, 0.07, 0.07, amp=0.4), gold, bm.shade_of(gold, 0.78), lighten(gold, 0.3))
+    k.put(k.oval(0, 0.91, 0.025, 0.025, amp=0), bm.shade_of(gold, 0.7))
+    k.put(k.poly([(-tw - 0.04, 1.01), (0, 1.18), (tw + 0.04, 1.01)], amp=1), otter, otter_dk, otter_lt)
+    pennant(k, 0, 1.17, 1.29, otter)
+    for side in (-1, 1):  # wing pavilions
+      pavilion(side * 0.5, 0.15, D, 0.3, 0.14)
+  if tier >= 3:  # upper floor with a balcony and the wide price board
+    up = k.box(-hw, D, hw, D + 0.5, amp=0.8)
+    k.put(up, wood, wood_dk, wood_lt)
+    k.fill(clip(k.lines([[(x, D), (x, D + 0.5)] for x in [-hw + 0.05 * j for j in range(int(2 * hw / 0.05) + 1)]], 3),
+                up), wood_dk)
+    top = pavilion(0, hw, D + 0.28, 0.22, 0.17)
+    chalkboard(k, -hw + 0.04, D + 0.33, hw - 0.04, D + 0.47, "ticks")
+    k.put(k.box(-hw - 0.04, D + 0.26, hw + 0.04, D + 0.29, amp=0.5), wood, wood_dk, wood_lt)  # balcony
+    for x in [-hw - 0.02 + 0.04 * j for j in range(int((2 * hw + 0.04) / 0.04) + 1)]:
+      k.line([(x, D + 0.29), (x, D + 0.32)], wood_dk, 3)
+    k.line([(-hw - 0.04, D + 0.325), (hw + 0.04, D + 0.325)], gold, 5)
+    base_h = 0.26
+  else:
+    top = pavilion(0, hw, D, 0.3 if tier == 1 else 0.36, 0.16 if tier == 1 else 0.2)
+    base_h = 0.3 if tier == 1 else 0.36
+  k.put(k.box(-hw + 0.02, D, hw - 0.02, D + base_h * 0.4, amp=0.5), wood, wood_dk, wood_lt)  # counter
+  k.line([(-hw + 0.02, D + base_h * 0.4), (hw - 0.02, D + base_h * 0.4)], gold, 4)
+  for j, x in enumerate((-hw * 0.5, 0, hw * 0.5)):  # coin stacks on the counter
+    for n in range(2 + j % 2):
+      k.put(k.box(x - 0.022, D + base_h * 0.4 + n * 0.014, x + 0.022, D + base_h * 0.4 + (n + 1) * 0.014, amp=0.2), gold)
+  if tier == 2:  # board hung on the back wall between the posts
+    chalkboard(k, -0.14, D + base_h * 0.5, 0.14, D + base_h * 0.92, "wage")
+  if tier < 4:  # easel board at the deck's end
+    ex = dw + 0.02
+    for dx in (-0.05, 0.05):
+      k.pole([(ex + dx, D - 0.03), (ex + dx * 0.4, D + 0.3)], g["timber"])
+    chalkboard(k, ex - 0.08, D + 0.1, ex + 0.08, D + 0.28, "bars")
+  else:  # the wings carry boards instead
+    for side, kind in ((-1, "bars"), (1, "wage")):
+      chalkboard(k, side * 0.5 - 0.1, D + 0.12, side * 0.5 + 0.1, D + 0.28, kind)
+  if tier == 1:
+    mast(-dw + 0.04, D + 0.5)
+  else:
+    mast(-dw + 0.04, top + (0.0 if tier < 4 else -0.3))
+  if tier >= 3:
+    mast(dw - 0.1 if tier == 3 else dw - 0.04, top - (0.05 if tier == 3 else 0.3))
+  if tier >= 2:  # moored rowboat
+    bx = -dw + 0.1  # tied alongside, overlapping the deck so it stays one cut-out
+    hull = k.poly([(bx - 0.14, 0.09), (bx + 0.12, 0.09), (bx + 0.08, 0.02), (bx - 0.1, 0.02)], amp=0.8)
+    k.put(hull, wood, wood_dk, wood_lt)
+    k.line([(bx - 0.12, 0.075), (bx + 0.1, 0.075)], otter, 5)
+  if tier == 3:
+    crate(k, dw - 0.1, D, dw - 0.01, D + 0.08)
+
+
+# ---------------------------------------------------------------- services
+def wheel(k, x, y, r):
+  """Side-on cart wheel: timber rim, plank face, six spokes, cut-wood hub."""
+  g = bm.G
+  rim = k.oval(x, y, r, r, amp=0.6)
+  k.put(rim, g["timber"])
+  face = k.oval(x, y, r * 0.78, r * 0.78, amp=0.4)
+  k.fill(face, g["palisade_dk"])
+  k.fill(clip(k.lines([[(x + math.cos(a) * r, y + math.sin(a) * r), (x - math.cos(a) * r, y - math.sin(a) * r)]
+                       for a in (math.pi * i / 3 for i in range(3))], 6), face), g["timber"])
+  k.put(k.oval(x, y, r * 0.22, r * 0.22, amp=0.3), g["stump_top"])
+
+
+def paint_caravan(canvas, ax, ay, s, rng, tier):
+  """Guild caravan stop: a covered wagon parked with its shaft down, a
+  waymark post with arrow boards pointing off to the other stops, a lantern,
+  sacks and a barrel by the post."""
+  g, k = bm.G, Sketch(canvas, ax, ay, s, rng, 1.6, 1.1)
+  teal = g["banner"]
+  px = -0.56  # waymark post, with boards pointing both ways
+  k.pole([(px, 0), (px, 0.66)])
+  for y, side, c in ((0.6, 1, g["palisade"]), (0.5, -1, g["stump_top"]), (0.4, 1, g["palisade"])):
+    x0, x1 = px - side * 0.05, px + side * 0.17
+    k.put(k.poly([(x0, y - 0.035), (x1, y - 0.035), (x1 + side * 0.04, y), (x1, y + 0.035), (x0, y + 0.035)],
+                 amp=0.5, sub=1), c, bm.shade_of(c, 0.78))
+  pennant(k, px, 0.66, 0.78, teal)
+  bed = k.box(-0.44, 0.15, 0.24, 0.27, amp=0.8)
+  k.put(bed, g["palisade"], g["palisade_dk"])
+  k.fill(clip(k.lines([[(-0.5, 0.21), (0.3, 0.21)]], 3), bed), g["palisade_dk"])
+  for x in (-0.33, -0.1, 0.13):
+    k.line([(x, 0.16), (x, 0.26)], g["palisade_dk"], 3)
+  hood = k.poly([(-0.42, 0.27), (-0.45, 0.4), (-0.4, 0.52), (-0.28, 0.58), (-0.1, 0.6), (0.08, 0.58), (0.18, 0.52),
+                 (0.23, 0.4), (0.21, 0.27)], amp=1.5)
+  k.put(hood, g["stem"], bm.shade_of(g["stem"], 0.85), lighten(g["stem"], 0.4))
+  k.fill(clip(k.lines([[(x, 0.25), (x * 0.95, 0.62)] for x in (-0.27, -0.1, 0.07)], 4), hood),
+         bm.shade_of(g["stem"], 0.82))  # hoops showing through the canvas
+  k.fill(clip(k.box(-0.5, 0.36, 0.3, 0.42, amp=0.5), hood), teal)  # Guild stripe
+  k.put(k.oval(-0.405, 0.41, 0.035, 0.09, amp=0.5), g["lm_cave"])  # puckered back opening
+  for x in (-0.3, 0.1):
+    wheel(k, x, 0.13, 0.13)
+  k.pole([(0.22, 0.2), (0.48, 0.02)], g["palisade"])  # shaft resting on the ground
+  k.put(k.oval(0.5, 0.015, 0.03, 0.02, amp=0.3), g["rock_lt"], g["rock_dk"])
+  k.pole([(0.22, 0.5), (0.3, 0.5), (0.3, 0.44)])  # lantern on a hook at the front hoop
+  k.put(k.box(0.27, 0.36, 0.33, 0.44, amp=0.4), g["timber"])
+  glow(k, 0.3, 0.4, 0.02, g["window"], halo=2.4, alpha=0.3)
+  loot_sack(k, -0.4)
+  bm.paint_barrel(canvas, *k.at(-0.66, 0), s * 0.3, rng)
+
+
+def paint_beehive(canvas, ax, ay, s, rng, tier):
+  """Apiary node: two coiled straw skeps on a plank bench, honey running from
+  the big one's door, a honey pot with a dipper, wildflowers."""
+  g, k = bm.G, Sketch(canvas, ax, ay, s, rng, 1.3, 1.2)
+  honey, honey_dk = g["honey"], g["honey_dk"]
+
+  def skep(x, y, rx, ry):
+    m = k.oval(x, y, rx, ry, amp=1.5, a1=math.pi, n=18)
+    m = ImageChops.lighter(m, k.box(x - rx, y - 0.005, x + rx, y + 0.03, amp=1))
+    k.put(m, g["hay"], g["hay_dk"], lighten(g["hay"], 0.3))
+    n = int(ry / 0.055)
+    k.fill(clip(k.lines([[(x - rx, y + ry * (i + 1) / (n + 1)), (x + rx, y + ry * (i + 1) / (n + 1))]
+                         for i in range(n)], 4), m), g["hay_dk"])
+    k.put(k.oval(x, y + ry, rx * 0.22, ry * 0.12, amp=0.4), g["hay"], g["hay_dk"])  # knot on top
+    return m
+
+  for x in (-0.28, 0.28):  # bench legs
+    k.put(k.box(x - 0.025, 0, x + 0.025, 0.12, amp=0.5), g["timber"])
+  k.put(k.box(-0.36, 0.11, 0.36, 0.16, amp=0.6), g["palisade"], g["palisade_dk"])
+  skep(-0.17, 0.16, 0.14, 0.24)
+  skep(0.08, 0.16, 0.2, 0.36)
+  k.put(k.arch(0.04, 0.12, 0.16, 0.22), g["lm_cave"])
+  ooze = k.poly([(0.0, 0.17), (0.17, 0.17), (0.15, 0.14), (0.125, 0.145), (0.12, 0.125), (0.1, 0.12), (0.09, 0.14),
+                 (0.03, 0.14)], amp=0.4, sub=2)  # honey over the sill and down the bench edge
+  k.put(ooze, honey, honey_dk, lighten(honey, 0.35))
+  k.put(k.oval(0.11, 0.075, 0.017, 0.022, amp=0.2), honey, None, lighten(honey, 0.35))
+  pot = k.poly([(0.32, 0), (0.46, 0), (0.49, 0.06), (0.46, 0.12), (0.43, 0.14), (0.35, 0.14), (0.32, 0.12),
+                (0.29, 0.06)], amp=0.8)
+  k.pole([(0.4, 0.1), (0.47, 0.25)], g["palisade"])  # dipper
+  k.put(pot, g["roofs"][2], bm.shade_of(g["roofs"][2], 0.78))
+  k.put(k.box(0.33, 0.13, 0.45, 0.16, amp=0.4), honey, honey_dk)
+  k.line([(0.3, 0.07), (0.48, 0.07)], bm.shade_of(g["roofs"][2], 0.7), 3)
+  bm.paint_flowers(canvas, *k.at(-0.44, 0), s * 0.2, rng)
+  bm.paint_flowers(canvas, *k.at(0.2, 0), s * 0.14, rng)
+
+
+def paint_shrine(canvas, ax, ay, s, rng, tier):
+  """Wayside shrine to no god in particular: a stone niche under a little
+  tiled roof, a faceless robed idol inside, a gold ring on the gable, candles
+  and an offering bowl on the steps, prayer ribbons on a post, a cairn."""
+  g, k = bm.G, Sketch(canvas, ax, ay, s, rng, 1.3, 1.4)
+  stone, stone_dk = g["stone"], g["stone_dk"]
+  roofc = g["roofs"][1]
+  k.pole([(-0.36, 0), (-0.36, 0.56)])  # ribbon post
+  k.line([(-0.43, 0.52), (-0.29, 0.52)], g["timber"], 6)
+  for x, c, ln in ((-0.41, g["blossom"], 0.16), (-0.36, g["banner"], 0.22), (-0.31, g["hay"], 0.13)):
+    k.put(k.poly([(x - 0.018, 0.52), (x + 0.018, 0.52), (x + 0.012, 0.52 - ln), (x, 0.52 - ln + 0.02),
+                  (x - 0.014, 0.52 - ln)], amp=0.4, sub=1), c, bm.shade_of(c, 0.8))
+  for w, y0, y1 in ((0.24, 0, 0.05), (0.19, 0.05, 0.1)):  # steps
+    k.put(k.box(-w, y0, w, y1, amp=0.6), stone, stone_dk)
+  body = k.box(-0.15, 0.1, 0.15, 0.6)
+  k.put(body, stone, stone_dk)
+  masonry(k, body, -0.15, 0.15, 0.1, 0.6, stone_dk)
+  k.put(k.arch(-0.11, 0.11, 0.2, 0.5, amp=0.6), g["marble"], g["marble_dk"])  # niche frame
+  niche = k.arch(-0.085, 0.085, 0.21, 0.48, amp=0.4)
+  k.put(niche, g["lm_cave"])
+  k.fill(clip(k.oval(0, 0.27, 0.07, 0.07, amp=0).point(lambda v: int(v * 0.3)), niche), g["flame_lt"])
+  idol = k.poly([(-0.05, 0.21), (0.05, 0.21), (0.035, 0.33), (0.03, 0.37), (0.035, 0.41), (0.0, 0.44),
+                 (-0.035, 0.41), (-0.03, 0.37), (-0.035, 0.33)], amp=0.4, sub=1)
+  k.put(idol, g["marble"], g["marble_dk"])
+  k.put(k.oval(0, 0.395, 0.018, 0.022, amp=0), g["lm_cave"])  # an empty hood, no face
+  k.put(k.box(-0.18, 0.58, 0.18, 0.62, amp=0.5), stone, stone_dk)
+  roof = k.poly([(-0.24, 0.6), (0, 0.8), (0.24, 0.6)], amp=1.5)
+  k.put(roof, roofc, bm.shade_of(roofc, 0.78))
+  k.fill(clip(k.lines([[(-0.3, y), (0.3, y)] for y in (0.65, 0.7, 0.75)], 3), roof), bm.shade_of(roofc, 0.78))
+  k.pole([(0, 0.79), (0, 0.85)])  # gold ring finial
+  k.put(k.oval(0, 0.9, 0.05, 0.05, amp=0.3), g["banner_lt"], bm.shade_of(g["banner_lt"], 0.8))
+  k.put(k.oval(0, 0.9, 0.024, 0.024, amp=0.2), roofc)
+  bowl = k.oval(-0.13, 0.1, 0.06, 0.04, amp=0.4, a0=math.pi, a1=2 * math.pi)
+  for x, c in ((-0.15, g["fruit"]), (-0.11, g["banner_lt"])):  # an apple and a coin left for it
+    k.put(k.oval(x, 0.105, 0.018, 0.018, amp=0.2), c)
+  k.put(bowl, g["roofs"][2], bm.shade_of(g["roofs"][2], 0.78))
+  for x, h in ((0.13, 0.08), (0.17, 0.05)):  # candles on the step
+    k.put(k.box(x - 0.014, 0.1, x + 0.014, 0.1 + h, amp=0.3), g["stem"], bm.shade_of(g["stem"], 0.85))
+    flame(k, x, 0.1 + h, 0.012)
+  for x, y, r in ((0.36, 0.03, 0.06), (0.37, 0.1, 0.045), (0.36, 0.16, 0.032)):  # cairn
+    k.put(k.oval(x, y, r, r * 0.6, amp=0.6), g["rock_lt"], g["rock_dk"])
+  for x, y in ((-0.12, 0.13), (-0.1, 0.56), (0.13, 0.4)):  # lichen
+    k.fill(clip(k.oval(x, y, 0.025, 0.014, amp=0.3), body), g["moss"])
+
+
+def paint_warehouse(canvas, ax, ay, s, rng, tier):
+  """Storehouse: a plank barn on a stone footing, big doors swung open on
+  stacked goods, a loft door with a hoist and a crate on the rope, a lean-to
+  shed, barrels and crates outside."""
+  g, k = bm.G, Sketch(canvas, ax, ay, s, rng, 1.5, 1.2)
+  roofc = g["roofs"][0]
+  shed = k.box(0.36, 0, 0.56, 0.28)  # lean-to
+  k.put(shed, g["palisade"], g["palisade_dk"])
+  k.fill(clip(k.lines([[(x, 0), (x, 0.3)] for x in (0.41, 0.46, 0.51)], 3), shed), g["palisade_dk"])
+  k.put(k.poly([(0.34, 0.42), (0.6, 0.27), (0.6, 0.24), (0.34, 0.33)], amp=1), roofc, bm.shade_of(roofc, 0.78))
+  k.put(k.box(-0.41, 0, 0.41, 0.07, amp=1), g["stone"], g["stone_dk"])
+  body = k.poly([(-0.38, 0.06), (0.38, 0.06), (0.38, 0.52), (0, 0.84), (-0.38, 0.52)], amp=1.2)
+  k.put(body, g["palisade"], g["palisade_dk"])
+  k.fill(clip(k.lines([[(x, 0.06), (x, 0.9)] for x in [-0.33 + 0.065 * i for i in range(11)]], 3), body),
+         g["palisade_dk"])
+  for x in (-0.38, 0.38):  # corner posts
+    k.put(k.box(x - 0.025, 0.06, x + 0.025, 0.53, amp=0.5), g["timber"])
+  roof = k.poly([(-0.48, 0.47), (0, 0.9), (0.48, 0.47), (0.42, 0.45), (0, 0.8), (-0.42, 0.45)], amp=1.5)
+  k.put(roof, roofc, bm.shade_of(roofc, 0.78))
+  door = k.box(-0.16, 0.06, 0.16, 0.38, amp=0.6)
+  k.put(door, g["lm_cave"])
+  for x0, x1, y0, y1 in ((-0.14, -0.04, 0.06, 0.14), (-0.03, 0.07, 0.06, 0.15), (-0.1, 0.0, 0.14, 0.22)):
+    k.put(clip(k.box(x0, y0, x1, y1, amp=0.5), door), g["palisade_dk"])  # goods stacked inside
+  k.put(clip(k.oval(0.11, 0.1, 0.045, 0.045, amp=0.6), door), g["hay_dk"])
+  for side in (-1, 1):  # door leaves swung back against the wall
+    x0, x1 = side * 0.17, side * 0.3
+    leaf = k.box(min(x0, x1), 0.07, max(x0, x1), 0.37, amp=0.6)
+    k.put(leaf, g["timber"], bm.shade_of(g["timber"], 0.75))
+    k.line([(x0, 0.1), (x1, 0.34)], bm.shade_of(g["timber"], 0.65), 4)
+    k.line([(x0, 0.22), (x1, 0.22)], bm.shade_of(g["timber"], 0.65), 4)
+  k.put(k.box(-0.06, 0.55, 0.06, 0.68, amp=0.5), g["lm_cave"])  # loft door
+  k.put(k.box(-0.025, 0.72, 0.025, 0.76, amp=0.3), g["timber"])
+  k.put(k.oval(0, 0.71, 0.025, 0.025, amp=0.2), g["rock_dk"])  # pulley
+  k.pole([(0, 0.7), (0, 0.5)], g["hay_dk"])
+  crate(k, -0.055, 0.42, 0.055, 0.5)
+  for x in (-0.24, 0.24):
+    k.window(x - 0.04, 0.42, x + 0.04, 0.5)
+  bm.paint_barrel(canvas, *k.at(-0.54, 0), s * 0.32, rng)
+  crate(k, 0.24, 0.0, 0.36, 0.11)
+  crate(k, 0.28, 0.11, 0.38, 0.2)
+  loot_sack(k, -0.3)
+
+
+def paint_bank(canvas, ax, ay, s, rng, tier):
+  """Counting house: a rusticated stone strongroom with arched upper windows,
+  slate roof and chimney, an iron-banded vault door up marble steps, barred
+  windows, a gold coin sign, coin sacks and a strongbox by the door."""
+  g, k = bm.G, Sketch(canvas, ax, ay, s, rng, 1.4, 1.3)
+  stone, stone_dk = g["stone"], g["stone_dk"]
+  iron, iron_dk = g["rock_dk"], bm.shade_of(g["rock_dk"], 0.7)
+  gold = g["banner_lt"]
+  k.put(k.box(0.18, 0.76, 0.26, 0.98), stone, stone_dk)  # chimney
+  k.put(k.box(0.165, 0.96, 0.275, 0.99, amp=0.4), stone, stone_dk)
+  k.put(k.poly([(-0.45, 0.62), (-0.3, 0.9), (0.3, 0.9), (0.45, 0.62)]), g["guild_roof"], g["guild_roof_dk"])
+  body = k.box(-0.38, 0, 0.38, 0.64)
+  k.put(body, stone, stone_dk)
+  segs = []  # big rusticated blocks below, finer courses above
+  for row, y in enumerate((0.08, 0.16, 0.24, 0.32)):
+    segs.append([(-0.4, y), (0.4, y)])
+    x = -0.38 + (0.06 if row % 2 else 0.12)
+    while x < 0.38:
+      segs.append([(x, y - 0.08), (x, y)])
+      x += 0.12
+  k.fill(clip(k.lines(segs, 4), body), stone_dk)
+  masonry(k, clip(k.box(-0.4, 0.36, 0.4, 0.66, amp=0), body), -0.38, 0.38, 0.36, 0.64, stone_dk, course=0.055)
+  k.put(k.box(-0.4, 0.33, 0.4, 0.37, amp=0.5), g["marble"], g["marble_dk"])  # string course
+  k.put(k.box(-0.42, 0.62, 0.42, 0.66, amp=0.5), g["marble"], g["marble_dk"])  # eave cornice
+  for x in (-0.25, -0.085, 0.085, 0.25):  # arched upper windows
+    k.put(k.arch(x - 0.05, x + 0.05, 0.41, 0.58, amp=0.5), g["marble"], g["marble_dk"])
+    k.window(x - 0.035, 0.42, x + 0.035, 0.565, arched=True)
+  for x in (-0.25, 0.25):  # barred ground-floor windows
+    k.put(k.box(x - 0.05, 0.13, x + 0.05, 0.26, amp=0.5), g["window"])
+    for f in (-0.025, 0, 0.025):
+      k.line([(x + f, 0.13), (x + f, 0.26)], iron, 5)
+    k.line([(x - 0.05, 0.195), (x + 0.05, 0.195)], iron, 4)
+  k.put(k.arch(-0.13, 0.13, 0.06, 0.32, amp=0.6), g["marble"], g["marble_dk"])  # vault door
+  vault = k.arch(-0.1, 0.1, 0.06, 0.3, amp=0.5)
+  k.put(vault, g["timber"])
+  k.fill(clip(k.lines([[(-0.12, y), (0.12, y)] for y in (0.1, 0.16, 0.22, 0.27)], 7), vault), iron)
+  for y in (0.1, 0.16, 0.22):
+    for x in (-0.07, 0.07):
+      k.put(k.oval(x, y, 0.01, 0.01, amp=0), iron_dk)
+  k.put(k.oval(0.0, 0.19, 0.04, 0.04, amp=0.3), gold, bm.shade_of(gold, 0.8))  # lock boss
+  k.put(k.oval(0.0, 0.19, 0.016, 0.016, amp=0), g["ink"])
+  for w, y0, y1 in ((0.2, -0.01, 0.025), (0.16, 0.025, 0.06)):  # marble steps
+    k.put(k.box(-w, y0, w, y1, amp=0.5), g["marble"], g["marble_dk"])
+  k.pole([(0.38, 0.5), (0.52, 0.5)], g["timber"])  # coin sign on a bracket
+  k.line([(0.39, 0.42), (0.47, 0.5)], g["timber"], 6)
+  for x in (0.455, 0.505):
+    k.line([(x, 0.5), (x, 0.46)], width=3)
+  k.put(k.oval(0.48, 0.38, 0.075, 0.075, amp=0.4), gold, bm.shade_of(gold, 0.78), lighten(gold, 0.3))
+  k.put(k.oval(0.48, 0.38, 0.05, 0.05, amp=0), bm.shade_of(gold, 0.85))
+  k.put(k.oval(0.48, 0.38, 0.018, 0.018, amp=0), g["ink"])
+  chest = k.box(-0.56, 0, -0.4, 0.09, amp=0.6)  # strongbox
+  k.put(chest, g["timber"], bm.shade_of(g["timber"], 0.75))
+  k.put(k.poly([(-0.56, 0.09), (-0.4, 0.09), (-0.41, 0.13), (-0.48, 0.145), (-0.55, 0.13)], amp=0.4, sub=1),
+        g["timber"])
+  for x in (-0.53, -0.43):
+    k.line([(x, 0.0), (x, 0.135)], iron, 5)
+  k.put(k.box(-0.495, 0.06, -0.465, 0.095, amp=0), gold)
+  loot_sack(k, 0.3)
 
 
 # name -> painter(canvas, ax, ay, width_px, rng, tier); (ax, ay) = base centre
@@ -1037,7 +1772,10 @@ PAINTERS = {"guildhall": bm.paint_guildhall, "building": paint_building, "cave":
             "herb": paint_herb, "tracks": paint_tracks, "marquise_keep": paint_marquise_keep,
             "eyrie_roost": paint_eyrie_roost, "otter_tradepost": paint_otter_tradepost,
             "knave_camp": paint_knave_camp, "alliance_burrow": paint_alliance_burrow,
-            "lizard_garden": paint_lizard_garden, "stone_tower": paint_stone_tower}
+            "lizard_garden": paint_lizard_garden, "guild_tower": paint_guild_tower, "caravan": paint_caravan,
+            "beehive": paint_beehive, "shrine": paint_shrine, "warehouse": paint_warehouse, "bank": paint_bank,
+            "eyrie_tower": paint_eyrie_tower, "marquise_barracks": paint_marquise_barracks,
+            "alliance_barracks": paint_alliance_barracks, "otter_barracks": paint_otter_barracks}
 
 
 def die(msg):

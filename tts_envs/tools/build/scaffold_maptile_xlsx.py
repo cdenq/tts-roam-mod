@@ -11,10 +11,12 @@ biomes, patterns or densities in asset_variables.csv just add rows.
   backs                 deck back image                   deck
   biome_descriptions    biome: effect + flavor            biome (= tile GMNotes)
   maptile_table         biome: what Render spawns         gmnotes
-  exploration           biome: what Explore rolls (draft) biome
+  explore_outcomes      Explore outcome: what it does     outcome (hand-filled)
+  exploration           biome: weight per outcome         biome (resource + poi columns)
   density               density stage                     density -> explorations
   weights               draw roll                         param -> pool ("a|b|b" = b twice as likely)
   tiers                 tier of a tiered biome            biome + tier -> gmnotes, tileset (hand-filled)
+  landmark_table        landmark kind: what Global attaches  gmnotes (hand-filled; sync_landmark_data.py)
 
 A tileset named on the tiers sheet that is not a biome (none today) keeps its
 deck-sheet image rows but gets no biome_descriptions / maptile_table /
@@ -46,13 +48,21 @@ SHEETS = {
   "backs": ["deck", "name", "image", "file", "url"],
   "biome_descriptions": ["biome", "deck", "name", "effect", "flavor"],
   # spawn-cell grammar (tools/spawn_cells.py); any spawnN / spawnmeepleN column may be added
+  # <spawncol>_gmnotes / _memo: stamped onto that slot's copy (blank = keep the object's own)
   "maptile_table": ["gmnotes", "spawnmeeple1", "spawnmeeple2", "spawn1", "spawn2", "spawngold", "spawnlandmark1",
-                    "spawnlandmark2", "spawnlandmark3", "notes"],
-  # draft -- see plans/auto_TODO.md "Explore action"; no sync reads it yet
-  "exploration": ["biome", "spawn1", "spawn2", "spawn3", "spawnmeeple1", "spawngold", "notes"],
+                    "spawnlandmark2", "spawnlandmark3", "notes",
+                    "spawnmeeple1_gmnotes", "spawnmeeple1_memo", "spawnmeeple2_gmnotes", "spawnmeeple2_memo",
+                    "spawnlandmark1_gmnotes", "spawnlandmark1_memo", "spawnlandmark2_gmnotes", "spawnlandmark2_memo",
+                    "spawnlandmark3_gmnotes", "spawnlandmark3_memo"],
+  "explore_outcomes": ["outcome", "category", "kind", "name", "landmarks", "gmnotes", "memo", "flavor", "notes"],
+  # one weight column per resource / poi row on explore_outcomes; add a column when an outcome is added
+  "exploration": ["biome", "fishing", "mining", "forestry", "hunting", "herbalism", "resource_none",
+                  "camp", "cave", "caravan", "beehive", "shrine", "warehouse", "bank", "poi_none", "notes"],
   "density": ["density", "explorations", "notes"],
   "weights": ["param", "pool", "notes"],
   "tiers": ["biome", "tier", "gmnotes", "tileset", "notes"],
+  # gmnotes = a landmark kind; actions = "a|b", keys of LANDMARK_ACTIONS in src/global.lua
+  "landmark_table": ["gmnotes", "actions", "notes"],
 }
 # Display names that .title() would get wrong.
 BIOME_NAMES = {
@@ -66,7 +76,7 @@ BIOME_NAMES = {
 HEADER_FONT = Font(bold=True, color="FFFFFF")
 HEADER_FILL = PatternFill("solid", fgColor="3B2B20")
 GUILDHALL = "guildhall"  # starter tile: kept out of the Draw pools, rolled from guildhall:* instead
-WIDTHS = {"url": 60, "effect": 45, "flavor": 90, "file": 42, "image": 30, "pool": 70, "notes": 50}
+WIDTHS = {"landmarks": 40, "url": 60, "effect": 45, "flavor": 90, "file": 42, "image": 30, "pool": 70, "notes": 50}
 
 
 def sheet(wb, title, headers):
@@ -159,6 +169,8 @@ def main():
                   for r in biomes]))
   report.append(("maptile_table", sheet(wb, "maptile_table", SHEETS["maptile_table"]), "gmnotes",
                  [{"gmnotes": r["name"]} for r in biomes]))
+  sheet(wb, "explore_outcomes", SHEETS["explore_outcomes"])
+  sheet(wb, "landmark_table", SHEETS["landmark_table"])
   report.append(("exploration", sheet(wb, "exploration", SHEETS["exploration"]), "biome",
                  [{"biome": r["name"]} for r in biomes]))
   densities = sorted({d for r in regions for d in r["densities"]})

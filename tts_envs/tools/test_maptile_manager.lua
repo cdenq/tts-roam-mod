@@ -28,6 +28,8 @@ local function newObject(fields)
   function o.getName() return o.Nickname or "" end
   function o.isDestroyed() return false end
   function o.setLock() end
+  function o.getPosition() return {x = 10, y = 1, z = 20} end
+  function o.getRotation() return {x = 0, y = 90, z = 0} end
   return o
 end
 
@@ -58,6 +60,12 @@ local tagged = {}
 function getObjectsWithTag() return tagged end
 local globalCalls = {}
 Global = {call = function(fn, args) table.insert(globalCalls, {fn = fn, args = args}) end}
+-- Wait.time is collected, not run: a test fires a timer by hand
+local timers, nextTimer = {}, 0
+Wait = {time = function(fn) nextTimer = nextTimer + 1; timers[nextTimer] = fn; return nextTimer end,
+        stop = function(id) timers[id] = nil end}
+local bags = {}
+function getObjectFromGUID(g) return bags[g] end
 
 dofile(path)
 -- every combination gets a fake URL, as if the sheet were filled
@@ -250,9 +258,27 @@ check(t.tooltip == false and t.buttons[3].font_color[1] > 0.3, "? again turns it
 check(takes == 1, "template taken out once")
 
 print("== tile buttons ==")
+local forestExplore = MAPTILE.exploration.forest
+MAPTILE.exploration.forest = {resource = {{"resource_none", 1}}}
 tileExplore(t, "Red")
-check(t.memo == "d=2|explore=1|rendered=0" and t.buttons[1].label == "Explore: 1", "explore decrements memo + label")
-tileExplore(t, "Red"); tileExplore(t, "Red")
+check(t.memo == "d=2|explore=2|rendered=0", "Explore alone spends nothing")
+check(#t.buttons == 6 and t.buttons[1].label == "Wander" and t.buttons[2].label == "Resources"
+      and t.buttons[3].label == "Points of interest" and t.buttons[4].label == "Experiences",
+      "Explore swaps for the four choices")
+check(t.buttons[1].tooltip:find("Randomly picks") and t.buttons[4].tooltip:find("Draw the next event card"),
+      "choices carry their tooltips")
+timers[nextTimer]()
+check(t.buttons[1].label == "Explore: 2" and t.memo == "d=2|explore=2|rendered=0", "untouched choices time out back to Explore")
+tileExplore(t, "Red")
+local first = nextTimer
+tileExplore(t, "Red")
+check(timers[first] == nil and timers[nextTimer] ~= nil, "re-opening replaces the old timeout")
+exploreResources(t, "Red")
+check(t.memo == "d=2|explore=1|rendered=0" and t.buttons[1].label == "Explore: 1", "a choice spends one explore, Explore returns")
+check(messages[#messages]:find("^RedPlayer searches the Forest for resources %(1 left%): "), "choice announces itself")
+check(timers[nextTimer] == nil, "picking a choice cancels the timeout")
+tileExplore(t, "Red"); exploreResources(t, "Red")
+tileExplore(t, "Red")
 check(t.memo:find("explore=0") and messages[#messages]:find("Nothing left"), "explore stops at 0")
 check(#t.buttons == 2 and t.buttons[1].label == "Render", "Explore button is gone at 0")
 MAPTILE.table.forest = {meeple = {{"Cave"}}, gold = {1, 3}}
@@ -264,6 +290,83 @@ check(call and call.fn == "spawnFromFor" and call.args.guid == t.guid and call.a
 tileRender(t)
 check(t.memo:find("rendered=1") and #globalCalls == 1, "second render does nothing")
 MAPTILE.table.forest = nil
+MAPTILE.exploration.forest = forestExplore
+
+print("== explore outcomes ==")
+check(#MAPTILE.exploration.forest.resource > 0 and #MAPTILE.exploration.forest.poi > 0, "sheet weights inlined per category")
+check(MAPTILE.outcomes.event.category == "event" and #MAPTILE.outcomes.event.flavor > 0, "Experiences flavor inlined")
+for _, o in pairs(MAPTILE.outcomes) do
+  if o.category ~= "event" then check(#o.flavor > 0, "every outcome has flavor: " .. o.name) end
+end
+local n = 0
+local function freshTile()
+  n = n + 1
+  local tile = newObject({Nickname = "Forest", GMNotes = "forest", memo = "d=1|explore=1|rendered=0"})
+  function tile.getGUID() return "x" .. n end
+  return tile
+end
+local function choose(fn, category, outcome)
+  MAPTILE.exploration.forest = {[category] = {{outcome, 1}}}
+  local tile = freshTile()
+  tileExplore(tile, "Red")
+  fn(tile, "Red")
+  return tile
+end
+local calls = #globalCalls
+choose(exploreResources, "resource", "fishing")
+local c = globalCalls[#globalCalls]
+check(#globalCalls == calls + 1 and c.fn == "spawnCopyFromBagFor" and c.args.category == "landmark"
+      and c.args.name == "Fishing Node", "Resources spawns the node from the landmark bag")
+check(c.args.position[1] == 10 and c.args.position[3] == 20 and c.args.position[2] > 1, "node drops on the tile's centre")
+check(c.args.stamp.memo == "biome=forest" and c.args.stamp.gm_notes == "", "memo stamped with {biome} filled; GMNotes left to the landmark")
+check(messages[#messages]:find("for resources %(0 left%): .+ %(Fishing Node%)$"), "announces flavor + the landmark")
+choose(explorePoi, "poi", "cave")
+c = globalCalls[#globalCalls]
+check(c.args.name == "Hollow" or c.args.name == "Burrow" or c.args.name == "Cave" or c.args.name == "Warren",
+      "Points of interest spawns from the outcome's landmark pool")
+check(messages[#messages]:find("for points of interest %(0 left%): "), "POI announces itself")
+calls = #globalCalls
+local tile = choose(explorePoi, "poi", "poi_none")
+check(#globalCalls == calls and tile.memo:find("explore=0") and not messages[#messages]:find("%)$"), "none: spends the explore, spawns nothing, flavor only")
+MAPTILE.exploration.forest = {resource = {{"fishing", 1}}}
+local bare = freshTile(); tileExplore(bare, "Red"); explorePoi(bare, "Red")
+check(messages[#messages]:find("no poi weights for forest"), "a category without weights says so")
+
+local taken = {}
+local woodBag = {getObjects = function() return {{guid = "ev1"}} end,
+                 takeObject = function(p) table.insert(taken, p) end, isDestroyed = function() return false end}
+bags[EVENT_BAGS.woodland] = woodBag
+local ex = freshTile(); tileExplore(ex, "Red"); exploreExperiences(ex, "Red")
+check(#taken == 1 and taken[1].guid == nil and taken[1].index == nil, "Experiences takes the TOP card of the region bag")
+check(taken[1].position[1] == 10 and taken[1].position[3] == 20, "event card lands on the tile's centre")
+check(taken[1].rotation[1] == 0 and taken[1].rotation[2] == 90 and taken[1].rotation[3] == 0, "face up, turned with the tile")
+check(messages[#messages]:find("looks for the locals in the Forest %(0 left%): "), "Experiences announces itself")
+woodBag.getObjects = function() return {} end
+ex = freshTile(); tileExplore(ex, "Red"); exploreExperiences(ex, "Red")
+check(#taken == 1 and messages[#messages]:find("event bag is empty"), "empty event bag says so")
+bags[EVENT_BAGS.woodland] = nil
+ex = freshTile(); tileExplore(ex, "Red"); exploreExperiences(ex, "Red")
+check(messages[#messages]:find("no event bag for woodland"), "missing event bag says so")
+
+local heads = {resource = 0, poi = 0, event = 0}
+MAPTILE.exploration.forest = {resource = {{"resource_none", 1}}, poi = {{"poi_none", 1}}}
+for _ = 1, 600 do
+  local w = freshTile(); tileExplore(w, "Red"); exploreWander(w, "Red")
+  local m = messages[#messages]
+  if m:find("for resources") then heads.resource = heads.resource + 1
+  elseif m:find("for points of interest") then heads.poi = heads.poi + 1
+  elseif m:find("looks for the locals") then heads.event = heads.event + 1 end
+end
+check(heads.resource > 120 and heads.poi > 120 and heads.event > 120, "Wander lands on all three, roughly evenly")
+
+calls = #globalCalls
+for _ = 1, 2000 do
+  MAPTILE.exploration.forest = {resource = {{"mining", 3}, {"resource_none", 1}}}
+  local tile = freshTile(); tileExplore(tile, "Red"); exploreResources(tile, "Red")
+end
+local mined = #globalCalls - calls
+check(mined > 1350 and mined < 1650, "weights set the odds (3:1 -> ~1500/2000, got " .. mined .. ")")
+MAPTILE.exploration.forest = forestExplore
 
 print("== draw random ==")
 local before = #spawned

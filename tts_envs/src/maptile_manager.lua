@@ -50,11 +50,18 @@ re-renders every Maptile from its GMNotes + memo.
 Render hands the biome's maptile_table spawn table to Global's spawnFrom, so
 landmarks, items and gold come out of the same bags as every other spawn and
 drop onto the tile's centre.
+
+Explore swaps itself for four choices (EXPLORE_CHOICES); picking one spends
+the explore. Resources / Points of interest roll the biome's weights for that
+category and clone the landmark onto the tile's centre, stamped with the
+outcome's GMNotes + memo. Experiences takes the top card of the region's
+EVENT_BAGS bag. Wander picks one of the three for you. Every outcome is
+announced with its flavor (explore_outcomes sheet).
 ]]
 
 --[[ BEGIN GENERATED MAPTILE DATA -- do not edit ]]
 MAPTILE = {decks = {}, biomes = {}, patterns = {}, orientations = {}, densities = {},
-           images = {}, explore = {}, weights = {}, table = {}}
+           images = {}, explore = {}, weights = {}, table = {}, outcomes = {}, exploration = {}}
 --[[ END GENERATED MAPTILE DATA ]]
 
 TEMPLATE_GM = "maptile_template"
@@ -111,6 +118,32 @@ PANEL = {
   TEXT_COLOR = {1, 1, 1},
 }
 
+--[[ Explore: one bag of single event cards per region deck (never decked, so
+each can be searched). DROP = world units above the tile's centre. ]]
+EVENT_BAGS = {woodland = "570544", waterside = "524231", opencountry = "3546e2", settlement = "8bce91",
+              scarred = "f608d7"}
+EXPLORE = {DROP = 1.5, CHOICE_TIMEOUT = 5}  -- seconds the four choices wait before Explore returns
+
+EXPLORE_CHOICES = {
+  {fn = "exploreWander", label = "Wander", tooltip = "Randomly picks one of the other three options."},
+  {fn = "exploreResources", label = "Resources",
+   tooltip = "Focus on finding resources. Chance to find a Mining, Fishing, Herbalism, Hunting, or Forestry node "
+             .. "for this biome."},
+  {fn = "explorePoi", label = "Points of interest",
+   tooltip = "Focus on finding points of interests. Chance to find various Landmarks with long-lasting impact on "
+             .. "the map for this biome."},
+  {fn = "exploreExperiences", label = "Experiences",
+   tooltip = "Focus on interacting with the local people (though no guarantee you'll find them). Draw the next "
+             .. "event card for this region."},
+}
+
+-- How each choice is announced: player, tile name, explores left.
+EXPLORE_HEADS = {
+  resource = "%s searches the %s for resources (%d left): ",
+  poi = "%s searches the %s for points of interest (%d left): ",
+  event = "%s looks for the locals in the %s (%d left): ",
+}
+
 -- Where a drawn tile lands, in the bag's local units, and how it is turned.
 -- z = 180 lands it face down: the deck back shows until someone flips it.
 SPAWN = {OFFSET = {-5.5, 1, 0}, ROTATION = {0, 180, 180}}
@@ -122,6 +155,9 @@ TILE_UI = {
   EXPLORE_POS = {0, 0, -0.8},
   RENDER_POS = {0, 0, 0},
   HELP_POS = {0.8, 0, 0.8},
+  -- the four explore choices, 2x2 where the Explore button was: Wander, Resources, Points of interest, Experiences
+  CHOICE_POS = {{-0.5, 0, -0.95}, {0.5, 0, -0.95}, {-0.5, 0, -0.65}, {0.5, 0, -0.65}},
+  CHOICE_W = 640,
   BTN_W = 520, BTN_H = 160, BTN_FONT = 95, BTN_SCALE = 0.5,
   HELP_W = 160,
   HELP_COLOR = {0.9, 0.87, 0.78},
@@ -144,6 +180,7 @@ ADVANCED = false          -- config grid shown; saved
 local configButton = {}   -- key -> button index on self; empty while the grid is hidden
 local forceButton = {}    -- "toggle" / "N" / "E" / "S" / "W" -> button index; empty while hidden
 local templateData = nil  -- cached getData() of the template; refreshed each load
+local choosing = {}       -- tile GUID -> Wait id of its timeout while the explore choices show; not saved
 local renderTile          -- defined with the tile buttons; spawning needs it first
 
 -- ---------------------------------------------------------------- helpers
@@ -630,7 +667,11 @@ renderTile = function(obj)
   if isGone(obj) or MAPTILE.biomes[obj.getGMNotes()] == nil then return end
   obj.clearButtons()
   local m = parseMemo(obj.memo)
-  if m.explore > 0 then
+  if m.explore > 0 and choosing[obj.getGUID()] then
+    for i, c in ipairs(EXPLORE_CHOICES) do
+      tileButton(obj, c.fn, c.label, c.tooltip, TILE_UI.CHOICE_POS[i], TILE_UI.EXPLORE_COLOR, TILE_UI.CHOICE_W)
+    end
+  elseif m.explore > 0 then
     tileButton(obj, "tileExplore", "Explore: " .. m.explore, "Explore this tile (" .. m.explore .. " left)",
                TILE_UI.EXPLORE_POS, TILE_UI.EXPLORE_COLOR)
   end
@@ -643,10 +684,80 @@ renderTile = function(obj)
              obj.tooltip and TILE_UI.HELP_ON_TEXT or TILE_UI.HELP_OFF_TEXT)
 end
 
--- TODO(plans/auto_TODO.md "Maptile Explore action"): the exploration itself.
-local function exploreEffect(obj, color, left)
-  broadcastToAll(Player[color].steam_name .. " explores the " .. obj.getName() .. " (" .. left .. " left).",
-                 {0.7, 0.9, 1})
+-- {{outcome, weight}, ...} -> one outcome id, or nil when every weight is 0.
+local function rollWeighted(list)
+  local total = 0
+  for _, e in ipairs(list or {}) do total = total + e[2] end
+  if total <= 0 then return nil end
+  local r = math.random(total)
+  for _, e in ipairs(list) do
+    r = r - e[2]
+    if r <= 0 then return e[1] end
+  end
+end
+
+-- Just above the tile's centre, so what lands drops flat onto it.
+local function abovePosition(obj)
+  local p = obj.getPosition()
+  return {p.x, p.y + EXPLORE.DROP, p.z}
+end
+
+--[[ The top card of the tile's region bag, face up on the tile. TAKEN, not
+cloned: an event drawn is gone from its bag until someone puts it back. No
+shuffle, so anything that sets the bag's order is respected. Global renders the
+card as it leaves the bag (onObjectLeaveContainer). ]]
+local function drawEvent(obj, deck)
+  local bag = getObjectFromGUID(EVENT_BAGS[deck] or "")
+  if isGone(bag) then return "no event bag for " .. deck end
+  if #bag.getObjects() == 0 then return "the " .. deck .. " event bag is empty" end
+  bag.takeObject({position = abovePosition(obj), rotation = {0, obj.getRotation().y, 0}, smooth = false})
+  return nil
+end
+
+-- One line of an outcome's flavor, or its bare name when none is written.
+local function flavorOf(outcome)
+  if #outcome.flavor > 0 then return pick(outcome.flavor) end
+  return outcome.name .. "."
+end
+
+-- "{biome}" in a stamp becomes the tile's biome, so a node knows where it was found.
+local function fillStamp(text, biome)
+  return (string.gsub(text or "", "{biome}", biome))
+end
+
+local function exploreHead(obj, color, category, left)
+  return string.format(EXPLORE_HEADS[category], Player[color].steam_name, obj.getName(), left)
+end
+
+--[[ Resources / Points of interest: roll the biome's weights for the category,
+clone the landmark (if any) onto the tile through Global, stamped with the
+outcome's GMNotes + memo, and announce the flavor. ]]
+local function findLandmark(obj, color, left, category)
+  local biome = obj.getGMNotes()
+  local head = exploreHead(obj, color, category, left)
+  local id = rollWeighted((MAPTILE.exploration[biome] or {})[category])
+  local outcome = MAPTILE.outcomes[id or ""]
+  if outcome == nil then
+    broadcastToAll(head .. "nothing to find (no " .. category .. " weights for " .. biome .. ").", {1, 0.6, 0.3})
+    return
+  end
+  local said = flavorOf(outcome)
+  if outcome.kind == "landmark" then
+    local landmark = pick(outcome.landmarks)
+    Global.call("spawnCopyFromBagFor", {
+      category = "landmark", name = landmark, position = abovePosition(obj),
+      stamp = {gm_notes = fillStamp(outcome.gmnotes, biome), memo = fillStamp(outcome.memo, biome)}
+    })
+    said = said .. " (" .. landmark .. ")"
+  end
+  broadcastToAll(head .. said, {0.7, 0.9, 1})
+end
+
+local function findExperience(obj, color, left)
+  local said = MAPTILE.outcomes.event and flavorOf(MAPTILE.outcomes.event) or "An event."
+  local err = drawEvent(obj, MAPTILE.biomes[obj.getGMNotes()].deck)
+  if err then said = said .. " (" .. err .. ")" end
+  broadcastToAll(exploreHead(obj, color, "event", left) .. said, {0.7, 0.9, 1})
 end
 
 --[[ Global owns the spawn pipeline (bags, unique takes, gold). Global.call
@@ -660,16 +771,62 @@ local function renderEffect(obj)
   Global.call("spawnFromFor", {guid = obj.getGUID(), spawn = spawn})
 end
 
+-- Close a tile's choices: stop its timeout so a late tick cannot re-render a newer menu.
+local function closeChoices(guid)
+  if choosing[guid] ~= nil then Wait.stop(choosing[guid]) end
+  choosing[guid] = nil
+end
+
+--[[ Explore: swap the button for the four choices. Nothing is spent until one
+is picked; left alone for CHOICE_TIMEOUT seconds, Explore comes back. ]]
 function tileExplore(obj, color)
+  if parseMemo(obj.memo).explore <= 0 then
+    broadcastToColor("Nothing left to explore here.", color, {1, 0.6, 0.3})
+    return
+  end
+  local guid = obj.getGUID()
+  closeChoices(guid)
+  choosing[guid] = Wait.time(function()
+    choosing[guid] = nil
+    renderTile(obj)
+  end, EXPLORE.CHOICE_TIMEOUT)
+  renderTile(obj)
+end
+
+-- Picking a choice spends one explore and puts the Explore button back. nil = none left.
+local function spendExplore(obj, color)
+  closeChoices(obj.getGUID())
   local m = parseMemo(obj.memo)
   if m.explore <= 0 then
     broadcastToColor("Nothing left to explore here.", color, {1, 0.6, 0.3})
-    return
+    renderTile(obj)
+    return nil
   end
   m.explore = m.explore - 1
   obj.memo = encodeMemo(m)
   renderTile(obj)
-  exploreEffect(obj, color, m.explore)
+  return m.explore
+end
+
+function exploreResources(obj, color)
+  local left = spendExplore(obj, color)
+  if left then findLandmark(obj, color, left, "resource") end
+end
+
+function explorePoi(obj, color)
+  local left = spendExplore(obj, color)
+  if left then findLandmark(obj, color, left, "poi") end
+end
+
+function exploreExperiences(obj, color)
+  local left = spendExplore(obj, color)
+  if left then findExperience(obj, color, left) end
+end
+
+-- No announcement of its own: the choice it lands on announces itself.
+function exploreWander(obj, color, alt)
+  local choices = {exploreResources, explorePoi, exploreExperiences}
+  choices[math.random(#choices)](obj, color, alt)
 end
 
 -- obj.tooltip is saved with the object, so the state needs no memo field.
