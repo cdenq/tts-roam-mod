@@ -801,7 +801,8 @@ for _, setName in ipairs(CARD_SET_ORDER) do
     local node = REAL_DATA[id]
     if not node then
       missing = missing + 1
-    elseif #node.options == 0 then
+    elseif #node.options == 0 and setName ~= "generic" then
+      -- generic (art-only) cards have no options by design
       optionless = optionless + 1
     end
   end
@@ -809,7 +810,7 @@ end
 check(total > 0, "the index names some cards ("..total.." found)")
 check(dupes == 0, "no id appears in two sets")
 check(missing == 0, "every card id exists in the data bank")
-check(optionless == 0, "every card id is an entry node (has options)")
+check(optionless == 0, "every non-generic card id is an entry node (has options)")
 
 -- An outcome node must never get a card: it has no options, so Global would
 -- render a dead end. Conversely every entry node should be somebody's card.

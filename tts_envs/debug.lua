@@ -2537,6 +2537,141 @@ EVENT_DATA = {
     effect = "",
     options = {},
   },
+  ["CB1"] = {
+    title = "Spell 0",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell0_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell0_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB2"] = {
+    title = "Spell 1",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell1_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell1_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB3"] = {
+    title = "Spell 2",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell2_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell2_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB4"] = {
+    title = "Spell 3",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell3_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/spell3_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB5"] = {
+    title = "Origin",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/origin_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/origin_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB6"] = {
+    title = "Side Quest",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_side_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_side_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB7"] = {
+    title = "Minor Quest",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_minor_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_minor_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB8"] = {
+    title = "Major Quest",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_major_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_major_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB9"] = {
+    title = "Story Quest",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_story_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/quest_story_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB10"] = {
+    title = "Passive",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/passive_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/passive_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB11"] = {
+    title = "Settlement",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/settlement_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/settlement_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB12"] = {
+    title = "Woodland",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/woodland_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/woodland_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB13"] = {
+    title = "Open Country",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/opencountry_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/opencountry_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB14"] = {
+    title = "Waterside",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/waterside_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/waterside_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
+  ["CB15"] = {
+    title = "Scarred",
+    template = "generic_card_template",
+    face = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/scarred_front.png",
+    back = "https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/scarred_back.png",
+    flavor = "",
+    effect = "",
+    options = {},
+  },
 }
 
 -- Intro nodes that get a physical card, grouped by region (sheet order).
@@ -2546,10 +2681,11 @@ CARD_SETS = {
   ["opencountry"] = {"EV5", "EV16", "EV17", "EV20", "EV30", "EV33", "EV35", "EV37"},
   ["scarred"] = {"EV7", "EV13", "EV18", "EV24", "EV26", "EV27", "EV36"},
   ["settlement"] = {"EV10", "EV25", "EV32"},
+  ["generic"] = {"CB1", "CB2", "CB3", "CB4", "CB5", "CB6", "CB7", "CB8", "CB9", "CB10", "CB11", "CB12", "CB13", "CB14", "CB15"},
 }
 
 -- Region names in sheet order -- drives the importer's button grid.
-CARD_SET_ORDER = {"woodland", "waterside", "opencountry", "scarred", "settlement"}
+CARD_SET_ORDER = {"woodland", "waterside", "opencountry", "scarred", "settlement", "generic"}
 --[[ END GENERATED DATA ]]
 
 --[[ Branching event cards.
@@ -4167,9 +4303,10 @@ owned by different scripts". So the importer never reads EVENT_DATA or
 CARD_SETS directly -- it calls these, which flatten to plain strings.
 
 Format is one record per line, fields separated by \t:
-  <set>\t<node id>\t<template>\t<title>
+  <set>\t<node id>\t<template>\t<face url>\t<back url>\t<title>
 That is enough for the importer to build its buttons, pick each card's
-template (by GMNotes) AND name each clone, without a second call per card.
+template (by GMNotes), swap its art (empty url = keep the template's) AND name
+each clone, without a second call per card.
 Title goes last: the importer's pattern lets the last field hold anything.
 ]]
 function cardIndexText()
@@ -4179,7 +4316,9 @@ function cardIndexText()
       local node = EVENT_DATA[id]
       local title = (node and node.title ~= "" and node.title) or id
       local template = (node and node.template) or ""
-      table.insert(out, setName .. "\t" .. id .. "\t" .. template .. "\t" .. title)
+      local face = (node and node.face) or ""
+      local back = (node and node.back) or ""
+      table.insert(out, table.concat({setName, id, template, face, back, title}, "\t"))
     end
   end
 
@@ -4190,7 +4329,7 @@ function cardIndexText()
     local o = ORIGIN_DATA and ORIGIN_DATA[id]
     local title = (o and o.name ~= "" and o.name) or id
     local template = (o and o.template) or ""
-    table.insert(out, "origin\t" .. id .. "\t" .. template .. "\t" .. title)
+    table.insert(out, table.concat({"origin", id, template, "", "", title}, "\t"))
   end
 
   return table.concat(out, "\n")

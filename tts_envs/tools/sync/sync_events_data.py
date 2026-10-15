@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Convert scenarios.xlsx into the TTS Global script.
+"""Convert cards.xlsx into the TTS Global script.
 
 Three sheets, one scenario tree each:
   scenario_intro     the card: scenario_id (EV1), template, region, title,
-                     flavor
+                     flavor, face_url, back_url
   scenario_options   its buttons; `outcomes` lists outcome_keys, and a key
                      repeated in the list is rolled that much more often
   scenario_outcomes  where a button can land, keyed by scenario_id + outcome_key
+
+plus `generic`: art-only cards (id, template, set, title, description,
+face_url, back_url), read as more intros via intro_rows(); no options needed.
 
 The game still sees one flat EVENT_DATA keyed by node id: an intro is its
 scenario_id, an outcome is "<scenario_id>_<outcome_key>" (EV1_pay_through).
@@ -19,14 +22,14 @@ The data is inlined rather than require()d so the script runs no matter which
 Save and Play variant the editor uses. Never hand-edit the two outputs.
 Run: python tools/sync/sync_events_data.py
 """
-import os, sys
+import os, re, sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/: datasets, spawn_cells, lua_inline
 from spawn_cells import (SPAWN_CATEGORIES, read_spawn, referenced_names,
                          spawn_gives_anything)
-from datasets import (ROOT, SCENARIOS, SCENARIO_INTRO, SCENARIO_OPTIONS,
+from datasets import (ROOT, CARDS, GENERIC_SHEET, SCENARIO_OPTIONS, intro_rows,
                       SCENARIO_OUTCOMES, load, read_rows, item_names,
                       token_names, outcome_id, template_cell)
 
@@ -68,15 +71,23 @@ def check_title(nid, title):
              "card index wire format: %r" % (nid, title))
 
 
+def check_url(row, col):
+  # URLs travel in the same tab-separated card index as titles.
+  url = row.get(col, "")
+  if re.search(r"\s", url):
+    sys.exit("%s: %s %r contains whitespace" % (row["_where"], col, url))
+  return url
+
+
 def main():
   known = item_names()
   meeples = token_names()
-  wb = load(SCENARIOS)
+  wb = load(CARDS)
   nodes = {}
 
   # ---- intros: one card each -----------------------------------------------
   intros = []
-  for r in read_rows(SCENARIOS, SCENARIO_INTRO, "scenario_id", wb):
+  for r in intro_rows(wb):
     sid = r["scenario_id"]
     if sid in nodes:
       sys.exit("%s: duplicate scenario_id %s" % (r["_where"], sid))
@@ -87,12 +98,15 @@ def main():
     check_title(sid, r.get("title", ""))
     nodes[sid] = {"title": r.get("title", ""), "flavor": r.get("flavor", ""),
                   "effect": "", "region": r["region"], "options": [],
-                  "template": template_cell(r, r["_where"])}
+                  "template": template_cell(r, r["_where"]),
+                  "face": check_url(r, "face_url"),
+                  "back": check_url(r, "back_url"),
+                  "generic": r["_sheet"] == GENERIC_SHEET}
     intros.append(sid)
 
   # ---- outcomes: where an option lands ------------------------------------
   outcomes_of = {sid: [] for sid in intros}
-  for r in read_rows(SCENARIOS, SCENARIO_OUTCOMES, "outcome_key", wb):
+  for r in read_rows(CARDS, SCENARIO_OUTCOMES, "outcome_key", wb):
     sid = r.get("scenario_id", "")
     if sid not in outcomes_of:
       sys.exit("%s: unknown scenario_id %r" % (r["_where"], sid))
@@ -142,7 +156,7 @@ def main():
   # ---- options: the buttons on an intro -----------------------------------
   opts = []
   used = set()
-  for r in read_rows(SCENARIOS, SCENARIO_OPTIONS, "scenario_id", wb):
+  for r in read_rows(CARDS, SCENARIO_OPTIONS, "scenario_id", wb):
     sid = r["scenario_id"]
     where = "%s (%s)" % (r["_where"], sid)
     if sid not in outcomes_of:
@@ -168,7 +182,7 @@ def main():
     nodes[sid]["options"].append({"label": label, "tooltip": tip,
                                   "outcomes": outs})
   for sid in intros:
-    if not nodes[sid]["options"]:
+    if not nodes[sid]["options"] and not nodes[sid]["generic"]:
       sys.exit("scenario %s has no rows on %s -- its card would have no "
                "buttons" % (sid, SCENARIO_OPTIONS))
     for nid in outcomes_of[sid]:
@@ -191,6 +205,10 @@ def main():
     # Intros only: the card importer clones the template this names.
     if "template" in n:
       L.append("    template = %s," % lua_str(n["template"]))
+      if n["face"]:
+        L.append("    face = %s," % lua_str(n["face"]))
+      if n["back"]:
+        L.append("    back = %s," % lua_str(n["back"]))
     L.append("    flavor = %s," % lua_str(n["flavor"]))
     L.append("    effect = %s," % lua_str(n["effect"]))
     if n["options"]:

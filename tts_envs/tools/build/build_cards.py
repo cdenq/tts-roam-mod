@@ -7,16 +7,17 @@
 
 Front: dark grunge ground, gradient band near the top with the gem on
 it, a lighter text panel below. Back: same ground, band across the middle,
-gem standing on it. Every gem in `card.gems` (`ruby_heart1|...`, names from
-build_gems.py, so run that first) gets one of each, named by the gem's colour.
+gem standing on it. Every `name=gem` pair in `card.gems` (`origin=ruby_heart1|...`,
+gem names from build_gems.py, so run that first) gets one of each, named by
+the pair's name.
 
 Layout lengths are design units of a 750-wide card, scaled to `out_w`.
 Deterministic: the grunge is seeded from the colour.
 
 Not part of master_sync.cmd: art is rebuilt by hand, then uploaded by hand.
 
-Run: python tools/build/build_cards.py           every gem in card.gems
-     python tools/build/build_cards.py ruby      one colour (others untouched)
+Run: python tools/build/build_cards.py           every gem in card.gems + every deck
+     python tools/build/build_cards.py ruby      one card (others untouched)
 """
 import csv, os, sys, zlib
 
@@ -67,19 +68,32 @@ def parse_card(raw):
 
 
 def parse_cards(raw, gems):
-  """card.gems `ruby_heart1|...` -> {colour: gem name}; the colour names the card."""
+  """card.gems `origin=ruby_heart1|...` -> {card name: gem name}."""
   cards = {}
-  for gem in (g.strip() for g in raw.split("|")):
-    if not gem:
+  for pair in (p.strip() for p in raw.split("|")):
+    if not pair:
       continue
+    name, sep, gem = (v.strip() for v in pair.partition("="))
+    if not sep or not name or not gem:
+      die("card.gems: %r is not name=gem" % pair)
     if gem not in gems:
       die("card.gems: unknown gem %r (names come from assets/gems/manifest.csv; run build_gems.py)" % gem)
-    colour = gems[gem]["colour"]
-    if colour in cards:
-      die("card.gems: %s and %s are both %s; one gem per colour (the colour names the card)" % (cards[colour], gem, colour))
-    cards[colour] = gem
+    if name in cards:
+      die("card.gems: %s is named twice" % name)
+    cards[name] = gem
   if not cards:
     die("card.gems is empty")
+  return cards
+
+
+def add_deck_cards(cards, groups, gems):
+  """One card per event deck, wearing the gem its maptile back wears."""
+  for did, deck in bm.parse_decks({g: r for g, r in groups.items() if g.startswith("deck_")}).items():
+    if did in cards:
+      die("deck_%s: card.gems already has a card called %r" % (did, did))
+    if deck["gem"] not in gems:
+      die("deck_%s.gem: unknown gem %r (run build_gems.py?)" % (did, deck["gem"]))
+    cards[did] = deck["gem"]
   return cards
 
 
@@ -176,7 +190,7 @@ def main():
   bm.setup(bm.parse_global(glob))
   card = parse_card(groups.get("card", {}))
   gems = gem_names()
-  cards = parse_cards(groups.get("card", {}).get("gems", ""), gems)
+  cards = add_deck_cards(parse_cards(groups.get("card", {}).get("gems", ""), gems), groups, gems)
   only = sys.argv[1:]
   for name in only:
     if name not in cards:

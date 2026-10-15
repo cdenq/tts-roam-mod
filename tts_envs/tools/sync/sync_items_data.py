@@ -18,7 +18,7 @@ cooldown duration -- it reads them from ITEM_INDEX, which global.lua builds from
 this same data.
 
 Validation is the real payoff. Every item name referenced by a spawn column in
-scenarios.xlsx must exist here, so a typo dies at build time instead of showing
+cards.xlsx must exist here, so a typo dies at build time instead of showing
 up mid-game as '"Rations" is not in bag ...'. The classification columns use
 closed vocabularies for the same reason: a typo'd 'conusmable' would otherwise
 silently create a new category.
@@ -32,7 +32,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/: datasets, spawn_cells, lua_inline
 from spawn_cells import staged_path, referenced_names, read_spawn
-from datasets import (ROOT, TILES, ITEM_SHEETS, SCENARIOS, SCENARIO_OUTCOMES,
+from datasets import (ROOT, TILES, ITEM_SHEETS, CARDS, SCENARIO_OUTCOMES,
                       TOKENS, TOKEN_SHEET, LANDMARK_SHEET, LANDMARK_ROLE,
                       FACTIONS_SHEET, LOOT_TABLE_SHEET,
                       STATS_TABLE_SHEET, SHOP_ROLE, COMBAT_ROLE, SHOPS,
@@ -859,15 +859,15 @@ def main():
                       "an item's gmnotes")
 
   # ---- cross-check against the event spawn tables -------------------------
-  # This is the check worth having: an item name typo'd in scenarios.xlsx
+  # This is the check worth having: an item name typo'd in cards.xlsx
   # currently fails only in-game, and silently enough to miss.
   #[[ The REVERSE is deliberately NOT checked. An item no event spawns is
   # normal -- most items are shop, drop-table or lootbox content and are never
   # named by an event, so flagging them was noise on almost every build.
   known = set(seen_names)
-  if os.path.exists(SCENARIOS):
+  if os.path.exists(CARDS):
     # Only outcomes spawn; intros have no spawn columns.
-    for r in read_rows(SCENARIOS, SCENARIO_OUTCOMES, "outcome_key"):
+    for r in read_rows(CARDS, SCENARIO_OUTCOMES, "outcome_key"):
       nid = outcome_id(r.get("scenario_id", ""), r["outcome_key"])
       # items only: statuses come from their own bag and are not in tiles.xlsx.
       seen_missing = set()
@@ -878,10 +878,10 @@ def main():
           # different speeds: an event may name an item before the sheet has
           # it. The spawn will fail in game with '"X" is not in bag ...', so
           # this still needs fixing -- it just must not block the build.
-          warn("scenarios.xlsx node %s spawns %r, which is not in "
+          warn("cards.xlsx node %s spawns %r, which is not in "
                "tiles.xlsx -- the spawn will fail in game" % (nid, nm))
   else:
-    warn("missing %s -- skipped the spawn cross-check" % SCENARIOS)
+    warn("missing %s -- skipped the spawn cross-check" % CARDS)
 
   # The description shown in game is composed from the columns, not authored.
   for it in items:

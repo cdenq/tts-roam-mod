@@ -36,7 +36,7 @@ ROAM/
 │   └── objects/              # staging; OVERWRITTEN by Ctrl+Alt+L
 └── tts_envs/                 # EDIT IN HERE
     ├── data/                 # every authored dataset
-    │   ├── scenarios.xlsx    # scenario_intro, scenario_options, scenario_outcomes
+    │   ├── cards.xlsx        # scenario_intro, generic, scenario_options, scenario_outcomes
     │   ├── origins.xlsx      # origins
     │   ├── tiles.xlsx        # items, skills, statuses, lootbox_table, _values
     │   ├── tokens.xlsx       # tokens, landmarks, factions, loot_table, stats_table, _values
@@ -61,7 +61,9 @@ ROAM/
     │   ├── build/            # art generators (manual, not in master_sync)
     │   │   ├── build_map_tiles.py, build_gems.py, build_cards.py, build_landmarks.py
     │   │   ├── build_meeple_shapes.py, build_meeples.py # meeple PSD -> shapes -> coloured PNGs
+    │   │   ├── build_insects.py  # code-drawn enemy insects -> the PSD's Enemy group
     │   │   ├── meeple_brush.py, meeple_smooth.py # brush-pen details, clean outlines
+    │   │   ├── meeple_split_eyes.py # gives a PSD layer's eyes their own colour slots (iris, pupil)
     │   │   └── scaffold_maptile_xlsx.py # adds a maptile.xlsx row per generated image
     │   ├── test_*.lua        # offline harness, stubs TTS API
     │   └── bin/lua54.exe     # harness interpreter (5.4; TTS is 5.2)
@@ -77,7 +79,7 @@ Never hand-edit `generated/`, `.tts/objects/`, `master_reload.lua`, `debug.lua`.
 
 | change | file |
 | --- | --- |
-| event cards | `data/scenarios.xlsx` |
+| event cards, generic (art-only) cards | `data/cards.xlsx` |
 | origin cards | `data/origins.xlsx` |
 | items / skills / statuses | `data/tiles.xlsx` |
 | lootbox contents | `data/tiles.xlsx` `lootbox_table` |
@@ -100,7 +102,7 @@ Never hand-edit `generated/`, `.tts/objects/`, `master_reload.lua`, `debug.lua`.
 
 | changed | push with |
 | --- | --- |
-| `src/global.lua`, `scenarios.xlsx`, `origins.xlsx`, lootboxes | focus `master_reload.lua` + `Ctrl+Shift+E` |
+| `src/global.lua`, `cards.xlsx`, `origins.xlsx`, lootboxes | focus `master_reload.lua` + `Ctrl+Shift+E` |
 | one object's script | focus its `.tts/objects/*.lua` -> `TTS Editor: Update Object` |
 | both, or unsure | `Ctrl+Alt+S` Save and Play (save the game first) |
 
@@ -126,7 +128,7 @@ Never hand-edit `generated/`, `.tts/objects/`, `master_reload.lua`, `debug.lua`.
 
 - `sync_gold` first — writes `base_gold`/`spawngold` INTO `data/`
 - `sync_origin_text` — rewrites "Gain N gold." prose to match `spawngold`
-- `sync_events_data` — rebuilds Global from `src/global.lua` + scenarios
+- `sync_events_data` — rebuilds Global from `src/global.lua` + cards.xlsx
 - `sync_card_importer`, `sync_items_data`, `sync_lootbox_data`,
   `sync_landmark_data`, `sync_origins_data`, `sync_change_converter`, `sync_merchant_board`
 - `sync_gold --splice-only` — re-splices `ECONOMY` (events sync wiped it)
@@ -173,8 +175,8 @@ Card fronts + backs (one pair per gem in `card.gems`, see [Card frame art](#card
 ```bash
 cd "/c/Users/Owner/Data/D/Board Games/ROAM/tts_envs"
 python tools/build/build_gems.py     # only if gem art changed; cards read assets/gems/
-python tools/build/build_cards.py    # every gem in card.gems -> assets/cards/<colour>_front.png + _back.png
-python tools/build/build_cards.py ruby   # one colour, others untouched
+python tools/build/build_cards.py    # every gem in card.gems + every deck_* -> assets/cards/<name>_front.png + _back.png
+python tools/build/build_cards.py origin   # one card, others untouched
 ```
 
 Landmark standees (see [Landmark art](#landmark-art)):
@@ -201,6 +203,7 @@ Meeples (see [Meeple art](#meeple-art)):
 
 ```bash
 cd "/c/Users/Owner/Data/D/Board Games/ROAM/tts_envs"
+python tools/build/build_insects.py                        # redraw the enemy insects into meeples_clean.psd (~35 s); then the two below
 python tools/build/build_meeple_shapes.py                  # after editing meeples_clean.psd (all layers, ~45 s)
 python tools/build/build_meeple_shapes.py denizen_beaver   # just the layers you changed
 python tools/build/build_meeples.py                        # after any meeple_* row change (~10 s)
@@ -256,14 +259,15 @@ the bag.
   the card out instead of cloning it). Not checked at sync: the names live only in that bag
 - every name checked against `tiles.xlsx` / `tokens.xlsx` at sync
 
-## Event cards (scenarios)
+## Event cards (cards.xlsx)
 
 Card Importer `4b808d`. Cards carry only an id; Global renders and handles
 every click.
 
 | sheet | one row per | key |
 | --- | --- | --- |
-| `scenario_intro` | card: `template`, `region`, `title`, `flavor` | `scenario_id` (`EV1`) |
+| `scenario_intro` | card: `template`, `region`, `title`, `flavor`, `face_url`, `back_url` | `scenario_id` (`EV1`) |
+| `generic` | art-only card: `template`, `set` (= region), `title`, `description` (= flavor), `face_url`, `back_url`; no options needed | `id` (`CB1`) |
 | `scenario_options` | button: `label`, `tooltip`, `outcomes` | `scenario_id` + `option` |
 | `scenario_outcomes` | landing: `title`, `flavor`, `effect`, spawns | `scenario_id` + `outcome_key` |
 
@@ -273,13 +277,18 @@ every click.
   `scarred`, see `internal/agent/taxonomy.md` "Event decks"): one importer button per
   deck, and the biomes that draw from it. Map-tile biomes (`forest`, `marsh`...)
   are a different list
+- `face_url` / `back_url`: replace the template's art at import (empty = keep
+  it). `generic` rows point at `assets/cards/` on GitHub
+  (`https://raw.githubusercontent.com/cdenq/tts-roam-mod/main/assets/cards/<file>`)
+- `generic` rows use `set` `generic` -> one importer button for the set
 - GMNotes = `scenario_id` (permanent); memo = current node (empty = intro)
 - object name is cosmetic; GMNotes is authoritative
 - `EVENT_DATA` lives in Global -> text fix = edit, sync, push; cards on the
   table re-render without re-import
 - push BOTH Global and the bag after a scenario change (or `Ctrl+Alt+S`)
 - sync fails on: unknown `scenario_id`, duplicate key, option -> missing
-  outcome, intro with no options, tab/newline in a title. Warns on
+  outcome, intro with no options (generic rows exempt), tab/newline in a
+  title, whitespace in a url. Warns on
   unreachable outcomes
 - cards **merge into a deck on contact** (absorbed one is destroyed);
   importer locks the template and clones off to the side
@@ -472,15 +481,15 @@ A drawn tile is a copy of the bag's template (Custom Tile, GMNotes
 
 Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + memo):
 - `Explore: N` -- N from the `density` sheet. Click = swap it for four choices (spends nothing); picking one
-  spends 1 and brings `Explore: N-1` back (gone at 0). Each choice announces itself with a flavor line:
+  spends 1 and brings `Explore: N-1` back (gone at 0). Each choice broadcasts one short line: the spawned landmark's name, `Event!`, or `Nothing...` (`EXPLORE_SAYS` in `src/maptile_manager.lua`; the reason for a data miss goes to `log`):
   - `Resources` / `Landmarks` -- roll the biome's `exploration` weights for that category; a `landmark`
     outcome clones one from its pool out of bag `6a6425` onto the tile's centre, memo stamped from
     `explore_outcomes` (GMNotes left as the landmark's own kind)
   - `Experiences` -- takes the top card of the tile's region bag (`EVENT_BAGS` in `src/maptile_manager.lua`:
-    woodland `570544`, waterside `524231`, opencountry `3546e2`, settlement `8bce91`, scarred `f608d7`) face up
+    woodland `9b1bd8`, waterside `7abfaf`, opencountry `12d32e`, settlement `3d7a98`, scarred `3e737b`) face up
     onto the tile. Bags hold single cards, never decks; never shuffled by script; a drawn card leaves its bag
   - `Wander` -- one of the other three at random
-  - a fifth choice on biomes listed on `explore_special` (guildhall: `Eat`) -- spends an explore and announces its flavor; Wander never picks it
+  - a fifth choice on biomes listed on `explore_special` (guildhall: `Eat`) -- spends an explore and broadcasts `Maptile special action used.`; Wander never picks it
   - untouched for 5 s (`EXPLORE.CHOICE_TIMEOUT`), the choices close and `Explore: N` returns. Not saved: a reload shows `Explore: N` again
 - `?` -- toggles the tile's hover tooltip (name + description). Tiles spawn with it off; grey text =
   off, black = on. State is the object's own `tooltip`, saved by TTS, not the memo
@@ -495,9 +504,9 @@ Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + me
 | `backs` | deck | `deck` `name` `image` `file` **`url`** |
 | `biome_descriptions` | biome | `biome` `deck` `name` `effect` `flavor` |
 | `maptile_table` | biome (GMNotes) | `gmnotes` + spawn cells (`spawnN`, `spawnmeepleN`, `spawnlandmark1..3`, `spawngold`); names checked against tiles/tokens. Landmarks go in `spawnlandmarkN` (bag `6a6425`), not `spawnmeepleN` -- the sync fails on a landmark in a meeple cell | `<spawncol>_gmnotes` / `<spawncol>_memo` (e.g. `spawnlandmark1_memo`) stamp that slot's copy; blank = keep its own, `{biome}` = the row's biome. A stamp on an empty spawn column fails the sync |
-| `explore_outcomes` | Explore outcome | `outcome` `category` (`resource` / `poi` / `event`) `kind` (`landmark` / `nothing`) `name` `landmarks` (pool, `a\|b\|b`; checked against tokens.xlsx `landmarks`) `gmnotes` `memo` (stamped on the spawned landmark, blank = leave; `{biome}` = the tile's biome) `flavor` (`line\|line`, one is announced). The `event` row = Experiences' flavor |
+| `explore_outcomes` | Explore outcome | `outcome` `category` (`resource` / `poi` / `event`) `kind` (`landmark` / `nothing`) `name` `landmarks` (pool, `a\|b\|b`; checked against tokens.xlsx `landmarks`) `gmnotes` `memo` (stamped on the spawned landmark, blank = leave; `{biome}` = the tile's biome). `flavor` is no longer read (explores broadcast short fixed lines) |
 | `exploration` | biome | `biome` + one weight column per resource / poi outcome (`fishing` ... `resource_none`, `camp` ... `poi_none`); relative odds within each category, blank/0 = never. A new outcome = a new row there + a new column here; weight on a landmark outcome with no landmarks fails the sync |
-| `explore_special` | biome with a fifth Explore choice | `biome` `label` (button text) `tooltip` `flavor` (`line\|line`) -- hand-filled; most biomes have no row |
+| `explore_special` | biome with a fifth Explore choice | `biome` `label` (button text) `tooltip` -- hand-filled; most biomes have no row. `flavor` is no longer read |
 | `landmark_table` | landmark kind (GMNotes) | `gmnotes` (lowercase snake_case) `actions` (`inspect\|enter`: keys of `LANDMARK_ACTIONS` in `src/global.lua`, which hold each action's label + click function) `notes`. `sync_landmark_data.py` -> `LANDMARK_DATA` in Global; warns on a kind no landmark carries, or one carried with no row. New kind = a row; new action = code |
 | `tiers` | biome + tier | `biome` `tier` `gmnotes` `tileset` -- gmnotes = the biome the tile becomes (needs its own `biome_descriptions` row, kept out of the pools); tileset = whose images it uses; a tileset that is not a biome has image rows only |
 | `density` | density stage | `density` `explorations` |
@@ -640,7 +649,7 @@ assets/meeples/<folder>/<file>.png + manifest.csv, internal/asset_generation/mee
     `body=<colour>` required; `shape=<layer>` (default: the file name);
     `ink=` / `accent1=` ... override a slot (unset slots keep their painted colour);
     `tone=off` flattens a gradient shape. Colours are `meeple_colour` names or `#rrggbb`
-- output folders (every shape gets its normal colours; all but special + character also get a yellow denizen):
+- output folders (every shape gets its normal colours; all but special, character and enemies also get a yellow denizen):
 
   | folder | what | shapes |
   | --- | --- | --- |
@@ -649,12 +658,17 @@ assets/meeples/<folder>/<file>.png + manifest.csv, internal/asset_generation/mee
   | `custom/` | not from Root, their own colours | `custom_*` (beaver, bristle, red panda, squirrel) |
   | `special/` | one-offs; no denizen version | `special_*` (stag, bear, boar, snake, penguin, guildmaster) |
   | `character/` | vagabonds; no denizen version | `vb_*` |
+  | `enemies/` | insects (enemies); no denizen version | `enemy_*` (ant, stag beetle, spider, scorpion, mantis, antlion, wasp, mosquito) |
   | `denizens/` | every base/advanced/custom shape again in denizen yellow, as `denizen_<shape>` | |
 
 - new colour of an existing meeple = one row: `meeple_skin,custom/purple_cat,shape=faction_cat body=corvid,`
 - new shape = a layer in `meeples_clean.psd` (right group, 1536 canvas, feet on
   the bottom row; layer name `<faction|hireling|custom|special|vb>_<species>`) + a `meeple_shape` row
   + a normal `meeple_skin` row + (unless special/vb) a `denizens/denizen_<shape>` row, then run both scripts
+- enemy insects are NOT painted in the PSD: `tools/build/build_insects.py` draws them by code into its
+  `Enemy` group (replacing only those layers, verifying the rest, previous PSD kept as `meeples_clean.psd.bak`).
+  `--png DIR` previews without touching the PSD. New insect: a function there + `meeple_shape` / `meeple_skin`
+  rows + a `tokens.xlsx` row (set `enemies`). Style: `meeple_artguide.md` section 12
   `internal/` is gitignored: back the PSD up before editing
 - size lives in the shape (its pixels on the shared 1536 canvas), never in the skin
 - needs `psd-tools` and `scikit-image` (`pip install psd-tools scikit-image`)
@@ -680,12 +694,14 @@ Card fronts + backs composed around a gem, after `assets/reference/City_*.png`.
 Manual step, not part of `master_sync.cmd`. Run `build_gems.py` first.
 How to run: see [Offline Generation](#offline-generation).
 
-- writes `assets/cards/<colour>_front.png` + `<colour>_back.png` + `manifest.csv` (~1 s)
+- writes `assets/cards/<name>_front.png` + `<name>_back.png` + `manifest.csv` (~1 s)
 - front = grunge ground, band near the top with the gem on it, text panel; back = band across the middle, gem standing on it
 - knobs in `data/asset_variables.csv` `card` rows:
-  - `gems`: `|` list of gem names from `assets/gems/manifest.csv`, e.g. `ruby_heart1|topaz_trillion1`.
-    One card per gem, named by the gem's colour, so one gem per colour. Unknown name fails the build;
-    a colour dropped from the list has its files deleted
+  - `gems`: `|` list of `name=gem` pairs, gems from `assets/gems/manifest.csv`, e.g. `origin=ruby_heart1|spell0=diamond_cabochon1`.
+    One card per pair, files named `<name>_front/back.png`. Unknown gem fails the build;
+    a name dropped from the list has its files deleted
+- plus one card per event deck (`deck_<id>` rows, shared with the maptile backs), named by deck id
+  (`woodland_front.png`) and wearing that deck's `gem`
   - layout (units of a 750-wide card): `out_w`/`out_h`, `panel_box`, `front_band`/`back_band`,
     `front_gem_y`/`_long`/`_max_h`, `back_gem_y`/`_long`/`_max_h` (gems are never rotated;
     `_max_h` keeps tall gems inside the card)

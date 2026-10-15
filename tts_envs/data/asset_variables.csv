@@ -617,7 +617,7 @@ landmark_colour,shadow,#4d5249,the dark hollow the hunted insect lurks in
 card,out_w,750,px width of each card PNG. Lengths below are design units of a 750-wide card
 card,out_h,1050,px height (750 x 1050 = poker 5:7)
 card,seed_offset,0,change to reroll every card's grunge
-card,gems,emerald_emerald1|ruby_heart1|sapphire_pear1|topaz_trillion1|amethyst_marquise1|diamond_cabochon1,one front + back per gem (names from assets/gems/manifest.csv); files are named <colour>_front/back
+card,gems,spell0=diamond_cabochon1|spell1=emerald_cabochon1|spell2=sapphire_cabochon1|spell3=amethyst_cabochon1|origin=ruby_heart1|quest_side=citrine_marquise1|quest_minor=citrine_oval1|quest_major=citrine_pear1|quest_story=citrine_emerald1|passive=aquamarine_trillion1,one front + back per name=gem pair (gems from assets/gems/manifest.csv); files are <name>_front/back. Every deck_* also gets one with its back gem
 card,bg,#0a0a0a,ground colour around the panel + whole back
 card,bg_grunge,0.8,0-1: blotchy stains + grain on the ground
 card,vignette,0.45,0-1: darkening towards the card edges
@@ -834,20 +834,20 @@ battlefieldwaterside,feature,river,
 battlefieldwaterside,mud,4,
 battlefieldwaterside,speckle,#5a4636:140,
 deck_settlement,name,Settlement,tile back for this event deck: the text on the ribbon (as typed)
-deck_settlement,gem,diamond_cabochon1,gem image from assets/gems/ (.png optional)
-deck_settlement,colour,#8c5a44,back colour
+deck_settlement,gem,topaz_heart1,gem image from assets/gems/ (.png optional)
+deck_settlement,colour,#4a4440,back colour
 deck_woodland,name,Woodland,
-deck_woodland,gem,emerald_cushion1,
+deck_woodland,gem,amethyst_cushion1,
 deck_woodland,colour,#55703a,
 deck_opencountry,name,Open Country,
-deck_opencountry,gem,emerald_cabochon1,
+deck_opencountry,gem,amethyst_cabochon1,
 deck_opencountry,colour,#a8913f,
 deck_waterside,name,Waterside,
-deck_waterside,gem,emerald_pear1,
+deck_waterside,gem,amethyst_pear1,
 deck_waterside,colour,#3f6f86,
 deck_scarred,name,Scarred,
-deck_scarred,gem,emerald_trillion1,
-deck_scarred,colour,#4a4440,
+deck_scarred,gem,amethyst_trillion1,
+deck_scarred,colour,#8c5a44,
 meeple,canvas,1536,"px; every meeple PNG is this square, feet on the bottom row (tools/build/build_meeples.py)"
 meeple,brush_strength,2.6,brush-pen warp on brush=yes shapes (build_meeple_shapes.py); 0 = off
 meeple,brush_blotch,0,extra 8 px wobble = lumpier line width; 0 = off
@@ -877,6 +877,7 @@ meeple_colour,bristle,#935925,custom_bristle
 meeple_colour,redpanda,#ff7170,custom_redpanda
 meeple_colour,squirrel,#db9221,custom_squirrel
 meeple_colour,beaver,#8a5a3b,custom_beaver
+meeple_colour,insect,#b5482a,enemy insects (enemy_*): chitin rust
 meeple_shape,faction_badger,species=badger class=base,
 meeple_shape,faction_bat,species=bat class=base,
 meeple_shape,faction_bird,species=bird class=base brush=yes,
@@ -930,6 +931,14 @@ meeple_shape,vb_scoundrel,species=vagabond class=base brush=yes,
 meeple_shape,vb_thief,species=vagabond class=base brush=yes,
 meeple_shape,vb_tinker,species=vagabond class=base,
 meeple_shape,vb_vagrant,species=vagabond class=base,
+meeple_shape,enemy_ant,species=ant class=short brush=yes,enemy insect: crouched frontal; sized by its face, legs widen the footprint
+meeple_shape,enemy_stagbeetle,species=stag_beetle class=short brush=yes,
+meeple_shape,enemy_spider,species=spider class=short brush=yes,
+meeple_shape,enemy_scorpion,species=scorpion class=short brush=yes,
+meeple_shape,enemy_mantis,species=mantis class=short brush=yes,
+meeple_shape,enemy_antlion,species=antlion class=short brush=yes,
+meeple_shape,enemy_wasp,species=wasp class=short brush=yes,
+meeple_shape,enemy_mosquito,species=mosquito class=short brush=yes,
 meeple_skin,base/faction_badger,body=keepers,
 meeple_skin,base/faction_bat,body=bat,
 meeple_skin,base/faction_bird,body=eyrie,
@@ -1023,3 +1032,11 @@ meeple_skin,denizens/denizen_custom_beaver,shape=custom_beaver body=denizen,
 meeple_skin,denizens/denizen_custom_bristle,shape=custom_bristle body=denizen accent1=denizen accent2=ink,
 meeple_skin,denizens/denizen_custom_redpanda,shape=custom_redpanda body=denizen accent1=denizen accent2=ink,
 meeple_skin,denizens/denizen_custom_squirrel,shape=custom_squirrel body=denizen,
+meeple_skin,enemies/enemy_ant,body=insect,
+meeple_skin,enemies/enemy_stagbeetle,body=insect,
+meeple_skin,enemies/enemy_spider,body=insect,
+meeple_skin,enemies/enemy_scorpion,body=insect,
+meeple_skin,enemies/enemy_mantis,body=insect,
+meeple_skin,enemies/enemy_antlion,body=insect,
+meeple_skin,enemies/enemy_wasp,body=insect,
+meeple_skin,enemies/enemy_mosquito,body=insect,

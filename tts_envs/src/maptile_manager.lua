@@ -55,9 +55,9 @@ Explore swaps itself for four choices (EXPLORE_CHOICES); picking one spends
 the explore. Resources / Points of interest roll the biome's weights for that
 category and clone the landmark onto the tile's centre, stamped with the
 outcome's GMNotes + memo. Experiences takes the top card of the region's
-EVENT_BAGS bag. Wander picks one of the three for you. Every outcome is
-announced with its flavor (explore_outcomes sheet). A biome on explore_special
-gets a fifth choice (the guildhall's Eat) that spends an explore and announces.
+EVENT_BAGS bag. Wander picks one of the three for you. Each explore broadcasts
+one short line (EXPLORE_SAYS, or the spawned landmark's name). A biome on
+explore_special gets a fifth choice (the guildhall's Eat) that spends an explore.
 ]]
 
 --[[ BEGIN GENERATED MAPTILE DATA -- do not edit ]]
@@ -121,8 +121,8 @@ PANEL = {
 
 --[[ Explore: one bag of single event cards per region deck (never decked, so
 each can be searched). DROP = world units above the tile's centre. ]]
-EVENT_BAGS = {woodland = "570544", waterside = "524231", opencountry = "3546e2", settlement = "8bce91",
-              scarred = "f608d7"}
+EVENT_BAGS = {woodland = "9b1bd8", waterside = "7abfaf", opencountry = "12d32e", settlement = "3d7a98",
+              scarred = "3e737b"}
 EXPLORE = {DROP = 1.5, CHOICE_TIMEOUT = 5}  -- seconds the four choices wait before Explore returns
 
 EXPLORE_CHOICES = {
@@ -138,12 +138,9 @@ EXPLORE_CHOICES = {
              .. "event card for this region."},
 }
 
--- How each choice is announced: player, tile name, explores left.
-EXPLORE_HEADS = {
-  resource = "%s searches the %s for resources (%d left): ",
-  poi = "%s searches the %s for landmarks (%d left): ",
-  event = "%s looks for the locals in the %s (%d left): ",
-}
+-- The one broadcast each explore makes. A spawn announces the landmark's name instead.
+EXPLORE_SAYS = {nothing = "Nothing...", event = "Event!", special = "Maptile special action used."}
+EXPLORE_COLOR = {0.7, 0.9, 1}
 
 -- Where a drawn tile lands, in the bag's local units, and how it is turned.
 -- z = 180 lands it face down: the deck back shows until someone flips it.
@@ -721,50 +718,37 @@ local function drawEvent(obj, deck)
   return nil
 end
 
--- One line of an outcome's flavor, or its bare name when none is written.
-local function flavorOf(outcome)
-  if #outcome.flavor > 0 then return pick(outcome.flavor) end
-  return outcome.name .. "."
-end
-
 -- "{biome}" in a stamp becomes the tile's biome, so a node knows where it was found.
 local function fillStamp(text, biome)
   return (string.gsub(text or "", "{biome}", biome))
 end
 
-local function exploreHead(obj, color, category, left)
-  return string.format(EXPLORE_HEADS[category], Player[color].steam_name, obj.getName(), left)
-end
-
---[[ Resources / Points of interest: roll the biome's weights for the category,
-clone the landmark (if any) onto the tile through Global, stamped with the
-outcome's GMNotes + memo, and announce the flavor. ]]
-local function findLandmark(obj, color, left, category)
+--[[ Resources / Landmarks: roll the biome's weights for the category, clone
+the landmark (if any) onto the tile through Global, stamped with the outcome's
+GMNotes + memo, and broadcast its name -- or "Nothing...". A data problem (no
+weights) also says "Nothing..." and goes to the log for whoever is debugging. ]]
+local function findLandmark(obj, category)
   local biome = obj.getGMNotes()
-  local head = exploreHead(obj, color, category, left)
   local id = rollWeighted((MAPTILE.exploration[biome] or {})[category])
   local outcome = MAPTILE.outcomes[id or ""]
-  if outcome == nil then
-    broadcastToAll(head .. "nothing to find (no " .. category .. " weights for " .. biome .. ").", {1, 0.6, 0.3})
+  if outcome == nil then log("Maptile Manager: no " .. category .. " weights for " .. biome) end
+  if outcome == nil or outcome.kind ~= "landmark" then
+    broadcastToAll(EXPLORE_SAYS.nothing, EXPLORE_COLOR)
     return
   end
-  local said = flavorOf(outcome)
-  if outcome.kind == "landmark" then
-    local landmark = pick(outcome.landmarks)
-    Global.call("spawnCopyFromBagFor", {
-      category = "landmark", name = landmark, position = abovePosition(obj),
-      stamp = {gm_notes = fillStamp(outcome.gmnotes, biome), memo = fillStamp(outcome.memo, biome)}
-    })
-    said = said .. " (" .. landmark .. ")"
-  end
-  broadcastToAll(head .. said, {0.7, 0.9, 1})
+  local landmark = pick(outcome.landmarks)
+  Global.call("spawnCopyFromBagFor", {
+    category = "landmark", name = landmark, position = abovePosition(obj),
+    stamp = {gm_notes = fillStamp(outcome.gmnotes, biome), memo = fillStamp(outcome.memo, biome)}
+  })
+  broadcastToAll(landmark, EXPLORE_COLOR)
 end
 
-local function findExperience(obj, color, left)
-  local said = MAPTILE.outcomes.event and flavorOf(MAPTILE.outcomes.event) or "An event."
+-- Experiences: "Event!" when a card comes out; an empty or missing bag is "Nothing..." (+ log).
+local function findExperience(obj)
   local err = drawEvent(obj, MAPTILE.biomes[obj.getGMNotes()].deck)
-  if err then said = said .. " (" .. err .. ")" end
-  broadcastToAll(exploreHead(obj, color, "event", left) .. said, {0.7, 0.9, 1})
+  if err then log("Maptile Manager: " .. err) end
+  broadcastToAll(err and EXPLORE_SAYS.nothing or EXPLORE_SAYS.event, EXPLORE_COLOR)
 end
 
 --[[ Render: the biome's maptile_table row, then the region's top event card,
@@ -820,27 +804,23 @@ end
 
 function exploreResources(obj, color)
   local left = spendExplore(obj, color)
-  if left then findLandmark(obj, color, left, "resource") end
+  if left then findLandmark(obj, "resource") end
 end
 
 function explorePoi(obj, color)
   local left = spendExplore(obj, color)
-  if left then findLandmark(obj, color, left, "poi") end
+  if left then findLandmark(obj, "poi") end
 end
 
 function exploreExperiences(obj, color)
   local left = spendExplore(obj, color)
-  if left then findExperience(obj, color, left) end
+  if left then findExperience(obj) end
 end
 
--- The biome's own fifth choice (explore_special): spends an explore, announces its flavor.
+-- The biome's own fifth choice (explore_special): spends an explore and says so.
 function exploreSpecial(obj, color)
-  local special = MAPTILE.special[obj.getGMNotes()]
-  local left = special and spendExplore(obj, color)
-  if not left then return end
-  local said = #special.flavor > 0 and pick(special.flavor) or (special.label .. ".")
-  broadcastToAll(string.format("%s: %s at the %s (%d left): ", Player[color].steam_name, special.label,
-                               obj.getName(), left) .. said, {0.7, 0.9, 1})
+  if MAPTILE.special[obj.getGMNotes()] == nil or not spendExplore(obj, color) then return end
+  broadcastToAll(EXPLORE_SAYS.special, EXPLORE_COLOR)
 end
 
 -- No announcement of its own: the choice it lands on announces itself. Never the special choice.

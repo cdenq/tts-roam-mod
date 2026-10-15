@@ -1613,9 +1613,10 @@ owned by different scripts". So the importer never reads EVENT_DATA or
 CARD_SETS directly -- it calls these, which flatten to plain strings.
 
 Format is one record per line, fields separated by \t:
-  <set>\t<node id>\t<template>\t<title>
+  <set>\t<node id>\t<template>\t<face url>\t<back url>\t<title>
 That is enough for the importer to build its buttons, pick each card's
-template (by GMNotes) AND name each clone, without a second call per card.
+template (by GMNotes), swap its art (empty url = keep the template's) AND name
+each clone, without a second call per card.
 Title goes last: the importer's pattern lets the last field hold anything.
 ]]
 function cardIndexText()
@@ -1625,7 +1626,9 @@ function cardIndexText()
       local node = EVENT_DATA[id]
       local title = (node and node.title ~= "" and node.title) or id
       local template = (node and node.template) or ""
-      table.insert(out, setName .. "\t" .. id .. "\t" .. template .. "\t" .. title)
+      local face = (node and node.face) or ""
+      local back = (node and node.back) or ""
+      table.insert(out, table.concat({setName, id, template, face, back, title}, "\t"))
     end
   end
 
@@ -1636,7 +1639,7 @@ function cardIndexText()
     local o = ORIGIN_DATA and ORIGIN_DATA[id]
     local title = (o and o.name ~= "" and o.name) or id
     local template = (o and o.template) or ""
-    table.insert(out, "origin\t" .. id .. "\t" .. template .. "\t" .. title)
+    table.insert(out, table.concat({"origin", id, template, "", "", title}, "\t"))
   end
 
   return table.concat(out, "\n")

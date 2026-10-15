@@ -1,4 +1,4 @@
---[[ Card Importer: clone one card per scenario intro and per origin.
+--[[ Card Importer: clone one card per scenario intro, generic card and origin.
 
 Unlike the Tile/Token Importer, this script holds NO data. Cards are dumb
 objects that carry only an id in GMNotes; Global owns EVENT_DATA, renders every
@@ -16,7 +16,8 @@ CARD_SETS and CARD_SET_ORDER are read from Global at load time -- they are
 generated into Global by tools/sync/sync_events_data.py alongside EVENT_DATA.
 
 Templates sit loose in this bag, each a Card whose GMNotes is the value the
-`template` column names (scenario_intro, origins) -- any value works.
+`template` column names (scenario_intro, generic, origins) -- any value works.
+A row with face_url / back_url gets that art instead of the template's.
 They are never consumed: the importer takes one out, clones from it, and puts
 it straight back. "Take out all" skips them. See src/lib/template_import.lua.
 
@@ -127,7 +128,7 @@ owned by different scripts". So Global flattens the index to a string
 One call per import, not one per card. Returns:
   order  {setName, ...}                         in sheet order
   sets   {setName = {row, ...}}                 rows per set, in sheet order
-         row = {id = , name = , template = }    what one clone is stamped from
+         row = {id =, name =, template =, face =, back =}  what one clone is stamped from
 or nil when Global has no index (sync not run, or Global not pushed).
 ]]
 function cardIndex()
@@ -136,15 +137,16 @@ function cardIndex()
 
   local order, sets = {}, {}
   for line in string.gmatch(text, "[^\n]+") do
-    local setName, id, template, title =
-      string.match(line, "^([^\t]*)\t([^\t]*)\t([^\t]*)\t(.*)$")
+    local setName, id, template, face, back, title = string.match(line,
+      "^([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t(.*)$")
     if setName and id then
       if sets[setName] == nil then
         sets[setName] = {}
         table.insert(order, setName)
       end
       table.insert(sets[setName], {
-        id = id, name = (title ~= "" and title) or id, template = template})
+        id = id, name = (title ~= "" and title) or id, template = template,
+        face = face, back = back})
     end
   end
   if #order == 0 then return nil end
@@ -224,7 +226,8 @@ end
   description  cleared: the card's text is DRAWN from Global's data, so a
                description inherited from the template would be stale
                duplicate text in the hover tooltip
-Everything else (face, back, size) comes from the template.
+Everything else (size, and face/back unless the row names them -- see
+restyleCard) comes from the template.
 
 The NAME is cosmetic and the ID is authoritative: Global renders from GMNotes,
 so renaming a card never changes what it shows. Global's onObjectSpawn renders
@@ -237,6 +240,31 @@ local function stampCard(clone, row)
   clone.setDescription("")
   clone.memo = ""
   return true
+end
+
+--[[ Swap a clone's art for the row's face_url / back_url.
+
+A card's images live in its CustomDeck entry, and CardID (deck key * 100 +
+index) picks its cell on a sheet. A new face is one image, so the entry
+becomes a 1x1 sheet and the card cell 0. Edits a getData() copy: the library
+respawns the clone from it. Returns nil when the row keeps the template's art.
+]]
+local function restyleCard(data, row)
+  if row.face == "" and row.back == "" then return nil end
+  for key, deck in pairs(data.CustomDeck or {}) do
+    if row.face ~= "" then
+      deck.FaceURL = row.face
+      deck.NumWidth = 1
+      deck.NumHeight = 1
+      data.CardID = tonumber(key) * 100
+    end
+    if row.back ~= "" then
+      deck.BackURL = row.back
+      deck.UniqueBack = false
+    end
+    return data
+  end
+  error("template has no CustomDeck entry to put the art in")
 end
 
 function importSet(setName)
@@ -252,7 +280,7 @@ function importSet(setName)
   end
   runTemplateImport({
     rows = rows, noun = "card", label = setName or "all sets",
-    prepare = prepareCardTemplate, stamp = stampCard,
+    prepare = prepareCardTemplate, restyle = restyleCard, stamp = stampCard,
   })
 end
 

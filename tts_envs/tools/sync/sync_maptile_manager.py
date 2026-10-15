@@ -12,9 +12,9 @@ Sheets read (tools/build/scaffold_maptile_xlsx.py creates and tops them up):
                        <spawncol>_gmnotes / <spawncol>_memo stamp that slot's copy ("{biome}" = the row's biome)
   explore_outcomes     outcome, category (resource / poi / event), kind (landmark / nothing), name,
                        landmarks ("a|b|b"), gmnotes + memo (stamped on the spawned landmark; "{biome}" =
-                       the tile's biome), flavor ("line|line": one is announced)
+                       the tile's biome). flavor is not read: explores broadcast short fixed lines
   exploration          biome + one weight column per resource / poi outcome  (blank / 0 = never)
-  explore_special      biome, label, tooltip, flavor: that biome's fifth Explore choice (guildhall: Eat)
+  explore_special      biome, label, tooltip: that biome's fifth Explore choice (guildhall: Eat)
   density              density, explorations
   weights              param, pool        ("a|b|b": b is twice as likely)
   tiers                biome, tier, gmnotes, tileset
@@ -49,7 +49,7 @@ BEGIN = "--[[ BEGIN GENERATED MAPTILE DATA -- do not edit ]]"
 END = "--[[ END GENERATED MAPTILE DATA ]]"
 GUILDHALL = "guildhall"
 EXPLORE_KINDS = ("landmark", "nothing")
-EXPLORE_CATEGORIES = ("resource", "poi", "event")  # event = the Experiences choice: flavor only, no weights
+EXPLORE_CATEGORIES = ("resource", "poi", "event")  # event = the Experiences choice: no weights
 DRIVE_PAGE = re.compile(r"https?://drive\.google\.com/(?:file/d/([\w-]+)|open\?id=([\w-]+))")
 
 
@@ -277,10 +277,7 @@ def main():
     if kind == "landmark" and not pool:
       warn("%s: %s has no landmarks yet -- give it weight only once it does" % (where, r["outcome"]))
     outcomes[r["outcome"]] = {"category": category, "kind": kind, "name": r.get("name") or r["outcome"].title(),
-                              "landmarks": pool, "gmnotes": r.get("gmnotes", ""), "memo": r.get("memo", ""),
-                              "flavor": [v.strip() for v in r.get("flavor", "").split("|") if v.strip()]}
-  if "event" not in outcomes:
-    warn("explore_outcomes has no 'event' row -- Experiences is announced without flavor")
+                              "landmarks": pool, "gmnotes": r.get("gmnotes", ""), "memo": r.get("memo", "")}
   exploration = {}
   for r in read_rows(MAPTILES, "exploration", "biome", wb):
     if r["biome"] not in biomes:
@@ -311,8 +308,7 @@ def main():
       sys.exit("%s: biome %r is not on biome_descriptions" % (r["_where"], r["biome"]))
     if not r.get("label"):
       sys.exit("%s: needs a label (the button text)" % r["_where"])
-    special[r["biome"]] = {"label": r["label"], "tooltip": r.get("tooltip", ""),
-                           "flavor": [v.strip() for v in r.get("flavor", "").split("|") if v.strip()]}
+    special[r["biome"]] = {"label": r["label"], "tooltip": r.get("tooltip", "")}
 
   unexplorable = sorted(set(biomes) - set(exploration))
   if unexplorable:
@@ -352,9 +348,9 @@ def main():
   L.append("  },")
   L.append("  outcomes = {")
   for o, v in outcomes.items():
-    L.append("    [%s] = {category = %s, kind = %s, name = %s, landmarks = %s, gmnotes = %s, memo = %s, flavor = %s}," % (
+    L.append("    [%s] = {category = %s, kind = %s, name = %s, landmarks = %s, gmnotes = %s, memo = %s}," % (
       lua_str(o), lua_str(v["category"]), lua_str(v["kind"]), lua_str(v["name"]), lua_list(v["landmarks"]),
-      lua_str(v["gmnotes"]), lua_str(v["memo"]), lua_list(v["flavor"])))
+      lua_str(v["gmnotes"]), lua_str(v["memo"])))
   L.append("  },")
   L.append("  exploration = {")
   for b, rows in exploration.items():
@@ -363,8 +359,7 @@ def main():
   L.append("  },")
   L.append("  special = {")
   for b, v in special.items():
-    L.append("    [%s] = {label = %s, tooltip = %s, flavor = %s}," % (
-      lua_str(b), lua_str(v["label"]), lua_str(v["tooltip"]), lua_list(v["flavor"])))
+    L.append("    [%s] = {label = %s, tooltip = %s}," % (lua_str(b), lua_str(v["label"]), lua_str(v["tooltip"])))
   L.append("  },")
   L.append("  images = {")
   for key, url in images.items():

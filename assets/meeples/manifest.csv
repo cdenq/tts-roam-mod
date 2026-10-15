@@ -92,3 +92,11 @@ denizens/denizen_custom_beaver.png,denizens,beaver,base,custom_beaver,denizen,79
 denizens/denizen_custom_bristle.png,denizens,hedgehog,base,custom_bristle,denizen,646,714
 denizens/denizen_custom_redpanda.png,denizens,red_panda,base,custom_redpanda,denizen,655,679
 denizens/denizen_custom_squirrel.png,denizens,squirrel,base,custom_squirrel,denizen,546,749
+enemies/enemy_ant.png,enemies,ant,short,enemy_ant,insect,943,550
+enemies/enemy_stagbeetle.png,enemies,stag_beetle,short,enemy_stagbeetle,insect,973,515
+enemies/enemy_spider.png,enemies,spider,short,enemy_spider,insect,1071,463
+enemies/enemy_scorpion.png,enemies,scorpion,short,enemy_scorpion,insect,1068,625
+enemies/enemy_mantis.png,enemies,mantis,short,enemy_mantis,insect,897,704
+enemies/enemy_antlion.png,enemies,antlion,short,enemy_antlion,insect,669,445
+enemies/enemy_wasp.png,enemies,wasp,short,enemy_wasp,insect,757,554
+enemies/enemy_mosquito.png,enemies,mosquito,short,enemy_mosquito,insect,1054,480

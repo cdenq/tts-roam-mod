@@ -10,7 +10,8 @@ is one edit here instead of a hunt through every tool.
                             loot_table               what a token drops when killed
                             stats_table              a token's combat numbers
                             landmarks                places on the map: caves, shrines, camps
-  data/scenarios.xlsx       scenario_intro           one row per event card
+  data/cards.xlsx           scenario_intro           one row per event card
+                            generic                  one row per art-only card (same headers)
                             scenario_options         the buttons on each card
                             scenario_outcomes        what each button can lead to
   data/origins.xlsx         origins                  one row per origin card
@@ -29,7 +30,7 @@ DATA = os.path.join(ROOT, "data")
 
 TILES = os.path.join(DATA, "tiles.xlsx")
 TOKENS = os.path.join(DATA, "tokens.xlsx")
-SCENARIOS = os.path.join(DATA, "scenarios.xlsx")
+CARDS = os.path.join(DATA, "cards.xlsx")
 ORIGINS = os.path.join(DATA, "origins.xlsx")
 GOLD = os.path.join(DATA, "gold_variables.csv")
 SHOPS = os.path.join(DATA, "shops.xlsx")
@@ -66,6 +67,24 @@ ORIGINS_SHEET = "origins"
 SCENARIO_INTRO = "scenario_intro"
 SCENARIO_OPTIONS = "scenario_options"
 SCENARIO_OUTCOMES = "scenario_outcomes"
+#[[ generic: art-only cards, a card per row but no options or outcomes. Its
+# own headers (id, set, description) map onto scenario_intro's (scenario_id,
+# region, flavor) in intro_rows(). face_url / back_url (on both sheets) replace
+# the template's art at import; empty keeps it.
+GENERIC_SHEET = "generic"
+GENERIC_COLUMNS = {"id": "scenario_id", "set": "region", "description": "flavor"}
+
+
+def intro_rows(wb=None):
+  """Every card row: scenario_intro, then generic renamed to its headers."""
+  wb = wb or load(CARDS)
+  rows = read_rows(CARDS, SCENARIO_INTRO, "scenario_id", wb)
+  if GENERIC_SHEET in wb.sheetnames:
+    for r in read_rows(CARDS, GENERIC_SHEET, "id", wb):
+      for src, dst in GENERIC_COLUMNS.items():
+        r[dst] = r.pop(src, "")
+      rows.append(r)
+  return rows
 
 
 def outcome_id(scenario_id, outcome_key):
@@ -189,11 +208,10 @@ def save(wb, path):
 
 def scenario_node_ids():
   """Every node id the game can see: intros and their outcomes."""
-  wb = load(SCENARIOS)
-  ids = {r["scenario_id"] for r in read_rows(SCENARIOS, SCENARIO_INTRO,
-                                             "scenario_id", wb)}
+  wb = load(CARDS)
+  ids = {r["scenario_id"] for r in intro_rows(wb)}
   ids |= {outcome_id(r["scenario_id"], r["outcome_key"])
-          for r in read_rows(SCENARIOS, SCENARIO_OUTCOMES, "outcome_key", wb)}
+          for r in read_rows(CARDS, SCENARIO_OUTCOMES, "outcome_key", wb)}
   return ids
 
 

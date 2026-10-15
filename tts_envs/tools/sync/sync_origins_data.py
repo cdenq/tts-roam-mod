@@ -17,8 +17,8 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/: datasets, spawn_cells, lua_inline
 from spawn_cells import SPAWN_CATEGORIES, read_spawn, referenced_names
-from datasets import (ROOT, ORIGINS, ORIGINS_SHEET, SCENARIOS,
-                      SCENARIO_INTRO, read_rows, item_names, token_names,
+from datasets import (ROOT, ORIGINS, ORIGINS_SHEET, CARDS,
+                      intro_rows, read_rows, item_names, token_names,
                       scenario_node_ids,
                       template_cell, template_collisions)
 
@@ -50,7 +50,7 @@ def main():
   # Scenario ids live in the same GMNotes namespace, so a collision would make
   # a card resolve to the wrong table.
   node_ids = set()
-  if os.path.exists(SCENARIOS):
+  if os.path.exists(CARDS):
     node_ids = scenario_node_ids()
 
   known = item_names()
@@ -105,9 +105,8 @@ def main():
   #[[ Every card lands in the one Card Importer bag carrying its id in
   # GMNotes, so no template -- origin or scenario -- may share an id.
   templates = [o["template"] for o in origins]
-  if os.path.exists(SCENARIOS):
-    templates += [r.get("template", "") for r in
-                  read_rows(SCENARIOS, SCENARIO_INTRO, "scenario_id")]
+  if os.path.exists(CARDS):
+    templates += [r.get("template", "") for r in intro_rows()]
   template_collisions(templates, node_ids | set(seen), "a card id")
 
   # ---- build the Lua ------------------------------------------------------
