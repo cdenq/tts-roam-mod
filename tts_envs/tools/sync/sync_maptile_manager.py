@@ -14,6 +14,7 @@ Sheets read (tools/build/scaffold_maptile_xlsx.py creates and tops them up):
                        landmarks ("a|b|b"), gmnotes + memo (stamped on the spawned landmark; "{biome}" =
                        the tile's biome), flavor ("line|line": one is announced)
   exploration          biome + one weight column per resource / poi outcome  (blank / 0 = never)
+  explore_special      biome, label, tooltip, flavor: that biome's fifth Explore choice (guildhall: Eat)
   density              density, explorations
   weights              param, pool        ("a|b|b": b is twice as likely)
   tiers                biome, tier, gmnotes, tileset
@@ -303,6 +304,16 @@ def main():
         rows.setdefault(o["category"], []).append((col, weight))
     if rows:
       exploration[r["biome"]] = rows
+  # explore_special: a biome's own fifth Explore choice
+  special = {}
+  for r in read_rows(MAPTILES, "explore_special", "biome", wb):
+    if r["biome"] not in biomes:
+      sys.exit("%s: biome %r is not on biome_descriptions" % (r["_where"], r["biome"]))
+    if not r.get("label"):
+      sys.exit("%s: needs a label (the button text)" % r["_where"])
+    special[r["biome"]] = {"label": r["label"], "tooltip": r.get("tooltip", ""),
+                           "flavor": [v.strip() for v in r.get("flavor", "").split("|") if v.strip()]}
+
   unexplorable = sorted(set(biomes) - set(exploration))
   if unexplorable:
     warn("%d biomes have no exploration weights (Explore finds nothing): %s"
@@ -349,6 +360,11 @@ def main():
   for b, rows in exploration.items():
     L.append("    [%s] = {%s}," % (lua_str(b), ", ".join(
       "%s = {%s}" % (cat, ", ".join("{%s, %d}" % (lua_str(o), w) for o, w in row)) for cat, row in rows.items())))
+  L.append("  },")
+  L.append("  special = {")
+  for b, v in special.items():
+    L.append("    [%s] = {label = %s, tooltip = %s, flavor = %s}," % (
+      lua_str(b), lua_str(v["label"]), lua_str(v["tooltip"]), lua_list(v["flavor"])))
   L.append("  },")
   L.append("  images = {")
   for key, url in images.items():

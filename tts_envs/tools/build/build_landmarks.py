@@ -18,7 +18,7 @@ design unit, so the canvas size never changes how big a landmark is drawn.
 
 (`landmark_class` rows give the heights; `landmark_tier` rows say which class
 each landmark size is; an optional `landmark_scale` row multiplies one
-landmark's height, e.g. guild_tower x1.5.) The height is reached by RE-DRAWING at a fitted width,
+landmark's height, e.g. guild_tower x1.5, or per size: guildhall |||1.2.) The height is reached by RE-DRAWING at a fitted width,
 not by resizing the image, so the ink line is the same weight on every
 landmark. Something too wide to reach its height inside the canvas is drawn
 as tall as fits, and the build says so.
@@ -1854,15 +1854,19 @@ def parse_tiers(raw, widths, classes):
 
 
 def parse_scales(raw, widths):
-  """landmark_scale rows -> {landmark: height multiplier}; missing = 1."""
+  """landmark_scale rows -> {landmark: [height multiplier per size]}; missing = 1.
+  One value covers every size (`1.5`); per size like landmark_size (`|||1.2`, blank = 1)."""
   out = {}
   for name, value in raw.items():
     if name not in widths:
       die("landmark_scale.%s: no landmark_size row for it" % name)
     try:
-      out[name] = float(value)
+      parts = [float(v) if v.strip() else 1.0 for v in value.split("|")]
     except ValueError:
-      die("landmark_scale.%s: %r is not a number" % (name, value))
+      die("landmark_scale.%s: %r is not a number or x1|x2|x3|x4" % (name, value))
+    if len(parts) > SIZES:
+      die("landmark_scale.%s: at most %d slots" % (name, SIZES))
+    out[name] = parts * SIZES if len(parts) == 1 else parts + [1.0] * (SIZES - len(parts))
   return out
 
 
@@ -2015,7 +2019,7 @@ def main():
     for size in sizes:
       file = "%s_s%d.png" % (name, size)
       cls = tiers[name][size - 1]
-      width, capped = fit_width(lm, name, size, widths[name][size - 1], classes[cls] * scales.get(name, 1.0))
+      width, capped = fit_width(lm, name, size, widths[name][size - 1], classes[cls] * scales.get(name, [1.0] * SIZES)[size - 1])
       img = draw_landmark(lm, name, size, width).resize((lm["out_size"], lm["out_size"]), Image.LANCZOS)
       area = lm["unit_px"] ** 2  # MIN_PIECE / MAX_HOLE are in design units squared
       # place AFTER the clean-up, so a dropped mote cannot pull it off centre

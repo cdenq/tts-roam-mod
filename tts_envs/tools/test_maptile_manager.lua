@@ -27,7 +27,7 @@ local function newObject(fields)
   function o.getGMNotes() return o.GMNotes or "" end
   function o.getName() return o.Nickname or "" end
   function o.isDestroyed() return false end
-  function o.setLock() end
+  function o.setLock(v) o.locked = v end
   function o.getPosition() return {x = 10, y = 1, z = 20} end
   function o.getRotation() return {x = 0, y = 90, z = 0} end
   return o
@@ -263,12 +263,13 @@ MAPTILE.exploration.forest = {resource = {{"resource_none", 1}}}
 tileExplore(t, "Red")
 check(t.memo == "d=2|explore=2|rendered=0", "Explore alone spends nothing")
 check(#t.buttons == 6 and t.buttons[1].label == "Wander" and t.buttons[2].label == "Resources"
-      and t.buttons[3].label == "Points of interest" and t.buttons[4].label == "Experiences",
+      and t.buttons[3].label == "Landmarks" and t.buttons[4].label == "Experiences",
       "Explore swaps for the four choices")
 check(t.buttons[1].tooltip:find("Randomly picks") and t.buttons[4].tooltip:find("Draw the next event card"),
       "choices carry their tooltips")
 timers[nextTimer]()
 check(t.buttons[1].label == "Explore: 2" and t.memo == "d=2|explore=2|rendered=0", "untouched choices time out back to Explore")
+check(t.locked ~= true, "an unrendered tile stays movable")
 tileExplore(t, "Red")
 local first = nextTimer
 tileExplore(t, "Red")
@@ -324,7 +325,7 @@ choose(explorePoi, "poi", "cave")
 c = globalCalls[#globalCalls]
 check(c.args.name == "Hollow" or c.args.name == "Burrow" or c.args.name == "Cave" or c.args.name == "Warren",
       "Points of interest spawns from the outcome's landmark pool")
-check(messages[#messages]:find("for points of interest %(0 left%): "), "POI announces itself")
+check(messages[#messages]:find("for landmarks %(0 left%): "), "POI announces itself")
 calls = #globalCalls
 local tile = choose(explorePoi, "poi", "poi_none")
 check(#globalCalls == calls and tile.memo:find("explore=0") and not messages[#messages]:find("%)$"), "none: spends the explore, spawns nothing, flavor only")
@@ -354,7 +355,7 @@ for _ = 1, 600 do
   local w = freshTile(); tileExplore(w, "Red"); exploreWander(w, "Red")
   local m = messages[#messages]
   if m:find("for resources") then heads.resource = heads.resource + 1
-  elseif m:find("for points of interest") then heads.poi = heads.poi + 1
+  elseif m:find("for landmarks") then heads.poi = heads.poi + 1
   elseif m:find("looks for the locals") then heads.event = heads.event + 1 end
 end
 check(heads.resource > 120 and heads.poi > 120 and heads.event > 120, "Wander lands on all three, roughly evenly")
@@ -367,6 +368,40 @@ end
 local mined = #globalCalls - calls
 check(mined > 1350 and mined < 1650, "weights set the odds (3:1 -> ~1500/2000, got " .. mined .. ")")
 MAPTILE.exploration.forest = forestExplore
+
+print("== render draws the region's event ==")
+local drawn = {}
+bags[EVENT_BAGS.woodland] = {getObjects = function() return {{guid = "ev9"}} end,
+                             takeObject = function(p) table.insert(drawn, p) end, isDestroyed = function() return false end}
+local rt = freshTile()
+tileRender(rt)
+check(rt.locked == true and rt.buttons[1].label ~= "Render", "Render locks the tile in place")
+check(#drawn == 1 and drawn[1].position[1] == 10 and drawn[1].position[3] == 20 and drawn[1].rotation[3] == 0,
+      "Render takes the region's top event card, face up on the tile")
+check(messages[#messages]:find("an event card is drawn from the woodland bag"), "Render announces the draw")
+tileRender(rt)
+check(#drawn == 1, "a second Render draws nothing")
+bags[EVENT_BAGS.woodland] = nil
+rt = freshTile()
+tileRender(rt)
+check(messages[#messages]:find("no event bag for woodland") and rt.memo:find("rendered=1"), "missing bag: said, render still spent")
+
+print("== special fifth choice ==")
+local gh = newObject({Nickname = "Guildhall", GMNotes = "guildhall", memo = "d=1|explore=2|rendered=1"})
+function gh.getGUID() return "gh1" end
+tileExplore(gh, "Red")
+check(#gh.buttons == 6 and gh.buttons[5].label == MAPTILE.special.guildhall.label, "guildhall gets a fifth choice")
+exploreSpecial(gh, "Red")
+check(gh.memo:find("explore=1") and messages[#messages]:find("^RedPlayer: Eat at the Guildhall %(1 left%): "),
+      "the special choice spends an explore and announces")
+local fo = freshTile(); tileExplore(fo, "Red")
+check(#fo.buttons == 6 and fo.buttons[5].label == "Render", "a biome without one gets only the four (+ Render, ?)")
+local before = #messages
+for _ = 1, 200 do local w = newObject({Nickname = "Guildhall", GMNotes = "guildhall", memo = "d=1|explore=1|rendered=1"})
+  function w.getGUID() return "w" end; tileExplore(w, "Red"); exploreWander(w, "Red") end
+local ate = false
+for i = before + 1, #messages do if messages[i]:find(": Eat at") then ate = true end end
+check(not ate, "Wander never picks the special choice")
 
 print("== draw random ==")
 local before = #spawned

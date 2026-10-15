@@ -13,6 +13,7 @@ biomes, patterns or densities in asset_variables.csv just add rows.
   maptile_table         biome: what Render spawns         gmnotes
   explore_outcomes      Explore outcome: what it does     outcome (hand-filled)
   exploration           biome: weight per outcome         biome (resource + poi columns)
+  explore_special       biome: its fifth Explore choice   biome (hand-filled)
   density               density stage                     density -> explorations
   weights               draw roll                         param -> pool ("a|b|b" = b twice as likely)
   tiers                 tier of a tiered biome            biome + tier -> gmnotes, tileset (hand-filled)
@@ -58,6 +59,8 @@ SHEETS = {
   # one weight column per resource / poi row on explore_outcomes; add a column when an outcome is added
   "exploration": ["biome", "fishing", "mining", "forestry", "hunting", "herbalism", "resource_none",
                   "camp", "cave", "caravan", "beehive", "shrine", "warehouse", "bank", "poi_none", "notes"],
+  # a biome's fifth Explore choice (hand-filled; most biomes have none)
+  "explore_special": ["biome", "label", "tooltip", "flavor", "notes"],
   "density": ["density", "explorations", "notes"],
   "weights": ["param", "pool", "notes"],
   "tiers": ["biome", "tier", "gmnotes", "tileset", "notes"],
@@ -170,6 +173,7 @@ def main():
   report.append(("maptile_table", sheet(wb, "maptile_table", SHEETS["maptile_table"]), "gmnotes",
                  [{"gmnotes": r["name"]} for r in biomes]))
   sheet(wb, "explore_outcomes", SHEETS["explore_outcomes"])
+  sheet(wb, "explore_special", SHEETS["explore_special"])
   sheet(wb, "landmark_table", SHEETS["landmark_table"])
   report.append(("exploration", sheet(wb, "exploration", SHEETS["exploration"]), "biome",
                  [{"biome": r["name"]} for r in biomes]))

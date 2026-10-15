@@ -56,12 +56,13 @@ the explore. Resources / Points of interest roll the biome's weights for that
 category and clone the landmark onto the tile's centre, stamped with the
 outcome's GMNotes + memo. Experiences takes the top card of the region's
 EVENT_BAGS bag. Wander picks one of the three for you. Every outcome is
-announced with its flavor (explore_outcomes sheet).
+announced with its flavor (explore_outcomes sheet). A biome on explore_special
+gets a fifth choice (the guildhall's Eat) that spends an explore and announces.
 ]]
 
 --[[ BEGIN GENERATED MAPTILE DATA -- do not edit ]]
 MAPTILE = {decks = {}, biomes = {}, patterns = {}, orientations = {}, densities = {},
-           images = {}, explore = {}, weights = {}, table = {}, outcomes = {}, exploration = {}}
+           images = {}, explore = {}, weights = {}, table = {}, outcomes = {}, exploration = {}, special = {}}
 --[[ END GENERATED MAPTILE DATA ]]
 
 TEMPLATE_GM = "maptile_template"
@@ -129,7 +130,7 @@ EXPLORE_CHOICES = {
   {fn = "exploreResources", label = "Resources",
    tooltip = "Focus on finding resources. Chance to find a Mining, Fishing, Herbalism, Hunting, or Forestry node "
              .. "for this biome."},
-  {fn = "explorePoi", label = "Points of interest",
+  {fn = "explorePoi", label = "Landmarks",
    tooltip = "Focus on finding points of interests. Chance to find various Landmarks with long-lasting impact on "
              .. "the map for this biome."},
   {fn = "exploreExperiences", label = "Experiences",
@@ -140,7 +141,7 @@ EXPLORE_CHOICES = {
 -- How each choice is announced: player, tile name, explores left.
 EXPLORE_HEADS = {
   resource = "%s searches the %s for resources (%d left): ",
-  poi = "%s searches the %s for points of interest (%d left): ",
+  poi = "%s searches the %s for landmarks (%d left): ",
   event = "%s looks for the locals in the %s (%d left): ",
 }
 
@@ -156,8 +157,9 @@ TILE_UI = {
   RENDER_POS = {0, 0, 0},
   HELP_POS = {0.8, 0, 0.8},
   -- the four explore choices, 2x2 where the Explore button was: Wander, Resources, Points of interest, Experiences
-  CHOICE_POS = {{-0.5, 0, -0.95}, {0.5, 0, -0.95}, {-0.5, 0, -0.65}, {0.5, 0, -0.65}},
-  CHOICE_W = 640,
+  CHOICE_POS = {{-0.42, 0, -0.78}, {0.42, 0, -0.78}, {-0.42, 0, -0.5}, {0.42, 0, -0.5}},
+  CHOICE_W = 560,
+  SPECIAL_POS = {0, 0, -0.22},  -- the biome's fifth choice (explore_special), centred under the grid
   BTN_W = 520, BTN_H = 160, BTN_FONT = 95, BTN_SCALE = 0.5,
   HELP_W = 160,
   HELP_COLOR = {0.9, 0.87, 0.78},
@@ -671,12 +673,17 @@ renderTile = function(obj)
     for i, c in ipairs(EXPLORE_CHOICES) do
       tileButton(obj, c.fn, c.label, c.tooltip, TILE_UI.CHOICE_POS[i], TILE_UI.EXPLORE_COLOR, TILE_UI.CHOICE_W)
     end
+    local special = MAPTILE.special[obj.getGMNotes()]
+    if special then
+      tileButton(obj, "exploreSpecial", special.label, special.tooltip, TILE_UI.SPECIAL_POS, TILE_UI.EXPLORE_COLOR,
+                 TILE_UI.CHOICE_W)
+    end
   elseif m.explore > 0 then
     tileButton(obj, "tileExplore", "Explore: " .. m.explore, "Explore this tile (" .. m.explore .. " left)",
                TILE_UI.EXPLORE_POS, TILE_UI.EXPLORE_COLOR)
   end
   if m.rendered == 0 then
-    tileButton(obj, "tileRender", "Render", "Spawn what this tile holds (once)", TILE_UI.RENDER_POS,
+    tileButton(obj, "tileRender", "Render", "Lock-in this maptile as the explored part of the world.", TILE_UI.RENDER_POS,
                TILE_UI.RENDER_COLOR)
   end
   tileButton(obj, "tileHelp", "?", "Toggle show-effects; hover over the tile to see its effects.",
@@ -760,15 +767,18 @@ local function findExperience(obj, color, left)
   broadcastToAll(exploreHead(obj, color, "event", left) .. said, {0.7, 0.9, 1})
 end
 
---[[ Global owns the spawn pipeline (bags, unique takes, gold). Global.call
-passes one table, and the tile goes by GUID because spawnFrom needs the object. ]]
+--[[ Render: the biome's maptile_table row, then the region's top event card,
+both onto the tile's centre. Global owns the spawn pipeline (bags, unique
+takes, gold); Global.call passes one table, so the tile goes by GUID. ]]
 local function renderEffect(obj)
   local spawn = MAPTILE.table[obj.getGMNotes()]
-  if spawn == nil then
-    printToAll(obj.getName() .. ": nothing to render.", {0.8, 0.8, 0.8})
-    return
+  if spawn ~= nil then
+    Global.call("spawnFromFor", {guid = obj.getGUID(), spawn = spawn})
   end
-  Global.call("spawnFromFor", {guid = obj.getGUID(), spawn = spawn})
+  local deck = MAPTILE.biomes[obj.getGMNotes()].deck
+  local err = drawEvent(obj, deck)
+  printToAll(obj.getName() .. ": " .. (err or "an event card is drawn from the " .. deck .. " bag") .. ".",
+             err and {1, 0.6, 0.3} or {0.8, 0.8, 0.8})
 end
 
 -- Close a tile's choices: stop its timeout so a late tick cannot re-render a newer menu.
@@ -823,7 +833,17 @@ function exploreExperiences(obj, color)
   if left then findExperience(obj, color, left) end
 end
 
--- No announcement of its own: the choice it lands on announces itself.
+-- The biome's own fifth choice (explore_special): spends an explore, announces its flavor.
+function exploreSpecial(obj, color)
+  local special = MAPTILE.special[obj.getGMNotes()]
+  local left = special and spendExplore(obj, color)
+  if not left then return end
+  local said = #special.flavor > 0 and pick(special.flavor) or (special.label .. ".")
+  broadcastToAll(string.format("%s: %s at the %s (%d left): ", Player[color].steam_name, special.label,
+                               obj.getName(), left) .. said, {0.7, 0.9, 1})
+end
+
+-- No announcement of its own: the choice it lands on announces itself. Never the special choice.
 function exploreWander(obj, color, alt)
   local choices = {exploreResources, explorePoi, exploreExperiences}
   choices[math.random(#choices)](obj, color, alt)
@@ -840,6 +860,7 @@ function tileRender(obj)
   if m.rendered ~= 0 then return end
   m.rendered = 1
   obj.memo = encodeMemo(m)
+  obj.setLock(true)  -- saved with the object, so it stays locked across reloads
   renderTile(obj)
   renderEffect(obj)
 end

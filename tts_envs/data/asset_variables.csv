@@ -289,6 +289,9 @@ landmark_scale,tree,1.5,forestry node
 landmark_scale,knave_camp,1.15,both knave camps
 landmark_scale,guild_tower,1.5,every tower size
 landmark_scale,eyrie_tower,1.5,every size (matches guild_tower)
+landmark_scale,guildhall,|||1.2,size 4 only (Guild Keep). Per-size slots like landmark_size; blank = 1
+landmark_scale,eyrie_roost,1.2,size 4 only
+landmark_scale,marquise_keep,1.2,size 4 only
 landmark_size,guildhall,380|500|620|720,width at size 1|2|3|4 (design units of the 1024 canvas). Size 3 = the tile centerpiece drawing
 riverside,variants,1,
 riverside,patterns,deadend|corner|straight|tee|cross,

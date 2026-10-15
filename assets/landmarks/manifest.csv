@@ -15,7 +15,7 @@ cave_s1,cave,1,base,1060.0,1004329443,cave_s1.png
 cave_s2,cave,2,big,935.2,584452669,cave_s2.png
 cave_s3,cave,3,special,721.3,1439890119,cave_s3.png
 cave_s4,cave,4,capitol,860.0,1270246762,cave_s4.png
-eyrie_roost_s4,eyrie_roost,4,capitol,746.0,156121982,eyrie_roost_s4.png
+eyrie_roost_s4,eyrie_roost,4,capitol,895.2,156121982,eyrie_roost_s4.png
 eyrie_tower_s1,eyrie_tower,1,base,688.9,1000051831,eyrie_tower_s1.png
 eyrie_tower_s2,eyrie_tower,2,big,664.1,580010785,eyrie_tower_s2.png
 eyrie_tower_s3,eyrie_tower,3,special,647.4,1435841427,eyrie_tower_s3.png
@@ -28,7 +28,7 @@ guild_tower_s4,guild_tower,4,capitol,540.2,1378026548,guild_tower_s4.png
 guildhall_s1,guildhall,1,base,701.7,2052714700,guildhall_s1.png
 guildhall_s2,guildhall,2,big,837.5,1666228054,guildhall_s2.png
 guildhall_s3,guildhall,3,special,751.5,341299168,guildhall_s3.png
-guildhall_s4,guildhall,4,capitol,794.5,171131969,guildhall_s4.png
+guildhall_s4,guildhall,4,capitol,953.4,171131969,guildhall_s4.png
 herb_s1,herb,1,small,441.1,783715348,herb_s1.png
 knave_camp_s1,knave_camp,1,big,858.1,963112602,knave_camp_s1.png
 knave_camp_s2,knave_camp,2,special,1038.0,544128256,knave_camp_s2.png
@@ -37,7 +37,7 @@ marquise_barracks_s1,marquise_barracks,1,base,592.1,1264603736,marquise_barracks
 marquise_barracks_s2,marquise_barracks,2,big,647.7,1382646210,marquise_barracks_s2.png
 marquise_barracks_s3,marquise_barracks,3,special,606.9,627994932,marquise_barracks_s3.png
 marquise_barracks_s4,marquise_barracks,4,capitol,688.6,990570197,marquise_barracks_s4.png
-marquise_keep_s4,marquise_keep,4,capitol,788.6,1456474937,marquise_keep_s4.png
+marquise_keep_s4,marquise_keep,4,capitol,946.3,1456474937,marquise_keep_s4.png
 mineral_node_s1,mineral_node,1,small,483.2,223686796,mineral_node_s1.png
 otter_barracks_s1,otter_barracks,1,base,645.7,2029892079,otter_barracks_s1.png
 otter_barracks_s2,otter_barracks,2,big,735.9,1643438505,otter_barracks_s2.png

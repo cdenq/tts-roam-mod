@@ -66,6 +66,7 @@ ROAM/
     │   ├── test_*.lua        # offline harness, stubs TTS API
     │   └── bin/lua54.exe     # harness interpreter (5.4; TTS is 5.2)
     ├── master_sync.cmd       # rebuild everything + run tests
+    ├── ship.sh               # Git Bash: git add . + commit + push (`./tts_envs/ship.sh "msg"`)
     ├── master_reload.lua     # generated; Execute Code -> live-apply Global
     └── debug.lua             # generated; Execute Code -> dump what Global sees
 ```
@@ -472,17 +473,18 @@ A drawn tile is a copy of the bag's template (Custom Tile, GMNotes
 Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + memo):
 - `Explore: N` -- N from the `density` sheet. Click = swap it for four choices (spends nothing); picking one
   spends 1 and brings `Explore: N-1` back (gone at 0). Each choice announces itself with a flavor line:
-  - `Resources` / `Points of interest` -- roll the biome's `exploration` weights for that category; a `landmark`
+  - `Resources` / `Landmarks` -- roll the biome's `exploration` weights for that category; a `landmark`
     outcome clones one from its pool out of bag `6a6425` onto the tile's centre, memo stamped from
     `explore_outcomes` (GMNotes left as the landmark's own kind)
   - `Experiences` -- takes the top card of the tile's region bag (`EVENT_BAGS` in `src/maptile_manager.lua`:
     woodland `570544`, waterside `524231`, opencountry `3546e2`, settlement `8bce91`, scarred `f608d7`) face up
     onto the tile. Bags hold single cards, never decks; never shuffled by script; a drawn card leaves its bag
   - `Wander` -- one of the other three at random
+  - a fifth choice on biomes listed on `explore_special` (guildhall: `Eat`) -- spends an explore and announces its flavor; Wander never picks it
   - untouched for 5 s (`EXPLORE.CHOICE_TIMEOUT`), the choices close and `Explore: N` returns. Not saved: a reload shows `Explore: N` again
 - `?` -- toggles the tile's hover tooltip (name + description). Tiles spawn with it off; grey text =
   off, black = on. State is the object's own `tooltip`, saved by TTS, not the memo
-- `Render` -- once (memo `rendered=1` removes the button); spawns the biome's `maptile_table` row onto the tile's centre, each slot's copy stamped from its `_gmnotes` / `_memo` columns, through Global
+- `Render` -- "Lock-in this maptile as the explored part of the world." Once (memo `rendered=1` removes the button); locks the tile (`setLock(true)`, saved with it); takes the region's top event card (as Experiences) and spawns the biome's `maptile_table` row onto the tile's centre, each slot's copy stamped from its `_gmnotes` / `_memo` columns, through Global
   (`Global.call("spawnFromFor", {guid, spawn})` -> `spawnFrom`, same bags as every other spawn)
 
 ### `data/maptile.xlsx`
@@ -495,6 +497,7 @@ Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + me
 | `maptile_table` | biome (GMNotes) | `gmnotes` + spawn cells (`spawnN`, `spawnmeepleN`, `spawnlandmark1..3`, `spawngold`); names checked against tiles/tokens. Landmarks go in `spawnlandmarkN` (bag `6a6425`), not `spawnmeepleN` -- the sync fails on a landmark in a meeple cell | `<spawncol>_gmnotes` / `<spawncol>_memo` (e.g. `spawnlandmark1_memo`) stamp that slot's copy; blank = keep its own, `{biome}` = the row's biome. A stamp on an empty spawn column fails the sync |
 | `explore_outcomes` | Explore outcome | `outcome` `category` (`resource` / `poi` / `event`) `kind` (`landmark` / `nothing`) `name` `landmarks` (pool, `a\|b\|b`; checked against tokens.xlsx `landmarks`) `gmnotes` `memo` (stamped on the spawned landmark, blank = leave; `{biome}` = the tile's biome) `flavor` (`line\|line`, one is announced). The `event` row = Experiences' flavor |
 | `exploration` | biome | `biome` + one weight column per resource / poi outcome (`fishing` ... `resource_none`, `camp` ... `poi_none`); relative odds within each category, blank/0 = never. A new outcome = a new row there + a new column here; weight on a landmark outcome with no landmarks fails the sync |
+| `explore_special` | biome with a fifth Explore choice | `biome` `label` (button text) `tooltip` `flavor` (`line\|line`) -- hand-filled; most biomes have no row |
 | `landmark_table` | landmark kind (GMNotes) | `gmnotes` (lowercase snake_case) `actions` (`inspect\|enter`: keys of `LANDMARK_ACTIONS` in `src/global.lua`, which hold each action's label + click function) `notes`. `sync_landmark_data.py` -> `LANDMARK_DATA` in Global; warns on a kind no landmark carries, or one carried with no row. New kind = a row; new action = code |
 | `tiers` | biome + tier | `biome` `tier` `gmnotes` `tileset` -- gmnotes = the biome the tile becomes (needs its own `biome_descriptions` row, kept out of the pools); tileset = whose images it uses; a tileset that is not a biome has image rows only |
 | `density` | density stage | `density` `explorations` |
@@ -701,6 +704,7 @@ How to run: see [Offline Generation](#offline-generation).
   - `landmark` rows: `out_size`, `seed_offset`, `margin` (gap under the base)
   - `landmark_size` rows: key = landmark, value = width per size `w1|w2|w3|w4`
     (design units of the 1024 canvas). Blank slot = size not drawn: `|||760` = size 4 only
+  - `landmark_scale` rows: height multiplier on top of the size class; one value (`1.5`) or per size (`|||1.2`, blank = 1)
   - `landmark_colour` rows: colours only landmarks use (brick, marble, ore, fey, ...);
     also uses `global` palette (`stone`, `timber`, `cat_banner`, `bird_banner`, `glow`, ...)
 - landmarks (no people or creatures drawn; they are places):
