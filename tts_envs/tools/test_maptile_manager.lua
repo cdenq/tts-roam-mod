@@ -75,9 +75,6 @@ local allBiomes = {}
 for b, v in pairs(MAPTILE.biomes) do
   allBiomes[v.deck] = allBiomes[v.deck] or {}
   table.insert(allBiomes[v.deck], b)
-  for _, tier in pairs(MAPTILE.tiers[b] or {}) do
-    if MAPTILE.biomes[tier.tileset] == nil then table.insert(allBiomes[v.deck], tier.tileset) end
-  end
 end
 for _, d in ipairs(MAPTILE.decks) do
   d.back = "back_" .. d.id
@@ -246,7 +243,7 @@ check(t ~= nil and t.data.CustomImage.ImageURL == "url:forest|corner|ES|2", "spa
 check(t.data.CustomImage.ImageSecondaryURL == "back_woodland", "back = the deck's back")
 check(t.data.Nickname == "Forest", "name: the biome name only")
 check(t.data.GMNotes == "forest", "GMNotes = biome")
-check(t.data.Memo == "d=2|explore=2|rendered=0", "memo from density table")
+check(t.data.Memo == "d=2|explore=2|rendered=0", "explorations = density")
 check(t.data.GUID == nil, "GUID cleared for TTS to assign")
 check(t.data.Tags[1] == TILE_TAG and t.data.Tags[2] == "Region:woodland" and t.data.Tags[3] == "Biome:forest"
       and #t.data.Tags == 3, "tagged Maptile + Region + Biome, Template tag stripped")
@@ -261,7 +258,7 @@ check(takes == 1, "template taken out once")
 
 print("== tile buttons ==")
 local forestExplore = MAPTILE.exploration.forest
-MAPTILE.exploration.forest = {resource = {{"resource_none", 1}}}
+MAPTILE.exploration.forest = {resources = {"Fishing Node"}}
 tileExplore(t, "Red")
 check(t.memo == "d=2|explore=2|rendered=0", "Explore alone spends nothing")
 check(#t.buttons == 6 and t.buttons[1].label == "Wander" and t.buttons[2].label == "Resources"
@@ -276,6 +273,7 @@ tileExplore(t, "Red")
 local first = nextTimer
 tileExplore(t, "Red")
 check(timers[first] == nil and timers[nextTimer] ~= nil, "re-opening replaces the old timeout")
+MAPTILE.exploration.forest = {resources = {""}}  -- a guaranteed miss for the "Nothing..." check
 exploreResources(t, "Red")
 check(t.memo == "d=2|explore=1|rendered=0" and t.buttons[1].label == "Explore: 1", "a choice spends one explore, Explore returns")
 check(messages[#messages] == "Nothing...", "a resource miss broadcasts Nothing...")
@@ -288,6 +286,7 @@ MAPTILE.table.forest = {meeple = {{"Cave"}}, gold = {1, 3}}
 tileRender(t)
 check(t.memo:find("rendered=1") and #t.buttons == 1 and t.buttons[1].label == "?", "render runs once, then its button goes")
 local call = globalCalls[#globalCalls]
+check(call and call.args.quiet == true, "render asks Global to spawn quietly")
 check(call and call.fn == "spawnFromFor" and call.args.guid == t.guid and call.args.spawn.meeple[1][1] == "Cave",
       "render hands the biome's spawn table to Global by tile GUID")
 tileRender(t)
@@ -296,8 +295,10 @@ MAPTILE.table.forest = nil
 MAPTILE.exploration.forest = forestExplore
 
 print("== explore outcomes ==")
-check(#MAPTILE.exploration.forest.resource > 0 and #MAPTILE.exploration.forest.poi > 0, "sheet weights inlined per category")
-check(MAPTILE.outcomes.event.category == "event" and MAPTILE.outcomes.event.flavor == nil, "flavor is not inlined")
+check(#MAPTILE.exploration.forest.resources > 0, "sheet pools inlined")
+local sawNone = false
+for _, e in ipairs(MAPTILE.exploration.forest.resources) do if e == "" then sawNone = true end end
+check(sawNone, '"none" in a pool arrives as "" (nothing found)')
 local n = 0
 local function freshTile()
   n = n + 1
@@ -305,32 +306,37 @@ local function freshTile()
   function tile.getGUID() return "x" .. n end
   return tile
 end
-local function choose(fn, category, outcome)
-  MAPTILE.exploration.forest = {[category] = {{outcome, 1}}}
+local function choose(fn, pool, landmark)
+  MAPTILE.exploration.forest = {[pool] = {landmark}}
   local tile = freshTile()
   tileExplore(tile, "Red")
   fn(tile, "Red")
   return tile
 end
 local calls = #globalCalls
-choose(exploreResources, "resource", "fishing")
+choose(exploreResources, "resources", "Fishing Node")
 local c = globalCalls[#globalCalls]
 check(#globalCalls == calls + 1 and c.fn == "spawnCopyFromBagFor" and c.args.category == "landmark"
       and c.args.name == "Fishing Node", "Resources spawns the node from the landmark bag")
 check(c.args.position[1] == 10 and c.args.position[3] == 20 and c.args.position[2] > 1, "node drops on the tile's centre")
-check(c.args.stamp.memo == "biome=forest" and c.args.stamp.gm_notes == "", "memo stamped with {biome} filled; GMNotes left to the landmark")
+check(c.args.stamp.memo == nil and c.args.stamp.gm_notes == nil, "no extra_info: memo and GMNotes untouched")
 check(messages[#messages] == "Fishing Node", "broadcasts only the node's name")
-choose(explorePoi, "poi", "cave")
+MAPTILE.extra_info.forest = "region=woodland"
+choose(exploreResources, "resources", "Fishing Node")
+check(globalCalls[#globalCalls].args.stamp.memo == "region=woodland", "the memo is exactly the biome's extra_info")
+choose(explorePoi, "landmarks", "Knave Camp")
+check(globalCalls[#globalCalls].args.stamp.memo == "region=woodland", "Landmarks gets the same extra_info")
+MAPTILE.extra_info.forest = nil
+choose(explorePoi, "landmarks", "Hollow")
 c = globalCalls[#globalCalls]
-check(c.args.name == "Hollow" or c.args.name == "Burrow" or c.args.name == "Cave" or c.args.name == "Warren",
-      "Points of interest spawns from the outcome's landmark pool")
+check(c.args.name == "Hollow", "Landmarks spawns the pool's landmark by name")
 check(messages[#messages] == c.args.name, "Landmarks broadcasts only the landmark's name")
 calls = #globalCalls
-local tile = choose(explorePoi, "poi", "poi_none")
+local tile = choose(explorePoi, "landmarks", "")
 check(#globalCalls == calls and tile.memo:find("explore=0") and messages[#messages] == "Nothing...", "none: spends the explore, spawns nothing, Nothing...")
-MAPTILE.exploration.forest = {resource = {{"fishing", 1}}}
+MAPTILE.exploration.forest = {resources = {"Fishing Node"}}
 local bare = freshTile(); tileExplore(bare, "Red"); explorePoi(bare, "Red")
-check(messages[#messages] == "Nothing..." and logs[#logs]:find("no poi weights for forest"), "no weights: Nothing..., reason logged")
+check(messages[#messages] == "Nothing..." and logs[#logs]:find("no landmarks pool for forest"), "no pool: Nothing..., reason logged")
 
 local taken = {}
 local woodBag = {getObjects = function() return {{guid = "ev1"}} end,
@@ -349,7 +355,7 @@ ex = freshTile(); tileExplore(ex, "Red"); exploreExperiences(ex, "Red")
 check(messages[#messages] == "Nothing..." and logs[#logs]:find("no event bag for woodland"), "missing event bag: Nothing..., reason logged")
 
 local heads = {resource = 0, poi = 0, event = 0}
-MAPTILE.exploration.forest = {resource = {{"fishing", 1}}, poi = {{"camp", 1}}}
+MAPTILE.exploration.forest = {resources = {"Fishing Node"}, landmarks = {"Knave Camp"}}
 bags[EVENT_BAGS.woodland] = {getObjects = function() return {{guid = "e"}} end, takeObject = function() end,
                              isDestroyed = function() return false end}
 for _ = 1, 600 do
@@ -364,11 +370,11 @@ bags[EVENT_BAGS.woodland] = nil
 
 calls = #globalCalls
 for _ = 1, 2000 do
-  MAPTILE.exploration.forest = {resource = {{"mining", 3}, {"resource_none", 1}}}
+  MAPTILE.exploration.forest = {resources = {"Mining Node", "Mining Node", "Mining Node", ""}}
   local tile = freshTile(); tileExplore(tile, "Red"); exploreResources(tile, "Red")
 end
 local mined = #globalCalls - calls
-check(mined > 1350 and mined < 1650, "weights set the odds (3:1 -> ~1500/2000, got " .. mined .. ")")
+check(mined > 1350 and mined < 1650, "repeats set the odds (3 of 4 -> ~1500/2000, got " .. mined .. ")")
 MAPTILE.exploration.forest = forestExplore
 
 print("== render draws the region's event ==")
@@ -376,17 +382,41 @@ local drawn = {}
 bags[EVENT_BAGS.woodland] = {getObjects = function() return {{guid = "ev9"}} end,
                              takeObject = function(p) table.insert(drawn, p) end, isDestroyed = function() return false end}
 local rt = freshTile()
+local said = #messages
 tileRender(rt)
 check(rt.locked == true and rt.buttons[1].label ~= "Render", "Render locks the tile in place")
 check(#drawn == 1 and drawn[1].position[1] == 10 and drawn[1].position[3] == 20 and drawn[1].rotation[3] == 0,
       "Render takes the region's top event card, face up on the tile")
-check(messages[#messages]:find("an event card is drawn from the woodland bag"), "Render announces the draw")
+check(#messages == said, "Render says nothing in chat")
 tileRender(rt)
 check(#drawn == 1, "a second Render draws nothing")
 bags[EVENT_BAGS.woodland] = nil
 rt = freshTile()
 tileRender(rt)
-check(messages[#messages]:find("no event bag for woodland") and rt.memo:find("rendered=1"), "missing bag: said, render still spent")
+check(logs[#logs]:find("no event bag for woodland") and rt.memo:find("rendered=1"), "missing bag: logged only, render still spent")
+
+print("== barren biome hides Resources ==")
+local keepForest = MAPTILE.exploration.forest
+MAPTILE.exploration.forest = {resources = {"", ""}, landmarks = {"Knave Camp"}}
+local bt = freshTile()
+tileExplore(bt, "Red")
+local labels = {}
+for _, b in ipairs(bt.buttons) do labels[b.label] = true end
+check(not labels.Resources and labels.Wander and labels.Landmarks and labels.Experiences, "a none-only pool hides Resources")
+local spawnedRes = false
+local before = #globalCalls
+for _ = 1, 200 do
+  local w = freshTile(); tileExplore(w, "Red"); exploreWander(w, "Red")
+end
+for i = before + 1, #globalCalls do
+  if globalCalls[i].args.name ~= "Knave Camp" then spawnedRes = true end
+end
+check(not spawnedRes, "Wander never lands on Resources there")
+MAPTILE.exploration.forest = keepForest
+bt = freshTile(); tileExplore(bt, "Red")
+labels = {}
+for _, b in ipairs(bt.buttons) do labels[b.label] = true end
+check(labels.Resources, "a pool with a node shows Resources")
 
 print("== special fifth choice ==")
 local gh = newObject({Nickname = "Guildhall", GMNotes = "guildhall", memo = "d=1|explore=2|rendered=1"})
@@ -438,7 +468,7 @@ for _, b in ipairs(MAPTILE.weights["biome:settlement"]) do
   if b == "town" or b == "settlement" then inPool = true end
 end
 check(not inPool, "settlement/town only come from a tier")
-MAPTILE.weights["tier:city"] = {"1"}
+MAPTILE.weights["tier:city"] = {"settlement"}
 SETTINGS = {deck = "settlement", biome = "city", pattern = "corner", orientation = "ES", density = "2"}
 drawSpecific(nil, "White")
 local town = spawned[#spawned]
@@ -446,15 +476,15 @@ check(town.data.CustomImage.ImageURL == "url:settlement|corner|ES|2", "tier 1 ci
 check(town.data.GMNotes == "settlement" and town.data.Nickname == "Settlement", "tier 1 becomes a settlement")
 check(town.data.Memo == "d=2|explore=2|rendered=0", "tier never reaches the memo")
 check(town.data.Tags[2] == "Region:settlement" and town.data.Tags[3] == "Biome:settlement", "tagged by its gmnotes biome")
-MAPTILE.weights["tier:city"] = {"2"}
+MAPTILE.weights["tier:city"] = {"town"}
 drawSpecific(nil, "White")
 check(spawned[#spawned].data.GMNotes == "town" and
       spawned[#spawned].data.CustomImage.ImageURL == "url:town|corner|ES|2", "tier 2 becomes a town on town images")
-MAPTILE.weights["tier:city"] = {"3"}
+MAPTILE.weights["tier:city"] = {"city"}
 drawSpecific(nil, "White")
 check(spawned[#spawned].data.CustomImage.ImageURL == "url:city|corner|ES|2" and
       spawned[#spawned].data.GMNotes == "city", "tier 3 is a city on city images")
-MAPTILE.weights["tier:city"] = {"1", "2", "3"}
+MAPTILE.weights["tier:city"] = {"settlement", "town", "city"}
 MAPTILE.images["settlement|corner|ES|2"] = nil
 MAPTILE.images["town|corner|ES|2"] = nil
 local n0 = #spawned

@@ -107,12 +107,18 @@ GLOBAL_COLOURS = ("ink", "frame", "paper", "path", "path_pebble", "clearing",
                   "berry", "cat_banner", "bird_banner", "foam", "barrow", "barrow_dk", "barrow_lt", "cave",
                   "slag", "slag_dk", "ember", "smoke", "hole", "spoil", "blight", "blight_dk", "blight_lt",
                   "blight_bark", "rot", "cold_rock_lt", "cold_rock_dk", "cold_pine", "cold_pine_dk", "frost",
-                  "lily_flower", "valley")
+                  "lily_flower", "valley", "thorn", "thorn_dk", "spikegrass", "ash", "ash_dk", "bone", "bone_dk",
+                  "ice", "ice_dk", "fern", "fern_dk", "fern_lt", "web", "web_dk", "egg", "egg_dk", "egg_lt",
+                  "silk_bark", "silk_leaf", "silk_leaf_dk", "silk_leaf_lt", "willow", "willow_dk", "willow_lt", "wisp",
+                  "insect_egg", "insect_egg_dot", "fiddle")
 GLOBAL_LISTS = ("roofs", "fields", "flower_colours")
 # Region keys that may be left out; the default reproduces an unwalled region.
 OPTIONAL_REGION_KEYS = {"town_radius": "0", "wall": "none", "outer_icons": "", "outer_spacing": "",
                         "centerpiece": "none", "centerpiece_size": "0",
-                        "feature": "none", "speckle": "", "layout": "scatter", "required": "", "mud": "0"}
+                        "feature": "none", "speckle": "", "layout": "scatter", "required": "", "mud": "0",
+                        "grass_style": "plain", "fog": "", "mill_chance": "0", "water": "", "lily_bloom": "0",
+                        "water_props": "", "wisps": "0", "ground_webs": "0"}
+GRASS_STYLES = ("plain", "spiky")
 WALLS = ("none", "palisade", "menhirs", "stone")
 CENTERPIECES = ("none", "guildhall", "windmill", "statue")
 # how far north of the plaza centre a centerpiece's base sits, as a fraction of
@@ -121,7 +127,7 @@ CENTERPIECE_SETBACK = {"guildhall": 0.3, "windmill": 0.3, "statue": 0.55}
 # area the scatter keeps clear, as (half-width, height) fractions of centerpiece_size
 CENTERPIECE_BOX = {"guildhall": (0.56, 0.66), "windmill": (0.56, 0.66), "statue": (0.42, 1.12)}
 FEATURES = ("none", "river", "pools", "pit", "lake", "canyon", "falls", "mud", "springs",
-            "ponds", "wharf", "flood", "millrace", "dam", "holes", "blight", "cliffs", "bighill")
+            "ponds", "wharf", "flood", "millrace", "dam", "holes", "blight", "cliffs", "bighill", "ice")
 RIVER_FEATURES = ("river", "millrace", "dam")  # all draw the same river first
 LAYOUTS = ("scatter", "rows")
 GLOBAL_STRINGS = ("back_font",)
@@ -129,16 +135,17 @@ GLOBAL_NUMBER_LISTS = ("density_scale",)
 # Feature + wall tuning. Numbers are design units unless named *_count.
 GLOBAL_FEATURE_NUMBERS = ("river_anchor", "river_width", "canyon_width", "pool_count", "mud_count", "spring_count",
                           "menhir_spacing", "stake_spacing", "rampart_spacing", "tower_gap_count",
-                          "hole_count", "cliff_width", "cliff_height", "bighill_size", "lake_land", "wharf_land")
+                          "hole_count", "cliff_width", "cliff_height", "bighill_size", "lake_land", "wharf_land", "ice_count")
 # "lo-hi" pairs
-GLOBAL_RANGES = ("falls_size", "pit_size", "pool_size", "mud_size", "spring_size",
+GLOBAL_RANGES = ("falls_size", "pit_size", "pool_size", "mud_size", "spring_size", "ice_size",
                  "hole_size", "pond_size", "dam_pond_size",
                  "menhir_size", "stake_size", "rampart_size", "tower_size", "field_width", "field_height", "reed_size")
 # Groups in asset_variables.csv that belong to other generators, not regions.
 OTHER_GROUPS = ("gem", "gem_colour", "landmark", "landmark_size", "landmark_colour", "landmark_class", "landmark_tier", "landmark_scale", "card",
                 "meeple", "meeple_colour", "meeple_shape", "meeple_skin")
 GLOBAL_NUMBERS = ("out_size", "supersample", "seed", "frame_width", "paper_tint", "back_gem_size",
-                  "paper_grain", "vignette", "path_width", "path_wobble")
+                  "paper_grain", "vignette", "path_width", "path_wobble", "fog_alpha",
+                  "web_alpha", "halo_alpha")
 
 # Set by setup() from the CSV. Every length in this file is in DESIGN units
 # (a tile is 1024 wide); u() converts to canvas pixels.
@@ -203,7 +210,7 @@ def parse_global(raw):
       g[k] = (lo, hi)
   except ValueError as e:
     die("global: bad value %s" % e)
-  for k in ("pool_count", "mud_count", "spring_count", "hole_count"):
+  for k in ("pool_count", "mud_count", "spring_count", "hole_count", "ice_count"):
     g[k] = int(g[k])
   for k in ("out_size", "supersample", "seed"):
     g[k] = int(g[k])
@@ -265,6 +272,7 @@ def parse_region(name, raw):
     r["town_radius"] = float(opt["town_radius"])
     r["outer_spacing"] = float(opt["outer_spacing"] or raw["spacing"])
     r["mud"] = int(opt["mud"])  # battlefield mud patches on top of any feature
+    r["mill_chance"] = float(opt["mill_chance"])  # river only: odds a tile also gets a watermill
   except ValueError as e:
     die("%s: bad value %s" % (name, e))
   if opt["wall"] not in WALLS:
@@ -283,6 +291,35 @@ def parse_region(name, raw):
     if opt[key] not in allowed:
       die("%s.%s: unknown %r (use %s)" % (name, key, opt[key], " ".join(allowed)))
     r[key] = opt[key]
+  if opt["grass_style"] not in GRASS_STYLES:
+    die("%s.grass_style: unknown %r (use %s)" % (name, opt["grass_style"], " ".join(GRASS_STYLES)))
+  r["grass_style"] = opt["grass_style"]
+  r["fog"] = None
+  if opt["fog"]:
+    try:
+      colour, count = opt["fog"].split(":")
+      r["fog"] = (hexrgb(colour), int(count))
+    except ValueError:
+      die("%s.fog: %r is not #colour:count" % (name, opt["fog"]))
+  try:
+    r["lily_bloom"] = float(opt["lily_bloom"])
+    r["wisps"] = int(opt["wisps"])
+    r["ground_webs"] = int(opt["ground_webs"])
+  except ValueError as e:
+    die("%s: bad value %s" % (name, e))
+  r["water"] = None
+  if opt["water"]:
+    try:
+      r["water"] = dict(zip(("water", "water_dk", "water_lt"), (hexrgb(c) for c in opt["water"].split("|"))))
+    except ValueError:
+      die("%s.water: %r is not #base|#shade|#light" % (name, opt["water"]))
+    if len(r["water"]) != 3:
+      die("%s.water: needs 3 colours, #base|#shade|#light" % name)
+  r["water_props"] = parse_icons(name, "water_props", opt["water_props"])
+  if (r["water_props"] or r["wisps"] or r["lily_bloom"]) and opt["feature"] not in WATER_FEATURES:
+    die("%s: water_props, wisps and lily_bloom need feature %s" % (name, " or ".join(WATER_FEATURES)))
+  if r["mill_chance"] and opt["feature"] != "river":
+    die("%s.mill_chance only works with feature river" % name)
   r["speckle"] = []
   for part in opt["speckle"].split("|"):
     if not part.strip():
@@ -1847,6 +1884,702 @@ def paint_catapult(canvas, ax, ay, s, rng):
   dc.ellipse([px - e, py - e, px + e, py + e], fill=G["rock_dk"], outline=G["ink"], width=max(1, int(u(2.5))))
 
 
+def paint_thorn(canvas, ax, ay, s, rng):
+  """Briar giant: one huge woody thorn rising out of the ground and curling
+  over at the top like a hook, with smaller spikes down its back. Sometimes a
+  younger one beside it."""
+  for k, (dx, f) in enumerate(((0.0, 1.0), (rng.choice([-1, 1]) * 0.32, 0.55))):
+    if k and rng.random() < 0.5:
+      continue
+    _thorn(canvas, ax + dx * s, ay + (u(4) if k else 0), s * f, rng, 1 if rng.random() < 0.5 else -1)
+
+
+def _thorn(canvas, ax, ay, s, rng, flip):
+  w, h = s * 1.4, s * 1.4
+  cx, by = PAD + w / 2, PAD + h
+  n, length = 24, s * 1.45
+  curl = math.radians(rng.uniform(190, 240))
+  spine, a, x, y = [], -math.pi / 2 + flip * rng.uniform(0.05, 0.2), cx, by
+  for k in range(n + 1):
+    spine.append((x, y))
+    t = (k + 1) / n
+    a = -math.pi / 2 + flip * (0.12 + curl * t ** 2.2)
+    x, y = x + math.cos(a) * length / n, y + math.sin(a) * length / n
+  left, right = [], []
+  for k, (px, py) in enumerate(spine):
+    half = s * 0.13 * (1 - k / n) ** 0.9 + u(1)
+    (x0, y0), (x1, y1) = spine[max(0, k - 1)], spine[min(n, k + 1)]
+    ln = math.hypot(x1 - x0, y1 - y0) or 1
+    nx, ny = -(y1 - y0) / ln, (x1 - x0) / ln
+    left.append((px + nx * half, py + ny * half))
+    right.append((px - nx * half, py - ny * half))
+  m = blank(w, h)
+  dm = ImageDraw.Draw(m)
+  dm.polygon(left + right[::-1], fill=255)
+  dm.polygon([(cx - s * 0.2, by), (cx, by - s * 0.18), (cx + s * 0.2, by)], fill=255)  # root flare
+  for k in range(3, n - 4, 3):  # spikes off the outer edge, raked back toward the tip
+    (px, py), (qx, qy) = left[k], left[k + 1]
+    ln = math.hypot(qx - px, qy - py) or 1
+    tx, ty = (qx - px) / ln, (qy - py) / ln
+    sx, sy = left[k][0] - spine[k][0], left[k][1] - spine[k][1]
+    sl = math.hypot(sx, sy) or 1
+    reach = s * 0.12 * (1 - k / n) + u(6)
+    tip = (px + sx / sl * reach + tx * reach * 0.8, py + sy / sl * reach + ty * reach * 0.8)
+    dm.polygon([(px - tx * u(8), py - ty * u(8)), tip, (px + tx * u(8), py + ty * u(8))], fill=255)
+  ox, oy = ax - cx, ay - by
+  stamp(canvas, m, ox, oy, G["thorn"], G["thorn_dk"])
+  dc = ImageDraw.Draw(canvas)
+  for k in range(2, n - 6, 4):  # bark rings
+    a_, b_ = left[k], right[k]
+    dc.line([(a_[0] + ox, a_[1] + oy), (b_[0] + ox, b_[1] + oy)], fill=G["thorn_dk"], width=max(1, int(u(3))))
+
+
+def paint_ashpile(canvas, ax, ay, s, rng):
+  """A low heap of grey ash, still smouldering in places."""
+  w, h = s * 1.3, s * 0.7
+  cx, by = PAD + w / 2, PAD + h
+  pts = [(cx + math.cos(math.pi + math.pi * k / 13) * s * 0.55,
+          by + math.sin(math.pi + math.pi * k / 13) * s * 0.36 * rng.uniform(0.8, 1.15)) for k in range(14)]
+  m = _mask_poly(w, h, pts, rng, amp=2.5, sub=2)
+  ox, oy = ax - cx, ay - by
+  stamp(canvas, m, ox, oy, G["ash"], G["ash_dk"], shade_of(G["ash"], 1.12))
+  dc = ImageDraw.Draw(canvas)
+  for _ in range(6):  # charcoal lumps
+    x, y = ax + rng.uniform(-s * 0.35, s * 0.35), ay - s * rng.uniform(0.05, 0.25)
+    e = u(rng.uniform(4, 7))
+    dc.ellipse([x - e, y - e * 0.7, x + e, y + e * 0.7], fill=G["charred"])
+  for _ in range(int(rng.integers(1, 4))):  # ember glints
+    x, y = ax + rng.uniform(-s * 0.25, s * 0.25), ay - s * rng.uniform(0.08, 0.22)
+    e = u(4)
+    dc.ellipse([x - e, y - e, x + e, y + e], fill=G["ember"])
+  x0 = ax + rng.uniform(-s * 0.1, s * 0.1)  # one thin curl of smoke
+  wisp = [(x0 + math.sin(t * 0.9) * u(8), ay - s * 0.35 - t * u(12)) for t in range(7)]
+  dc.line(wisp, fill=G["smoke"], width=max(1, int(u(5))), joint="curve")
+
+
+def _bone(canvas, a, b, width):
+  """One long bone: a shaft with knobbed ends, ink-edged."""
+  _ink_line(canvas, [a, b], G["bone"], width)
+  dc = ImageDraw.Draw(canvas)
+  ln = math.dist(a, b) or 1
+  nx, ny = -(b[1] - a[1]) / ln, (b[0] - a[0]) / ln
+  for x, y in (a, b):
+    for side in (-1, 1):
+      e = width * 0.62
+      px, py = x + side * nx * e * 0.7, y + side * ny * e * 0.7
+      dc.ellipse([px - e, py - e, px + e, py + e], fill=G["bone"], outline=G["ink"], width=max(1, int(u(2.5))))
+
+
+def _skull(canvas, x, y, r, rng):
+  """A small beast's skull, snout to one side."""
+  flip = 1 if rng.random() < 0.5 else -1
+  w = h = r * 4
+  cx, by = PAD + w / 2, PAD + h / 2
+  m = blank(w, h)
+  d = ImageDraw.Draw(m)
+  d.ellipse([cx - r, by - r * 0.9, cx + r, by + r * 0.7], fill=255)
+  d.polygon([(cx + flip * r * 0.4, by - r * 0.4), (cx + flip * r * 1.7, by + r * 0.15), (cx + flip * r * 0.3, by + r * 0.6)],
+            fill=255)
+  ox, oy = x - cx, y - by
+  stamp(canvas, m, ox, oy, G["bone"], G["bone_dk"])
+  dc = ImageDraw.Draw(canvas)
+  e = r * 0.28
+  ex, ey = x + flip * r * 0.25, y - r * 0.1
+  dc.ellipse([ex - e, ey - e, ex + e, ey + e], fill=G["cave"])
+
+
+def paint_bones(canvas, ax, ay, s, rng):
+  """Old bones in the grass: a few long bones crossed over, and a skull."""
+  for _ in range(int(rng.integers(2, 4))):
+    a = rng.uniform(-0.5, 0.5)
+    cx, cy = ax + rng.uniform(-s * 0.25, s * 0.25), ay - s * rng.uniform(0.05, 0.2)
+    half = s * rng.uniform(0.25, 0.38)
+    _bone(canvas, (cx - math.cos(a) * half, cy - math.sin(a) * half * 0.5),
+          (cx + math.cos(a) * half, cy + math.sin(a) * half * 0.5), u(9))
+  _skull(canvas, ax + rng.uniform(-s * 0.15, s * 0.15), ay - s * 0.18, s * 0.15, rng)
+
+
+def paint_bonepost(canvas, ax, ay, s, rng):
+  """A grave-marker: a leaning post with a horned skull lashed to the top and
+  bones hung off a crossbar."""
+  lean = rng.uniform(-0.05, 0.05) * s
+  top = (ax + lean, ay - s * 0.95)
+  _ink_line(canvas, [(ax, ay), top], G["timber"], s * 0.09)
+  bar = ay - s * 0.62
+  _ink_line(canvas, [(ax - s * 0.26 + lean * 0.6, bar), (ax + s * 0.26 + lean * 0.6, bar - s * 0.02)], G["timber"], s * 0.05)
+  dc = ImageDraw.Draw(canvas)
+  for side in (-1, 1):  # bones hanging off the crossbar on cords
+    x = ax + side * s * 0.2 + lean * 0.6
+    dc.line([(x, bar), (x, bar + s * 0.12)], fill=G["ink"], width=max(1, int(u(3))))
+    _bone(canvas, (x, bar + s * 0.12), (x + side * u(3), bar + s * 0.34), u(7))
+  for side in (-1, 1):  # horns curling up from the skull
+    pts = [(top[0] + side * s * 0.06, top[1] - s * 0.02)]
+    for k in range(1, 6):
+      t = k / 5
+      pts.append((top[0] + side * s * (0.06 + 0.2 * math.sin(t * 1.9)), top[1] - s * (0.02 + 0.22 * t)))
+    _ink_line(canvas, pts, G["bone_dk"], s * 0.045)
+  _skull(canvas, top[0], top[1], s * 0.11, rng)
+
+
+def _frond(base, angle, length, droop, width):
+  """Spine + outline of a tapered frond arching out from `base`."""
+  spine = []
+  for k in range(9):
+    t = k / 8
+    a = angle + droop * t * t
+    spine.append((base[0] + math.cos(a) * length * t, base[1] + math.sin(a) * length * t))
+  left, right = [], []
+  for k, (x, y) in enumerate(spine):
+    t = k / 8
+    w = width * math.sin(math.pi * min(1, t * 1.15 + 0.08)) * (1 - 0.6 * t)
+    (x0, y0), (x1, y1) = spine[max(0, k - 1)], spine[min(8, k + 1)]
+    ln = math.hypot(x1 - x0, y1 - y0) or 1
+    nx, ny = -(y1 - y0) / ln, (x1 - x0) / ln
+    left.append((x + nx * w, y + ny * w))
+    right.append((x - nx * w, y - ny * w))
+  return spine, left + right[::-1]
+
+
+def paint_fern(canvas, ax, ay, s, rng):
+  """A low clump of fern fronds arching off both sides."""
+  _fern_crown(canvas, ax, ay - s * 0.05, s, rng, int(rng.integers(5, 8)), s * 0.55)
+
+
+def paint_tallfern(canvas, ax, ay, s, rng):
+  """Fernbrake giant with no trunk: a tall clump of wide fronds straight out
+  of the ground, one or two still furled and standing above the rest."""
+  for _ in range(int(rng.integers(1, 3))):
+    x = ax + rng.uniform(-0.15, 0.15) * s
+    _fiddlehead(canvas, x, ay - s * 0.1, s * rng.uniform(1.1, 1.3), s * 0.1, 1 if rng.random() < 0.5 else -1, u(11))
+  _fern_crown(canvas, ax, ay - s * 0.02, s, rng, int(rng.integers(9, 13)), s * 1.0, upright=0.45, spread=0.95,
+              width=0.14)
+
+
+def paint_fiddleheads(canvas, ax, ay, s, rng):
+  """Three to five young fronds coming up through the leaf litter."""
+  n = int(rng.integers(3, 6))
+  for k in range(n):
+    x = ax + (k - (n - 1) / 2) * s * 0.22 + rng.uniform(-s * 0.04, s * 0.04)
+    _fiddlehead(canvas, x, ay, s * rng.uniform(0.45, 0.75), s * 0.1, 1 if rng.random() < 0.5 else -1, u(7))
+
+
+def _fiddlehead(canvas, x, y, h, r, flip, width):
+  """A curled young frond: a stalk rising into a tight spiral."""
+  top = (x + flip * r, y - h)
+  pts = [(x, y), (x + flip * r * 0.3, y - h * 0.55), top]
+  for k in range(14):  # spiral inward from the top of the stalk
+    a = flip * k * 0.5
+    rr = r * (1 - k / 16)
+    pts.append((top[0] - flip * r + flip * math.cos(a) * rr, top[1] - math.sin(a) * rr * flip))
+  _ink_line(canvas, pts, G["fiddle"], width)
+
+
+def _fern_crown(canvas, cx, cy, s, rng, n, reach, upright=0.35, spread=1.0, width=0.075):
+  """n fronds fanning up from (cx, cy), stamped as one shape, leaflet ticks
+  along each spine. upright 0-1 = how little the fronds droop; spread = how
+  wide the fan opens (1 = horizontal both sides)."""
+  box = s * 2.6
+  m = blank(box, box)
+  dm = ImageDraw.Draw(m)
+  ox, oy = cx - box / 2 - PAD, cy - box / 2 - PAD
+  spines = []
+  for k in range(n):
+    f = (k + 0.5) / n
+    side = -1 if f < 0.5 else 1
+    angle = 1.5 * math.pi + (f - 0.5) * math.pi * spread + rng.normal(0, 0.08) - upright * side * 0.4
+    droop = side * rng.uniform(0.7, 1.1) * (1 - upright)
+    spine, poly = _frond((box / 2 + PAD, box / 2 + PAD), angle, reach * rng.uniform(0.85, 1.1), droop, s * width)
+    dm.polygon(wobble(poly, rng, 1.2, sub=2), fill=255)
+    spines.append([(x + ox, y + oy) for x, y in spine])
+  stamp(canvas, m, ox, oy, G["fern"], G["fern_dk"], G["fern_lt"])
+  d = ImageDraw.Draw(canvas)
+  for spine in spines:
+    d.line(spine[1:-1], fill=G["fern_dk"], width=max(1, int(u(3))), joint="curve")
+    for k in range(2, 8):
+      (x0, y0), (x1, y1) = spine[k - 1], spine[k + 1]
+      ln = math.hypot(x1 - x0, y1 - y0) or 1
+      tx, ty = (x1 - x0) / ln, (y1 - y0) / ln
+      w = s * 0.05 * (1 - k / 10)
+      x, y = spine[k]
+      for side in (-1, 1):
+        d.line([(x, y), (x - side * ty * w + tx * w * 0.6, y + side * tx * w + ty * w * 0.6)], fill=G["fern_dk"],
+               width=max(1, int(u(2.5))))
+
+
+def paint_fallenlog(canvas, ax, ay, s, rng):
+  """An old trunk lying where it fell: moss along the top, shelf fungus, a
+  cut-looking broken end."""
+  flip = 1 if rng.random() < 0.5 else -1
+  w, h = s * 1.4, s * 0.6
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  r = s * 0.15
+  body = _mask_poly(w, h, [(cx - s * 0.6, by), (cx - s * 0.6, by - 2 * r), (cx + s * 0.6, by - 2 * r * 0.9),
+                           (cx + s * 0.6, by)], rng, amp=1.2)
+  stamp(canvas, body, ox, oy, G["gnarl_bark"], G["gnarl_bark_dk"])
+  dc = ImageDraw.Draw(canvas)
+  for k in range(4):  # bark lines along the length
+    y = ay - r * (0.4 + 0.4 * k)
+    dc.line([(ax - s * 0.5, y), (ax + s * 0.45, y + rng.uniform(-u(3), u(3)))], fill=G["gnarl_bark_dk"],
+            width=max(1, int(u(3))))
+  end = blank(w, h)  # the broken end, facing out
+  ex = cx + flip * s * 0.6
+  ImageDraw.Draw(end).ellipse([ex - r * 0.55, by - 2 * r, ex + r * 0.55, by], fill=255)
+  stamp(canvas, end, ox, oy, G["stump_top"])
+  dc.ellipse([ex + ox - r * 0.28, ay - r * 1.5, ex + ox + r * 0.28, ay - r * 0.5], outline=shade_of(G["stump_top"], 0.65),
+             width=max(1, int(u(2.5))))
+  moss = blank(w, h)  # moss blanket along the top
+  dmo = ImageDraw.Draw(moss)
+  for k in range(7):
+    x = cx - s * 0.5 + k * s * 0.15 + rng.uniform(-s * 0.03, s * 0.03)
+    e = s * rng.uniform(0.07, 0.1)
+    dmo.ellipse([x - e, by - 2 * r - e * 0.6, x + e, by - 2 * r + e * 0.8], fill=255)
+  stamp(canvas, moss, ox, oy, G["moss"], shade_of(G["moss"], 0.75), G["oak_lt"])
+  for k in range(int(rng.integers(1, 3))):  # shelf fungus on the side
+    x, y = ax + rng.uniform(-s * 0.3, s * 0.2), ay - r * rng.uniform(0.6, 1.1)
+    e = s * 0.06
+    dc.pieslice([x - e, y - e * 0.5, x + e, y + e * 0.5], 180, 360, fill=G["stump_top"], outline=G["ink"],
+                width=max(1, int(u(3))))
+
+
+def paint_mossrock(canvas, ax, ay, s, rng):
+  """A boulder that has sat here long enough to grow a cap of moss."""
+  paint_rock(canvas, ax, ay, s, rng)
+  w, h = s * 1.3, s * 0.8
+  cx, by = PAD + w / 2, PAD + h
+  m = blank(w, h)
+  d = ImageDraw.Draw(m)
+  for k in range(5):
+    x = cx + (k - 2) * s * 0.15 + rng.uniform(-s * 0.03, s * 0.03)
+    e = s * rng.uniform(0.11, 0.16)
+    d.ellipse([x - e, by - s * 0.55 - e * 0.5, x + e, by - s * 0.55 + e * 0.6], fill=255)
+  rock = blank(w, h)  # keep the moss on the rock's top half
+  ImageDraw.Draw(rock).ellipse([cx - s * 0.62, by - s * 0.7, cx + s * 0.62, by - s * 0.2], fill=255)
+  stamp(canvas, ImageChops.multiply(m, rock), ax - cx, ay - by, G["moss"], shade_of(G["moss"], 0.75), G["oak_lt"])
+
+
+def paint_berrybush(canvas, ax, ay, s, rng):
+  """A dark old-wood bush hung with berries."""
+  _bush(canvas, ax, ay, s, rng, G["oak"], G["oak_dk"], G["oak_lt"])
+  dc = ImageDraw.Draw(canvas)
+  for _ in range(7):
+    x, y = ax + rng.uniform(-s * 0.4, s * 0.4), ay - s * rng.uniform(0.15, 0.5)
+    e = u(6)
+    dc.ellipse([x - e, y - e, x + e, y + e], fill=G["berry"], outline=G["ink"], width=max(1, int(u(2.5))))
+
+
+def paint_reedsheaf(canvas, ax, ay, s, rng):
+  """Cut reeds tied in bundles and stood up together to dry, cattail heads on top."""
+  w, h = s * 1.0, s * 1.1
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  dc = ImageDraw.Draw(canvas)
+  for k, lean in enumerate((-0.16, 0.16, 0.0)):  # back two lean in, front one upright
+    bx = cx + lean * s * 1.2
+    tip = cx + lean * s * 0.3
+    m = _mask_poly(w, h, [(bx - s * 0.1, by), (tip - s * 0.07, by - s * 0.55), (tip - s * 0.16, by - s * 0.92),
+                          (tip + s * 0.16, by - s * 0.92), (tip + s * 0.07, by - s * 0.55), (bx + s * 0.1, by)], rng, amp=1)
+    stamp(canvas, m, ox, oy, G["reed"], shade_of(G["reed"], 0.75), shade_of(G["reed"], 1.2))
+    band_y = by - s * 0.5 + oy
+    dc.line([(tip - s * 0.08 + ox, band_y), (tip + s * 0.08 + ox, band_y)], fill=G["cattail"], width=max(1, int(u(6))))
+    for j in range(4):  # cut stalk strokes
+      x = tip - s * 0.08 + j * s * 0.055 + ox
+      dc.line([(x, by - s * 0.15 + oy), (x + (j - 1.5) * u(3), by - s * 0.85 + oy)], fill=shade_of(G["reed"], 0.7),
+              width=max(1, int(u(2.5))))
+    for j in range(2):  # cattail heads poking out of the top
+      x, y = tip + (j - 0.5) * s * 0.12 + ox, by - s * 0.95 + oy
+      e, f = u(5), u(11)
+      dc.ellipse([x - e - u(3), y - f - u(3), x + e + u(3), y + f + u(3)], fill=G["ink"])
+      dc.ellipse([x - e, y - f, x + e, y + f], fill=G["cattail"])
+
+
+def see_through(canvas, mask, x, y, colour, alpha):
+  """Paste colour through a mask at a fixed alpha. Only for silk, mist and
+  glow halos: everything else is opaque."""
+  a = mask.point(lambda v: int(v * alpha))
+  w, h = mask.size
+  canvas.paste(colour, (int(x), int(y), int(x) + w, int(y) + h), a)
+
+
+def halo(canvas, x, y, r, colour, alpha=None):
+  """A see-through disc of light round a lantern, wisp or eye (global halo_alpha)."""
+  m = Image.new("L", (int(2 * r) + 2, int(2 * r) + 2), 0)
+  ImageDraw.Draw(m).ellipse([0, 0, 2 * r, 2 * r], fill=255)
+  see_through(canvas, m, x - r, y - r, colour, G["halo_alpha"] if alpha is None else alpha)
+
+
+def web_sheet(canvas, anchors, rng):
+  """A side-view web strung between anchor points: milky sheet + strands."""
+  xs, ys = [p[0] for p in anchors], [p[1] for p in anchors]
+  x0, y0 = min(xs) - u(10), min(ys) - u(10)
+  m = Image.new("L", (int(max(xs) - x0 + u(20)), int(max(ys) - y0 + u(20))), 0)
+  ImageDraw.Draw(m).polygon([(x - x0, y - y0) for x, y in anchors], fill=255)
+  see_through(canvas, m, x0, y0, G["web"], G["web_alpha"])
+  d = ImageDraw.Draw(canvas)
+  cx, cy = sum(xs) / len(xs), sum(ys) / len(ys)
+  for x, y in anchors:  # radial strands to every anchor
+    d.line([(cx, cy), (x, y)], fill=G["web"], width=max(1, int(u(2.5))))
+  for f in (0.35, 0.65, 0.9):  # catching rings
+    ring = [(cx + (x - cx) * f, cy + (y - cy) * f) for x, y in anchors]
+    d.line(ring + ring[:1], fill=G["web_dk"], width=max(1, int(u(2))))
+
+
+def ground_web(d, cx, cy, r, rng):
+  """Top-down orb web flat on the ground."""
+  n = int(rng.integers(7, 10))
+  angles = [2 * math.pi * k / n + rng.normal(0, 0.12) for k in range(n)]
+  tips = [(cx + math.cos(a) * r * rng.uniform(0.85, 1.1), cy + math.sin(a) * r * 0.62 * rng.uniform(0.85, 1.1))
+          for a in angles]
+  for t in tips:
+    d.line([(cx, cy), t], fill=G["web"], width=max(1, int(u(3))))
+  for f in (0.25, 0.45, 0.65, 0.85):
+    ring = [(cx + (x - cx) * f, cy + (y - cy) * f) for x, y in tips]
+    d.line(ring + ring[:1], fill=G["web_dk"], width=max(1, int(u(2.5))))
+
+
+def paint_silktree(canvas, ax, ay, s, rng):
+  """Webwood tree: tall crooked dark trunk, high flat ragged canopy, silk
+  sheets strung from the limbs down to the roots."""
+  w, h = s * 1.4, s * 1.6
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  lean = rng.uniform(-0.06, 0.06) * s
+  trunk = blank(w, h)
+  dt = ImageDraw.Draw(trunk)
+  dt.polygon(wobble([(cx - s * 0.1, by), (cx - s * 0.05 + lean, by - s * 0.8), (cx - s * 0.02 + lean, by - s * 1.2),
+                        (cx + s * 0.04 + lean, by - s * 0.82), (cx + s * 0.1, by)], rng, 1.4, sub=2), fill=255)
+  limbs = []
+  for side, y0, reach, rise in ((-1, 0.75, 0.42, 0.28), (1, 0.85, 0.4, 0.3), (-1, 1.0, 0.25, 0.2), (1, 0.6, 0.3, 0.12)):
+    yb = by - s * y0
+    tip = (cx + side * s * reach + lean, yb - s * rise)
+    dt.polygon([(cx + lean, yb + s * 0.035), tip, (cx + lean, yb - s * 0.05)], fill=255)
+    limbs.append((tip[0] + ox, tip[1] + oy))
+  for side in (-1, 1):  # root flare
+    dt.polygon([(cx + side * s * 0.08, by - s * 0.14), (cx + side * s * 0.24, by), (cx, by)], fill=255)
+  # silk fans in the crooks between limb and trunk; now and then one trails to the ground
+  for k, tip in enumerate(limbs[:2]):
+    side = -1 if k == 0 else 1
+    web_sheet(canvas, [tip, (ax + lean * 0.8, ay - s * (0.95 if k else 0.85)), (ax + lean * 0.5, ay - s * 0.5),
+                       (tip[0] - side * s * 0.05, tip[1] + s * 0.32)], rng)
+  if rng.random() < 0.4:
+    tip = limbs[3]
+    web_sheet(canvas, [tip, (tip[0] + s * 0.12, ay - s * 0.02), (tip[0] - s * 0.1, ay - s * 0.02)], rng)
+  bark = G["silk_bark"]
+  stamp(canvas, trunk, ox, oy, bark, shade_of(bark, 0.7))
+  # flat, ragged canopy clumps high up
+  for fx, fy, r in ((-0.3, 1.08, 0.2), (0.28, 1.15, 0.22), (0.0, 1.32, 0.2)):
+    x, y, rr = ax + fx * s + lean, ay - fy * s, r * s
+    m = blank(rr * 3, rr * 2)
+    dm = ImageDraw.Draw(m)
+    for _ in range(5):
+      px = PAD + rr * 1.5 + rng.uniform(-rr * 0.9, rr * 0.9)
+      py = PAD + rr + rng.uniform(-rr * 0.25, rr * 0.2)
+      e = rr * rng.uniform(0.4, 0.55)
+      dm.ellipse([px - e, py - e * 0.6, px + e, py + e * 0.6], fill=255)
+    stamp(canvas, m, x - rr * 1.5 - PAD, y - rr - PAD, G["silk_leaf"], G["silk_leaf_dk"], G["silk_leaf_lt"])
+  # a strand of silk hanging from each canopy clump
+  d = ImageDraw.Draw(canvas)
+  for fx in (-0.3, 0.28):
+    x = ax + fx * s + lean
+    d.line([(x, ay - s * 1.0), (x + u(2), ay - s * rng.uniform(0.55, 0.75))], fill=G["web"], width=max(1, int(u(3))))
+
+
+def paint_webbush(canvas, ax, ay, s, rng):
+  """A bush gone under a shroud of silk."""
+  _bush(canvas, ax, ay, s, rng, G["bush"], G["leaf_dk"], G["leaf_lt"])
+  pts = [(ax - s * 0.52, ay - s * 0.05)]
+  for k in range(7):
+    t = k / 6
+    pts.append((ax - s * 0.5 + t * s, ay - s * (0.45 + 0.18 * math.sin(math.pi * t)) + rng.uniform(-s * 0.04, s * 0.04)))
+  pts.append((ax + s * 0.52, ay - s * 0.05))
+  web_sheet(canvas, pts, rng)
+
+
+def paint_eggsacs(canvas, ax, ay, s, rng):
+  """A clutch of spider egg sacs in a nest of silk."""
+  d = ImageDraw.Draw(canvas)
+  for k in range(5):  # silk nest strands
+    a = math.pi + math.pi * k / 4
+    d.line([(ax, ay - s * 0.1), (ax + math.cos(a) * s * 0.6, ay + math.sin(a) * s * 0.18)], fill=G["web"],
+           width=max(1, int(u(3))))
+  n = int(rng.integers(4, 7))
+  spots = sorted([(ax + rng.uniform(-0.38, 0.38) * s, ay - rng.uniform(0.0, 0.25) * s) for _ in range(n)],
+                 key=lambda p: p[1])
+  for x, y in spots:
+    r = s * rng.uniform(0.17, 0.24)
+    m = blank(2 * r, 2.4 * r)
+    ImageDraw.Draw(m).ellipse([PAD, PAD, PAD + 2 * r, PAD + 2.4 * r], fill=255)
+    stamp(canvas, m, x - r - PAD, y - 2.4 * r - PAD, G["egg"], G["egg_dk"], G["egg_lt"])
+    d.arc([x - r * 0.6, y - 2.0 * r, x + r * 0.6, y - 0.6 * r], 200, 340, fill=G["egg_dk"], width=max(1, int(u(2.5))))
+
+
+def paint_cocoon(canvas, ax, ay, s, rng):
+  """Something about vagabond-sized, wrapped tight in silk, lying on its side.
+  A boot sole pokes out of one end."""
+  w, h = s * 1.4, s * 0.7
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  pts = [(cx + math.cos(a) * s * 0.55, by - s * 0.22 + math.sin(a) * s * 0.2 * (1.15 if math.cos(a) > 0 else 0.9))
+         for a in np.linspace(0, 2 * math.pi, 18, endpoint=False)]
+  m = _mask_poly(w, h, pts, rng, amp=2, sub=2)
+  boot = blank(w, h)
+  ImageDraw.Draw(boot).rounded_rectangle([cx - s * 0.68, by - s * 0.32, cx - s * 0.5, by - s * 0.08], radius=s * 0.05,
+                                         fill=255)
+  stamp(canvas, boot, ox, oy, G["timber"], shade_of(G["timber"], 0.75))
+  stamp(canvas, m, ox, oy, G["web"], G["web_dk"], None)
+  d = ImageDraw.Draw(canvas)
+  for k in range(6):  # wrapping bands
+    x = ax - s * 0.4 + k * s * 0.16
+    d.arc([x - s * 0.08, ay - s * 0.44, x + s * 0.08, ay - s * 0.02], 250, 110, fill=G["web_dk"],
+          width=max(1, int(u(3))))
+
+
+def paint_pack(canvas, ax, ay, s, rng):
+  """An abandoned travel pack with a bedroll, silk drawn over it."""
+  w, h = s * 1.2, s * 1.0
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  body = _mask_poly(w, h, [(cx - s * 0.32, by), (cx - s * 0.3, by - s * 0.55), (cx - s * 0.15, by - s * 0.68),
+                              (cx + s * 0.15, by - s * 0.68), (cx + s * 0.3, by - s * 0.55), (cx + s * 0.32, by)],
+                       rng, amp=1.5, sub=2)
+  stamp(canvas, body, ox, oy, G["hay_dk"], shade_of(G["hay_dk"], 0.75))
+  flap = _mask_poly(w, h, [(cx - s * 0.3, by - s * 0.55), (cx + s * 0.3, by - s * 0.55), (cx + s * 0.22, by - s * 0.32),
+                              (cx - s * 0.22, by - s * 0.32)], rng, amp=1)
+  stamp(canvas, flap, ox, oy, shade_of(G["hay_dk"], 0.85), shade_of(G["hay_dk"], 0.65))
+  roll = blank(w, h)
+  ImageDraw.Draw(roll).rounded_rectangle([cx - s * 0.45, by - s * 0.85, cx + s * 0.45, by - s * 0.62], radius=s * 0.11,
+                                         fill=255)
+  stamp(canvas, roll, ox, oy, G["banner"], shade_of(G["banner"], 0.7))
+  d = ImageDraw.Draw(canvas)
+  e = s * 0.04
+  d.ellipse([ax - e, ay - s * 0.36 - e, ax + e, ay - s * 0.36 + e], fill=G["banner_lt"], outline=G["ink"],
+            width=max(1, int(u(2.5))))
+  web_sheet(canvas, [(ax - s * 0.55, ay), (ax - s * 0.2, ay - s * 0.9), (ax + s * 0.35, ay - s * 0.7),
+                     (ax + s * 0.6, ay)], rng)
+
+
+def paint_willow(canvas, ax, ay, s, rng):
+  """Weeping willow: low dome, curtains of hanging strands to the ground."""
+  w, h = s * 1.5, s * 1.4
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  trunk = blank(w, h)
+  ImageDraw.Draw(trunk).polygon(wobble([(cx - s * 0.1, by), (cx - s * 0.06, by - s * 0.75), (cx + s * 0.06, by - s * 0.75),
+                                           (cx + s * 0.1, by)], rng, 1.3, sub=2), fill=255)
+  stamp(canvas, trunk, ox, oy, G["trunk"], shade_of(G["trunk"], 0.72))
+  dome = blank(w, h)
+  dd = ImageDraw.Draw(dome)
+  ccy = by - s * 0.92
+  dd.ellipse([cx - s * 0.5, ccy - s * 0.3, cx + s * 0.5, ccy + s * 0.3], fill=255)
+  for k in range(6):
+    px = cx - s * 0.5 + k * s * 0.2
+    dd.ellipse([px - s * 0.13, ccy - s * 0.1, px + s * 0.13, ccy + s * 0.3], fill=255)
+  stamp(canvas, dome, ox, oy, G["willow"], G["willow_dk"], G["willow_lt"])
+  for k in range(7):  # hanging strands, ragged lengths
+    x = ax - s * 0.48 + k * s * 0.16 + rng.uniform(-s * 0.03, s * 0.03)
+    top = ay - s * 0.8 + abs(k - 3) * s * 0.04
+    bot = ay - s * rng.uniform(0.08, 0.45)
+    pts = [(x + math.sin(t * 1.3 + k) * u(4), top + (bot - top) * t / 5) for t in range(6)]
+    _ink_line(canvas, pts, G["willow"], u(5))
+
+
+def paint_lanternpost(canvas, ax, ay, s, rng):
+  """A leaning mooring post with a lit lantern nobody is tending."""
+  lean = rng.uniform(-0.12, 0.12) * s
+  top = (ax + lean, ay - s * 0.95)
+  _ink_line(canvas, [(ax, ay), top], G["timber"], s * 0.1)
+  arm = (top[0] + s * 0.22, top[1] + s * 0.02)
+  _ink_line(canvas, [(top[0], top[1] + s * 0.05), arm], G["timber"], s * 0.05)
+  lx, ly = arm[0], arm[1] + s * 0.18
+  halo(canvas, lx, ly, s * 0.32, G["window"])
+  d = ImageDraw.Draw(canvas)
+  d.line([arm, (lx, ly - s * 0.08)], fill=G["ink"], width=max(1, int(u(3))))
+  e = s * 0.075
+  d.rounded_rectangle([lx - e, ly - e * 1.2, lx + e, ly + e * 1.2], radius=e * 0.3, fill=G["window"], outline=G["ink"],
+                      width=max(1, int(u(3.5))))
+  d.line([(lx - e - u(3), ly - e * 1.2), (lx + e + u(3), ly - e * 1.2)], fill=G["ink"], width=max(1, int(u(5))))
+
+
+def paint_steeple(canvas, ax, ay, s, rng):
+  """The top of a drowned chapel's bell tower, the rest under the water."""
+  w, h = s * 0.9, s * 1.5
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  tilt = rng.uniform(-0.06, 0.06) * s
+  tower = _mask_poly(w, h, [(cx - s * 0.22, by), (cx - s * 0.22 + tilt, by - s * 0.6), (cx + s * 0.22 + tilt, by - s * 0.6),
+                               (cx + s * 0.22, by)], rng, amp=1.2)
+  stamp(canvas, tower, ox, oy, G["stone"], G["stone_dk"])
+  arch = blank(w, h)
+  ImageDraw.Draw(arch).rounded_rectangle([cx - s * 0.1 + tilt * 0.6, by - s * 0.5, cx + s * 0.1 + tilt * 0.6, by - s * 0.18],
+                                         radius=s * 0.1, fill=255)
+  stamp(canvas, arch, ox, oy, G["cave"])
+  d = ImageDraw.Draw(canvas)
+  bx, byy = ax + tilt * 0.6, ay - s * 0.36
+  e = s * 0.07
+  d.pieslice([bx - e, byy - e, bx + e, byy + e * 1.4], 180, 360, fill=shade_of(G["banner_lt"], 0.75), outline=G["ink"],
+             width=max(1, int(u(3))))
+  roof = _mask_poly(w, h, [(cx - s * 0.3 + tilt, by - s * 0.58), (cx + tilt * 1.4, by - s * 1.35),
+                              (cx + s * 0.3 + tilt, by - s * 0.58)], rng, amp=1.5)
+  stamp(canvas, roof, ox, oy, G["guild_roof"], G["guild_roof_dk"])
+  for k in range(3):  # missing slates
+    x, y = ax + tilt + rng.uniform(-s * 0.12, s * 0.12), ay - s * rng.uniform(0.7, 1.0)
+    d.rectangle([x - u(5), y - u(4), x + u(5), y + u(4)], fill=G["cave"])
+  for k in range(2):  # weed hanging off the waterline
+    x = ax + (k - 0.5) * s * 0.3
+    _ink_line(canvas, [(x, ay - s * 0.08), (x + u(3), ay - s * 0.02)], G["reed"], u(4))
+  for half in (s * 0.32, s * 0.45):
+    d.arc([ax - half, ay - u(6), ax + half, ay + u(8)], 10, 170, fill=G["water_lt"], width=max(1, int(u(3.5))))
+
+
+def paint_sunkboat(canvas, ax, ay, s, rng):
+  """A rowboat gone down by the stern, bow and one oar still out of the water."""
+  w, h = s * 1.3, s * 1.0
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  hull = _mask_poly(w, h, [(cx - s * 0.45, by), (cx + s * 0.1, by - s * 0.05), (cx + s * 0.42, by - s * 0.62),
+                              (cx + s * 0.3, by - s * 0.66), (cx - s * 0.1, by - s * 0.3), (cx - s * 0.5, by - s * 0.06)],
+                      rng, amp=1)
+  stamp(canvas, hull, ox, oy, G["palisade"], G["palisade_dk"])
+  d = ImageDraw.Draw(canvas)
+  for f in (0.3, 0.55):
+    d.line([(ax - s * 0.45 * (1 - f) + s * 0.1 * f, ay - s * 0.05 * f), (ax + s * 0.38 * f + s * 0.1 * (1 - f) - s * 0.05,
+            ay - s * 0.6 * f)], fill=G["palisade_dk"], width=max(1, int(u(3))))
+  _ink_line(canvas, [(ax - s * 0.2, ay - s * 0.02), (ax - s * 0.55, ay - s * 0.45)], G["timber"], u(6))
+  for half in (s * 0.4, s * 0.55):
+    d.arc([ax - half, ay - u(6), ax + half, ay + u(8)], 10, 170, fill=G["water_lt"], width=max(1, int(u(3.5))))
+
+
+def paint_fishbones(canvas, ax, ay, s, rng):
+  """A big fish picked clean on the shore: skull, spine, ribs, tail."""
+  d = ImageDraw.Draw(canvas)
+  tilt = rng.uniform(-0.15, 0.15)
+  flip = 1 if rng.random() < 0.5 else -1
+
+  def P(x, y):
+    return (ax + flip * (x * math.cos(tilt) - y * math.sin(tilt)) * s, ay - s * 0.18 + (x * math.sin(tilt) + y * math.cos(tilt)) * s)
+
+  spine = [P(-0.38 + 0.68 * k / 8, 0.02 * math.sin(k)) for k in range(9)]
+  for k in range(1, 8):  # ribs, longest mid-body
+    x, y = spine[k]
+    r = s * 0.16 * math.sin(math.pi * k / 8)
+    for side in (-1, 1):
+      tip = (x - flip * s * 0.05, y + side * r)
+      _ink_line(canvas, [(x, y), tip], G["bone"], u(4))
+  _ink_line(canvas, spine, G["bone"], u(6))
+  tx, ty = spine[0]
+  pts = [(tx, ty), P(-0.55, -0.14), P(-0.5, 0.0), P(-0.55, 0.14)]
+  m = Image.new("L", (R, R), 0)
+  ImageDraw.Draw(m).polygon(pts, fill=255)
+  stamp(canvas, m, 0, 0, G["bone"], G["bone_dk"])
+  hx, hy = spine[-1]  # skull
+  m = Image.new("L", (R, R), 0)
+  ImageDraw.Draw(m).polygon(wobble([(hx, hy - s * 0.13), P(0.5, 0.0), (hx, hy + s * 0.13)], rng, 0.8, sub=2), fill=255)
+  stamp(canvas, m, 0, 0, G["bone"], G["bone_dk"])
+  ex, ey = P(0.38, -0.03)
+  e = s * 0.04
+  d.ellipse([ex - e, ey - e, ex + e, ey + e], fill=G["ink"])
+
+
+def paint_insecteggs(canvas, ax, ay, s, rng):
+  """A clutch of jelly-wrapped insect eggs at the water's edge, a dark speck
+  in each."""
+  d = ImageDraw.Draw(canvas)
+  n = int(rng.integers(9, 15))
+  spots = sorted([(ax + rng.normal(0, 0.22) * s, ay - abs(rng.normal(0, 0.12)) * s) for _ in range(n)], key=lambda p: p[1])
+  for x, y in spots:
+    r = s * rng.uniform(0.09, 0.13)
+    m = Image.new("L", (int(2 * r) + 4, int(2 * r) + 4), 0)
+    ImageDraw.Draw(m).ellipse([0, 0, 2 * r, 2 * r], fill=255)
+    halo(canvas, x, y - r, r * 1.35, G["insect_egg"], G["web_alpha"])
+    d.ellipse([x - r, y - 2 * r, x + r, y], fill=G["insect_egg"], outline=G["ink"], width=max(1, int(u(2.5))))
+    e = r * 0.35
+    d.ellipse([x - e + r * 0.1, y - r - e, x + e + r * 0.1, y - r + e], fill=G["insect_egg_dot"])
+
+
+def paint_spikerock(canvas, ax, ay, s, rng):
+  """Rockglade boulder: a cluster of tall jagged shards leaning off one base,
+  silk strung between their points."""
+  w, h = s * 1.5, s * 1.4
+  cx, by = PAD + w / 2, PAD + h
+  ox, oy = ax - cx, ay - by
+  n = int(rng.integers(2, 5))
+  shards = []
+  for k in range(n):
+    f = (k - (n - 1) / 2) / max(1, (n - 1) / 2)
+    bx = cx + f * s * 0.3 + rng.uniform(-s * 0.05, s * 0.05)
+    tall = s * rng.uniform(0.7, 1.25) * (1 - 0.3 * abs(f))
+    lean = f * s * rng.uniform(0.08, 0.2)
+    half = s * rng.uniform(0.2, 0.27)
+    tip = (bx + lean, by - tall)
+    mid = (bx + lean * 0.3 - half * 0.1, by - s * 0.05)  # where the lit face meets the dark one at the foot
+    pts = [(bx - half, by), (bx - half * 0.75 + lean * 0.5, by - tall * 0.5), tip,
+           (bx + half * 0.7 + lean * 0.6, by - tall * 0.45), (bx + half, by)]
+    face = [(bx - half, by), (bx - half * 0.75 + lean * 0.5, by - tall * 0.5), tip, mid]
+    shards.append((abs(f), pts, face, tip))
+  d = ImageDraw.Draw(canvas)
+  for _, pts, face, tip in sorted(shards, key=lambda q: -q[0]):  # outer shards behind, middle in front
+    m = _mask_poly(w, h, pts, rng, amp=1.5, sub=2)
+    stamp(canvas, m, ox, oy, G["rock_dk"], shade_of(G["rock_dk"], 0.8))
+    lit = _mask_poly(w, h, face, rng, amp=1, sub=2)
+    canvas.paste(G["rock_lt"], (int(ox), int(oy), int(ox) + lit.size[0], int(oy) + lit.size[1]), ImageChops.multiply(lit, m))
+    d.line([(tip[0] + ox, tip[1] + oy), (mid[0] + ox, mid[1] + oy)], fill=G["ink"], width=max(1, int(u(4))))
+    for _ in range(2):  # cracks
+      x, y = tip[0] + ox + rng.uniform(-u(12), u(12)), tip[1] + oy + (by - tip[1]) * rng.uniform(0.3, 0.7)
+      d.line([(x, y), (x + u(6), y + u(14)), (x + u(2), y + u(24))], fill=G["ink"], width=max(1, int(u(2.5))))
+  for k in range(int(rng.integers(2, 4))):  # loose rubble at the foot
+    paint_rock(canvas, ax + rng.uniform(-0.45, 0.45) * s, ay + u(4), s * rng.uniform(0.15, 0.22), rng)
+  tips = [(t[0] + ox, t[1] + oy) for _, _, _, t in shards]
+  if len(tips) >= 2:  # silk between the two tallest points and down to the ground
+    tips.sort(key=lambda p: p[1])
+    a, b = tips[0], tips[1]
+    web_sheet(canvas, [a, b, ((a[0] + b[0]) / 2, max(a[1], b[1]) + s * 0.3)], rng)
+  if rng.random() < 0.6:
+    t = tips[0]
+    web_sheet(canvas, [t, (t[0] + s * 0.45, ay), (t[0] + s * 0.15, ay - s * 0.05)], rng)
+
+
+def paint_eyes(canvas, ax, ay, s, rng):
+  """Two eyes just above the surface, a dark hump of head under them."""
+  d = ImageDraw.Draw(canvas)
+  m = Image.new("L", (R, R), 0)
+  ImageDraw.Draw(m).chord([ax - s * 0.42, ay - s * 0.2, ax + s * 0.42, ay + s * 0.2], 180, 360, fill=255)
+  stamp(canvas, m, 0, 0, shade_of(G["water_dk"], 0.7), shade_of(G["water_dk"], 0.5))
+  for side in (-1, 1):
+    ex, ey = ax + side * s * 0.17, ay - s * 0.1
+    halo(canvas, ex, ey, s * 0.16, G["wisp"])
+    e = s * 0.075
+    d.ellipse([ex - e, ey - e * 0.75, ex + e, ey + e * 0.75], fill=G["window"], outline=G["ink"], width=max(1, int(u(3))))
+    d.ellipse([ex - e * 0.22, ey - e * 0.65, ex + e * 0.22, ey + e * 0.65], fill=G["ink"])  # slit pupil
+  for half in (s * 0.5, s * 0.68):
+    d.arc([ax - half, ay - u(6), ax + half, ay + u(9)], 10, 170, fill=G["water_lt"], width=max(1, int(u(3.5))))
+
+
+def paint_fin(canvas, ax, ay, s, rng):
+  """A dark fin cutting the water, a wake folding out behind it."""
+  flip = 1 if rng.random() < 0.5 else -1
+  m = Image.new("L", (R, R), 0)
+  pts = [(ax - flip * s * 0.28, ay), (ax + flip * s * 0.02, ay - s * 0.62), (ax + flip * s * 0.12, ay - s * 0.6),
+         (ax + flip * s * 0.06, ay - s * 0.3), (ax + flip * s * 0.22, ay)]
+  ImageDraw.Draw(m).polygon(wobble(pts, rng, 0.8, sub=2), fill=255)
+  stamp(canvas, m, 0, 0, shade_of(G["slag"], 1.1), G["slag_dk"])
+  d = ImageDraw.Draw(canvas)
+  d.line([(ax + flip * s * 0.0, ay - s * 0.08), (ax + flip * s * 0.06, ay - s * 0.48)], fill=G["slag_dk"],
+         width=max(1, int(u(3))))
+  for k in range(3):  # wake: widening V behind the fin
+    bx = ax - flip * s * (0.35 + 0.28 * k)
+    d.line([(ax - flip * s * 0.25, ay), (bx, ay - s * (0.06 + 0.06 * k))], fill=G["water_lt"], width=max(1, int(u(3.5))))
+    d.line([(ax - flip * s * 0.25, ay + u(2)), (bx, ay + s * (0.05 + 0.05 * k))], fill=G["water_lt"], width=max(1, int(u(3.5))))
+  d.arc([ax - s * 0.32, ay - u(6), ax + s * 0.32, ay + u(9)], 10, 170, fill=G["foam"], width=max(1, int(u(4))))
+
+
+def paint_drownedtree(canvas, ax, ay, s, rng):
+  """A dead tree standing in the water, ripples round its foot."""
+  _dead(canvas, ax, ay, s, rng, G["deadwood"])
+  d = ImageDraw.Draw(canvas)
+  for half in (u(18), u(28)):
+    d.arc([ax - half, ay - u(5), ax + half, ay + u(7)], 10, 170, fill=G["water_lt"], width=max(1, int(u(3.5))))
+
+
 def paint_field(canvas, x0, y0, fw, fh, rng):
   m = blank(fw, fh)
   ImageDraw.Draw(m).polygon(
@@ -1881,7 +2614,14 @@ PAINTERS = {"tree": paint_tree, "pine": paint_pine, "bush": paint_bush,
             "lodge": paint_lodge, "watermill": paint_watermill, "mangrove": paint_mangrove,
             "blighttree": paint_blighttree, "barrow": paint_barrow, "cave": paint_cave,
             "furnace": paint_furnace, "slagheap": paint_slagheap, "sword": paint_sword, "helmet": paint_helmet,
-            "catapult": paint_catapult}
+            "catapult": paint_catapult, "thorn": paint_thorn, "ashpile": paint_ashpile, "bones": paint_bones,
+            "bonepost": paint_bonepost, "fern": paint_fern, "fallenlog": paint_fallenlog, "mossrock": paint_mossrock,
+            "berrybush": paint_berrybush, "reedsheaf": paint_reedsheaf, "silktree": paint_silktree,
+            "webbush": paint_webbush, "eggsacs": paint_eggsacs, "cocoon": paint_cocoon, "pack": paint_pack,
+            "willow": paint_willow, "lanternpost": paint_lanternpost, "steeple": paint_steeple, "sunkboat": paint_sunkboat,
+            "fishbones": paint_fishbones, "insecteggs": paint_insecteggs, "spikerock": paint_spikerock, "eyes": paint_eyes,
+            "fin": paint_fin, "drownedtree": paint_drownedtree, "tallfern": paint_tallfern,
+            "fiddleheads": paint_fiddleheads}
 
 
 # ---------------------------------------------------------------- tile
@@ -1969,16 +2709,25 @@ def frame(img, edges=(), cuts=()):
 
 
 # half-width of a painter's body (x size) for scatter collision, and its ground shadow width
-WIDE_BASE = ("hill", "ruinwall", "gnarled", "briar", "cart", "barrow", "slagheap", "catapult")
+WIDE_BASE = ("hill", "ruinwall", "gnarled", "briar", "cart", "barrow", "slagheap", "catapult", "ashpile", "fallenlog",
+             "fern", "cocoon", "willow", "spikerock")
 BODY_HALF = {"gnarled": 0.5, "briar": 0.6, "cart": 0.6, "mountain": 0.7, "hill": 0.9, "ruinwall": 0.62, "crane": 0.45, "logpile": 0.35, "townhouse": 0.5,
-             "coldpeak": 0.7, "barrow": 0.8, "cave": 0.6, "slagheap": 0.6, "mangrove": 0.45, "catapult": 0.8, "helmet": 0.6}
+             "coldpeak": 0.7, "barrow": 0.8, "cave": 0.6, "slagheap": 0.6, "mangrove": 0.45, "catapult": 0.8, "helmet": 0.6,
+             "thorn": 0.45, "ashpile": 0.6, "bones": 0.5, "fern": 0.65, "fallenlog": 0.65, "mossrock": 0.6, "reedsheaf": 0.4,
+             "spikerock": 0.6, "silktree": 0.5, "cocoon": 0.6, "willow": 0.6, "eggsacs": 0.45, "insecteggs": 0.45,
+             "tallfern": 0.8}
 SHADOW_WIDTH = {"gnarled": 0.6, "briar": 0.62, "flowers": 0.3, "menhir": 0.22, "cart": 0.6, "spears": 0.25,
                 "warbanner": 0.15, "statue": 0.3, "mountain": 0.8, "stake": 0.3, "guildhall": 0.52, "windmill": 0.3, "hill": 0.85,
                 "rock": 0.55, "crane": 0.3, "reeds": 0.25, "ruinwall": 0.62, "column": 0.25,
                 "logpile": 0.45, "stump": 0.45, "townhouse": 0.55, "wallblock": 0.4, "tower": 0.35,
                 "barrow": 0.8, "cave": 0.6, "furnace": 0.35, "slagheap": 0.6, "barrel": 0.3, "crate": 0.35,
-                "sword": 0.25, "helmet": 0.5, "catapult": 0.6}
-NO_SHADOW = ("barge", "raft", "lodge", "watermill")  # afloat: no ground under them
+                "sword": 0.25, "helmet": 0.5, "catapult": 0.6, "thorn": 0.3, "ashpile": 0.6, "bones": 0.45,
+                "bonepost": 0.2, "fern": 0.55, "fallenlog": 0.65, "mossrock": 0.55, "reedsheaf": 0.4,
+                "silktree": 0.45, "willow": 0.62, "lanternpost": 0.15, "cocoon": 0.6, "eggsacs": 0.45, "spikerock": 0.6,
+                "fishbones": 0.45, "insecteggs": 0.4, "tallfern": 0.5, "fiddleheads": 0.3}
+# afloat: no ground under them
+NO_SHADOW = ("barge", "raft", "lodge", "watermill", "steeple", "sunkboat", "eyes", "fin", "drownedtree")
+WATER_FEATURES = ("lake", "wharf")  # where water_props, wisps and lily_bloom apply
 
 
 def river_points(rng):
@@ -2118,7 +2867,37 @@ def draw_bridge(img, pts, river, rw):
     d.line([(a[0] + off[0], a[1] + off[1]), (b[0] + off[0], b[1] + off[1])], fill=G["ink"], width=max(1, int(u(5))))
 
 
+def draw_fog(img, fog, rng):
+  """Long low banks of mist drifting across everything, see-through
+  (global fog_alpha). Fog and magic glow are the only see-through shapes."""
+  colour, count = fog
+  m = Image.new("L", (R, R), 0)
+  d = ImageDraw.Draw(m)
+  for _ in range(count):
+    cx, cy = rng.uniform(0, R), rng.uniform(u(60), R - u(60))
+    length = u(rng.uniform(260, 460))
+    for k in range(9):
+      t = k / 8
+      px = cx - length / 2 + t * length
+      ry = u(rng.uniform(18, 34)) * (1 - abs(t - 0.5))
+      rx = u(rng.uniform(45, 75))
+      d.ellipse([px - rx, cy - ry - u(10), px + rx, cy + ry], fill=255)
+  img.paste(colour, (0, 0, R, R), m.point(lambda v: int(v * G["fog_alpha"])))
+
+
 def draw_tile(region, seed, edges, density):
+  """A region's `water` colours stand in for the shared ones while its tile draws."""
+  if not region["water"]:
+    return _draw_tile(region, seed, edges, density)
+  shared = {k: G[k] for k in region["water"]}
+  G.update(region["water"])
+  try:
+    return _draw_tile(region, seed, edges, density)
+  finally:
+    G.update(shared)
+
+
+def _draw_tile(region, seed, edges, density):
   rng = np.random.default_rng(seed)
   clear_r = u(region["clearing"])
   wash = fbm(R, seed + 7, octaves=3, base=3)
@@ -2138,6 +2917,7 @@ def draw_tile(region, seed, edges, density):
   # ground features: drawn under paths; each adds a blocker the scatter avoids
   blockers = []
   bank_spots = []
+  deep_spots = []  # lake lily spots: open water for water_props and wisps
   river = None
   if region["feature"] in RIVER_FEATURES:
     river = river_points(rng)
@@ -2349,7 +3129,9 @@ def draw_tile(region, seed, edges, density):
         break
       x, y = rng.uniform(u(40), R - u(40), 2)
       if deep((x, y), u(28)):
-        lily(d, x, y, u(rng.uniform(12, 20)), rng)
+        bloom = region["lily_bloom"] > 0 and rng.random() < region["lily_bloom"]
+        lily(d, x, y, u(rng.uniform(12, 20)) * (0.8 if bloom else 1), rng, flower=bloom)
+        deep_spots.append((x, y))
         pads += 1
     reeds = []
     for _ in range(1500):  # reeds on the shore
@@ -2363,6 +3145,15 @@ def draw_tile(region, seed, edges, density):
       reeds.append((x, y))
       bank_spots.append((x, y, "reeds", u(rng.uniform(*G["reed_size"]))))
     blockers.append(lambda q: wet(q, u(20)))
+    # water_props: each painter COUNT times, in order, on lily spots well apart and off the tile edge
+    picks = [p for p in deep_spots if u(100) < p[0] < R - u(100) and u(140) < p[1] < R - u(80)]
+    spaced = []
+    for p in picks:
+      if all(math.dist(p, q) > u(170) for q in spaced):
+        spaced.append(p)
+    queue = [(painter, lo, hi) for painter, count, lo, hi in region["water_props"] for _ in range(int(count))]
+    for (x, y), (painter, lo, hi) in zip(spaced, queue):
+      bank_spots.append((x, y + u(20), painter, u(rng.uniform(lo, hi))))
   elif region["feature"] == "flood":
     # the region's ground colour IS the floodwater; this adds its surface
     for _ in range(70):
@@ -2469,8 +3260,42 @@ def draw_tile(region, seed, edges, density):
       x, y = R / 2 + math.cos(a) * hr * 0.9, R / 2 + u(20) + math.sin(a) * hry * 0.9
       d.line([(x, y), (x - math.cos(a) * u(28), y - math.sin(a) * u(24))], fill=G["hill_dk"], width=max(1, int(u(4))))
 
+  elif region["feature"] == "ice":
+    # frozen puddles: pale blue sheets with cracks and a rime of frost
+    sheets = []
+    lo, hi = G["ice_size"]
+    for _ in range(300):
+      if len(sheets) >= G["ice_count"]:
+        break
+      rx = u(rng.uniform(lo, hi))
+      ry = rx * rng.uniform(0.5, 0.7)
+      c = (rng.uniform(u(60) + rx, R - u(60) - rx), rng.uniform(u(60) + ry, R - u(60) - ry))
+      rim = [(c[0] + math.cos(a) * rx, c[1] + math.sin(a) * ry) for a in np.linspace(0, 2 * math.pi, 12, endpoint=False)]
+      if not all(clear_of(q, u(20)) for q in rim + [c]):
+        continue
+      if any(math.dist(c, (hx, hy)) < rx + hrx + u(30) for hx, hy, hrx, _ in sheets):
+        continue
+      sheets.append((c[0], c[1], rx, ry))
+      blob(img, c[0], c[1], rx, ry, rng, G["ice"], G["ice_dk"], G["frost"])
+      for _ in range(int(rng.integers(2, 4))):  # cracks from a point
+        x, y = c[0] + rng.uniform(-rx * 0.3, rx * 0.3), c[1] + rng.uniform(-ry * 0.3, ry * 0.3)
+        a = rng.uniform(0, 2 * math.pi)
+        pts = [(x, y)]
+        for k in range(3):
+          a += rng.uniform(-0.6, 0.6)
+          ln = rx * rng.uniform(0.15, 0.25)
+          pts.append((pts[-1][0] + math.cos(a) * ln, pts[-1][1] + math.sin(a) * ln * 0.6))
+        d.line(pts, fill=G["ice_dk"], width=max(1, int(u(3))), joint="curve")
+      for _ in range(3):  # glints
+        x, y = c[0] + rng.uniform(-rx * 0.5, rx * 0.2), c[1] + rng.uniform(-ry * 0.5, 0)
+        d.line([(x, y), (x + u(14), y - u(5))], fill=G["frost"], width=max(1, int(u(4))))
+    blockers.append(lambda q: any(((q[0] - hx) / (hrx + u(20))) ** 2 + ((q[1] - hy) / (hry + u(20))) ** 2 < 1
+                                  for hx, hy, hrx, hry in sheets))
+
   # extras built on a feature drawn above
-  if region["feature"] in ("millrace", "dam"):
+  mill = region["feature"] == "millrace" or (region["feature"] == "river" and region["mill_chance"] > 0
+                                             and rng.random() < region["mill_chance"])
+  if mill or region["feature"] == "dam":
     def site_score(i, probes):
       worst = float("inf")
       for q in probes(river[i]):
@@ -2479,7 +3304,7 @@ def draw_tile(region, seed, edges, density):
       return worst
 
     span = range(int(len(river) * 0.15), int(len(river) * 0.85))
-    if region["feature"] == "millrace":
+    if mill:
       ms = u(260)
       probes = lambda p: [(p[0] + ms * fx, p[1] + ms * fy) for fx in (0, 0.25, 0.55, 0.85) for fy in (0.26, -0.15, -0.5)]
       i = max(span, key=lambda k: site_score(k, probes))
@@ -2641,6 +3466,14 @@ def draw_tile(region, seed, edges, density):
     x, y = rng.uniform(u(40), R - u(40), 2)
     if any(b((x, y)) for b in blockers):  # no grass on water, cliffs or pits
       continue
+    if region["grass_style"] == "spiky":  # a fan of sharp blades
+      for k in range(5):
+        a = -math.pi / 2 + (k - 2) * 0.32 + rng.normal(0, 0.06)
+        ln = u(rng.uniform(16, 26))
+        bx = x + (k - 2) * u(4)
+        tip = (bx + math.cos(a) * ln, y + math.sin(a) * ln)
+        d.polygon([(bx - u(3), y), tip, (bx + u(3), y)], fill=G["spikegrass"])
+      continue
     for k in range(3):
       d.line([(x + k * u(9), y), (x + k * u(9) + (k - 1) * u(4), y - u(14) - (k == 1) * u(5))],
              fill=G["grass"], width=max(1, int(u(3))))
@@ -2652,6 +3485,18 @@ def draw_tile(region, seed, edges, density):
         continue
       e = u(rng.uniform(4, 7))
       d.ellipse([x - e, y - e * 0.65, x + e, y + e * 0.65], fill=colour)
+
+  webs = []
+  for _ in range(400):  # orb webs laid flat on the ground, under the roads
+    if len(webs) >= region["ground_webs"]:
+      break
+    x, y = rng.uniform(u(110), R - u(110), 2)
+    if math.dist((x, y), (R / 2, R / 2)) < clear_r + u(100) or any(b((x, y)) for b in blockers):
+      continue
+    if any(math.dist((x, y), q) < u(190) for q in webs):
+      continue
+    webs.append((x, y))
+    ground_web(d, x, y, u(rng.uniform(70, 105)), rng)
 
   for pts in paths:
     draw_path(d, pts)
@@ -2819,6 +3664,13 @@ def draw_tile(region, seed, edges, density):
   img.paste(shade_of(region["ground"], 0.72), (0, 0, R, R), shadow.filter(ImageFilter.GaussianBlur(u(6))))
   for x, y, name, s in sorted(spots, key=lambda q: q[1]):
     PAINTERS[name](img, x, y, s, rng)
+  for x, y in deep_spots[:region["wisps"]]:  # will-o'-wisps over open water
+    wx, wy = x + rng.uniform(-u(30), u(30)), y - u(rng.uniform(30, 70))
+    halo(img, wx, wy, u(22), G["wisp"])
+    e = u(5)
+    d.ellipse([wx - e, wy - e, wx + e, wy + e], fill=G["wisp"])
+  if region["fog"]:
+    draw_fog(img, region["fog"], rng)
   cuts = []
   if river:
     cuts.append((river[0][0], [(G["ink"], rw + u(12)), (G["water"], rw)]))

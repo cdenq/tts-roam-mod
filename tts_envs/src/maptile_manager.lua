@@ -37,7 +37,7 @@ A copy of the bag's template tile (GMNotes "maptile_template", tagged
 Template), stamped with:
 
   name         the biome name, e.g. "Deepwood"
-  description  biome_descriptions sheet
+  description  biome_explore sheet (effect + flavor)
   GMNotes      the biome id -- the key everything else reads
   memo         "d=<density>|explore=<left>|rendered=<0/1>"
   images       front = the rolled image, back = its deck's back
@@ -47,22 +47,22 @@ Its buttons belong to THIS script (function_owner = self), so a tile only
 works while the manager is on the table. TTS does not save buttons, so onLoad
 re-renders every Maptile from its GMNotes + memo.
 
-Render hands the biome's maptile_table spawn table to Global's spawnFrom, so
+Render hands the biome's biome_render spawn table to Global's spawnFrom, so
 landmarks, items and gold come out of the same bags as every other spawn and
 drop onto the tile's centre.
 
 Explore swaps itself for four choices (EXPLORE_CHOICES); picking one spends
-the explore. Resources / Points of interest roll the biome's weights for that
-category and clone the landmark onto the tile's centre, stamped with the
-outcome's GMNotes + memo. Experiences takes the top card of the region's
+the explore. Resources / Landmarks pick from the biome's pool (biome_explore
+resources / landmarks) and clone that landmark onto the tile's centre, its memo
+= the biome's extra_info. Experiences takes the top card of the region's
 EVENT_BAGS bag. Wander picks one of the three for you. Each explore broadcasts
 one short line (EXPLORE_SAYS, or the spawned landmark's name). A biome on
-explore_special gets a fifth choice (the guildhall's Eat) that spends an explore.
+biome_explore special_label gets a fifth choice (the guildhall's Eat) that spends an explore.
 ]]
 
 --[[ BEGIN GENERATED MAPTILE DATA -- do not edit ]]
 MAPTILE = {decks = {}, biomes = {}, patterns = {}, orientations = {}, densities = {},
-           images = {}, explore = {}, weights = {}, table = {}, outcomes = {}, exploration = {}, special = {}}
+           images = {}, explore = {}, weights = {}, table = {}, exploration = {}, special = {}, extra_info = {}}
 --[[ END GENERATED MAPTILE DATA ]]
 
 TEMPLATE_GM = "maptile_template"
@@ -156,7 +156,7 @@ TILE_UI = {
   -- the four explore choices, 2x2 where the Explore button was: Wander, Resources, Points of interest, Experiences
   CHOICE_POS = {{-0.42, 0, -0.78}, {0.42, 0, -0.78}, {-0.42, 0, -0.5}, {0.42, 0, -0.5}},
   CHOICE_W = 560,
-  SPECIAL_POS = {0, 0, -0.22},  -- the biome's fifth choice (explore_special), centred under the grid
+  SPECIAL_POS = {0, 0, -0.22},  -- the biome's fifth choice (biome_explore special_label), centred under the grid
   BTN_W = 520, BTN_H = 160, BTN_FONT = 95, BTN_SCALE = 0.5,
   HELP_W = 160,
   HELP_COLOR = {0.9, 0.87, 0.78},
@@ -202,6 +202,14 @@ end
 local function sharp(font, width, height, extra, k)
   local s = (extra or 1) / k
   return font * k, width * k, height * k, {s, s, s}
+end
+
+-- Whether a biome's resources pool can find anything; a pool of only "none" hides Resources.
+local function hasResources(biome)
+  for _, e in ipairs((MAPTILE.exploration[biome] or {}).resources or {}) do
+    if e ~= "" then return true end
+  end
+  return false
 end
 
 local function deckById(id)
@@ -457,21 +465,15 @@ end
 
 -- ---------------------------------------------------------------- rolling
 
---[[ A biome on the tiers sheet rolls a tier (weights tier:<biome>). The tier
-is never stored or shown: it swaps the biome for its gmnotes biome (a drawn
-city becomes settlement / town / city) and picks the TILESET whose images the
-tile uses (today each tier has its own: settlement, town, city). Any other biome
-is its own tileset. The image key is always tileset|pattern|orientation|density. ]]
+--[[ A biome with a weights tier:<biome> pool rolls it and BECOMES the result
+(a drawn city becomes settlement / town / city): its GMNotes and its images.
+The image key is always biome|pattern|orientation|density. ]]
 local function finish(t)
-  local tiers = MAPTILE.tiers[t.biome]
-  if tiers ~= nil then
-    local tier = tiers[pick(MAPTILE.weights["tier:" .. t.biome])]
-    t.biome = tier.gmnotes
-    t.tileset = tier.tileset
-  else
-    t.tileset = t.biome
+  local into = MAPTILE.weights["tier:" .. t.biome]
+  if into ~= nil then
+    t.biome = pick(into)
   end
-  t.key = table.concat({t.tileset, t.pattern, t.orientation, t.density}, "|")
+  t.key = table.concat({t.biome, t.pattern, t.orientation, t.density}, "|")
   return t
 end
 
@@ -532,7 +534,7 @@ local function fullySpecified(spec)
   for _, key in ipairs(CONFIG_KEYS) do
     if spec[key] == RANDOM then return false end
   end
-  return MAPTILE.tiers[spec.biome] == nil
+  return MAPTILE.weights["tier:" .. spec.biome] == nil
 end
 
 -- ---------------------------------------------------------------- spawning
@@ -584,7 +586,7 @@ local function spawnTile(t, url)
     data.Nickname = biome.name
     data.Description = biome.description or ""
     data.GMNotes = t.biome
-    data.Memo = encodeMemo({d = t.density, explore = MAPTILE.explore[t.density] or 0, rendered = 0})
+    data.Memo = encodeMemo({d = t.density, explore = tonumber(t.density) or 0, rendered = 0})
     data.LuaScript = ""
     data.Tooltip = false  -- the tile's "?" button turns hover name + description on
     data.CustomImage = data.CustomImage or {}
@@ -667,8 +669,12 @@ renderTile = function(obj)
   obj.clearButtons()
   local m = parseMemo(obj.memo)
   if m.explore > 0 and choosing[obj.getGUID()] then
+    -- a barren biome gets no Resources button; its grid slot stays empty
+    local barren = not hasResources(obj.getGMNotes())
     for i, c in ipairs(EXPLORE_CHOICES) do
-      tileButton(obj, c.fn, c.label, c.tooltip, TILE_UI.CHOICE_POS[i], TILE_UI.EXPLORE_COLOR, TILE_UI.CHOICE_W)
+      if not (barren and c.fn == "exploreResources") then
+        tileButton(obj, c.fn, c.label, c.tooltip, TILE_UI.CHOICE_POS[i], TILE_UI.EXPLORE_COLOR, TILE_UI.CHOICE_W)
+      end
     end
     local special = MAPTILE.special[obj.getGMNotes()]
     if special then
@@ -686,18 +692,6 @@ renderTile = function(obj)
   tileButton(obj, "tileHelp", "?", "Toggle show-effects; hover over the tile to see its effects.",
              TILE_UI.HELP_POS, TILE_UI.HELP_COLOR, TILE_UI.HELP_W,
              obj.tooltip and TILE_UI.HELP_ON_TEXT or TILE_UI.HELP_OFF_TEXT)
-end
-
--- {{outcome, weight}, ...} -> one outcome id, or nil when every weight is 0.
-local function rollWeighted(list)
-  local total = 0
-  for _, e in ipairs(list or {}) do total = total + e[2] end
-  if total <= 0 then return nil end
-  local r = math.random(total)
-  for _, e in ipairs(list) do
-    r = r - e[2]
-    if r <= 0 then return e[1] end
-  end
 end
 
 -- Just above the tile's centre, so what lands drops flat onto it.
@@ -718,29 +712,22 @@ local function drawEvent(obj, deck)
   return nil
 end
 
--- "{biome}" in a stamp becomes the tile's biome, so a node knows where it was found.
-local function fillStamp(text, biome)
-  return (string.gsub(text or "", "{biome}", biome))
-end
-
---[[ Resources / Landmarks: roll the biome's weights for the category, clone
-the landmark (if any) onto the tile through Global, stamped with the outcome's
-GMNotes + memo, and broadcast its name -- or "Nothing...". A data problem (no
-weights) also says "Nothing..." and goes to the log for whoever is debugging. ]]
-local function findLandmark(obj, category)
+--[[ Resources / Landmarks: pick one entry of the biome's pool (biome_explore
+resources / landmarks: exact landmark names, "" = nothing found), clone that
+landmark onto the tile through Global with the biome's extra_info as its memo,
+and broadcast its name -- or "Nothing...". A biome without a pool also says
+"Nothing..." and goes to the log for whoever is debugging. ]]
+local function findLandmark(obj, pool)
   local biome = obj.getGMNotes()
-  local id = rollWeighted((MAPTILE.exploration[biome] or {})[category])
-  local outcome = MAPTILE.outcomes[id or ""]
-  if outcome == nil then log("Maptile Manager: no " .. category .. " weights for " .. biome) end
-  if outcome == nil or outcome.kind ~= "landmark" then
+  local entries = (MAPTILE.exploration[biome] or {})[pool]
+  if entries == nil or #entries == 0 then log("Maptile Manager: no " .. pool .. " pool for " .. biome) end
+  local landmark = entries and #entries > 0 and pick(entries) or ""
+  if landmark == "" then
     broadcastToAll(EXPLORE_SAYS.nothing, EXPLORE_COLOR)
     return
   end
-  local landmark = pick(outcome.landmarks)
-  Global.call("spawnCopyFromBagFor", {
-    category = "landmark", name = landmark, position = abovePosition(obj),
-    stamp = {gm_notes = fillStamp(outcome.gmnotes, biome), memo = fillStamp(outcome.memo, biome)}
-  })
+  Global.call("spawnCopyFromBagFor", {category = "landmark", name = landmark, position = abovePosition(obj),
+                                      stamp = {memo = MAPTILE.extra_info[biome]}})
   broadcastToAll(landmark, EXPLORE_COLOR)
 end
 
@@ -751,18 +738,17 @@ local function findExperience(obj)
   broadcastToAll(err and EXPLORE_SAYS.nothing or EXPLORE_SAYS.event, EXPLORE_COLOR)
 end
 
---[[ Render: the biome's maptile_table row, then the region's top event card,
+--[[ Render: the biome's biome_render row, then the region's top event card,
 both onto the tile's centre. Global owns the spawn pipeline (bags, unique
 takes, gold); Global.call passes one table, so the tile goes by GUID. ]]
 local function renderEffect(obj)
   local spawn = MAPTILE.table[obj.getGMNotes()]
   if spawn ~= nil then
-    Global.call("spawnFromFor", {guid = obj.getGUID(), spawn = spawn})
+    Global.call("spawnFromFor", {guid = obj.getGUID(), spawn = spawn, quiet = true})
   end
-  local deck = MAPTILE.biomes[obj.getGMNotes()].deck
-  local err = drawEvent(obj, deck)
-  printToAll(obj.getName() .. ": " .. (err or "an event card is drawn from the " .. deck .. " bag") .. ".",
-             err and {1, 0.6, 0.3} or {0.8, 0.8, 0.8})
+  -- silent: a problem (empty / missing bag) goes to the log only
+  local err = drawEvent(obj, MAPTILE.biomes[obj.getGMNotes()].deck)
+  if err then log("Maptile Manager: " .. err) end
 end
 
 -- Close a tile's choices: stop its timeout so a late tick cannot re-render a newer menu.
@@ -804,12 +790,12 @@ end
 
 function exploreResources(obj, color)
   local left = spendExplore(obj, color)
-  if left then findLandmark(obj, "resource") end
+  if left then findLandmark(obj, "resources") end
 end
 
 function explorePoi(obj, color)
   local left = spendExplore(obj, color)
-  if left then findLandmark(obj, "poi") end
+  if left then findLandmark(obj, "landmarks") end
 end
 
 function exploreExperiences(obj, color)
@@ -817,7 +803,7 @@ function exploreExperiences(obj, color)
   if left then findExperience(obj) end
 end
 
--- The biome's own fifth choice (explore_special): spends an explore and says so.
+-- The biome's own fifth choice (biome_explore special_label): spends an explore and says so.
 function exploreSpecial(obj, color)
   if MAPTILE.special[obj.getGMNotes()] == nil or not spendExplore(obj, color) then return end
   broadcastToAll(EXPLORE_SAYS.special, EXPLORE_COLOR)
@@ -825,7 +811,8 @@ end
 
 -- No announcement of its own: the choice it lands on announces itself. Never the special choice.
 function exploreWander(obj, color, alt)
-  local choices = {exploreResources, explorePoi, exploreExperiences}
+  local choices = {explorePoi, exploreExperiences}
+  if hasResources(obj.getGMNotes()) then table.insert(choices, exploreResources) end
   choices[math.random(#choices)](obj, color, alt)
 end
 

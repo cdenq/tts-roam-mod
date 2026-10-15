@@ -112,6 +112,34 @@ global,cold_pine_dk,#2c403b,
 global,frost,#dde7ea,rime streaks (not snow)
 global,lily_flower,#f0b8c8,water lily flowers
 global,valley,#8e9a8c,far valley floor below cliffs
+global,thorn,#6b4f35,briar thicket giant thorns
+global,thorn_dk,#4a3524,thorn shade + bark rings
+global,spikegrass,#5d5a2e,grass_style spiky blades
+global,ash,#a19a90,ash heaps (ashland)
+global,ash_dk,#7c756c,ash heap shade
+global,bone,#e2d8c0,bones + skulls (barrows)
+global,bone_dk,#b3a68a,bone shade + horns
+global,ice,#c6dde3,feature ice: frozen puddles
+global,ice_dk,#94b3bd,ice shade + cracks
+global,fern,#6e9243,fern fronds
+global,fern_dk,#4d6a2f,fern shade + leaflet ticks
+global,fern_lt,#9ab85c,fern light
+global,web,#ebe5d5,spider silk: webs + cocoons (see-through at web_alpha)
+global,web_dk,#b3aa96,silk catching rings + cocoon shade
+global,egg,#e4d9bb,spider egg sacs
+global,egg_dk,#b9a780,egg sac shade
+global,egg_lt,#f3ecd8,egg sac light
+global,silk_bark,#4b403a,webwoods tree trunks
+global,silk_leaf,#5f6152,webwoods canopy
+global,silk_leaf_dk,#45473b,webwoods canopy shade
+global,silk_leaf_lt,#7f8270,webwoods canopy light
+global,willow,#7c8a68,weeping willow (fogmere)
+global,willow_dk,#5b6a4c,willow shade
+global,willow_lt,#a0ad85,willow light
+global,wisp,#d6f2e4,will-o'-wisps + lurking eyes' glow
+global,insect_egg,#c9d6c4,jelly insect eggs by the water
+global,insect_egg_dot,#3a3a30,the speck in each insect egg
+global,fiddle,#8aa64c,furled fern fronds (fiddleheads)
 global,flower_colours,#e8c547|#f2f0e6|#e59ab0|#a98bd0|#e07a4f,one picked per flower clump
 global,back_font,internal/asset_generation/Luminari-Regular.ttf,font for the region name on tile backs (path from repo root)
 global,back_gem_size,400,longest side of the gem on tile backs (design units)
@@ -124,6 +152,11 @@ global,pool_count,4,feature pools (marsh): max number of pools
 global,pool_size,60-130,feature pools: radius range
 global,mud_count,6,feature mud (battlefield): max number of patches
 global,mud_size,50-115,feature mud: radius range
+global,ice_count,4,feature ice (coldmountain): max number of frozen puddles
+global,ice_size,45-90,feature ice: radius range
+global,web_alpha,0.42,how see-through spider silk sheets are (0 clear - 1 solid)
+global,halo_alpha,0.3,how see-through the glow round lanterns + wisps is
+global,fog_alpha,0.5,region fog: how see-through the mist banks are (0 clear - 1 solid)
 global,spring_count,3,feature springs: max number of pools
 global,spring_size,55-95,feature springs: radius range
 global,reed_size,45-65,reeds placed along river banks and lake shores
@@ -207,7 +240,7 @@ mountain,variants,1,
 mountain,patterns,deadend|corner|straight|tee|cross,
 mountain,seed_offset,0,
 mountain,ground,#b1aa90,
-mountain,deck,opencountry,
+mountain,deck,woodland,
 mountain,densities,1-3,
 mountain,clearing,85,
 mountain,clearing_style,plain,
@@ -306,19 +339,21 @@ riverside,fields,0,
 riverside,grass,30,
 riverside,icons,tree:3:80-105|bush:3:60-80|pine:1:85-105,
 riverside,feature,river,
+riverside,mill_chance,0.25,odds a riverside tile gets a watermill on its river
 marsh,variants,1,
 marsh,patterns,deadend|corner|straight|tee|cross,
 marsh,seed_offset,0,
-marsh,ground,#959871,
+marsh,ground,#8a7a56,
 marsh,deck,waterside,
 marsh,densities,1-3,
 marsh,clearing,95,
 marsh,clearing_style,plain,
 marsh,spacing,95,
 marsh,fields,0,
-marsh,grass,45,
-marsh,icons,deadtree:2:90-120|reeds:5:50-70|bush:2:55-75,
+marsh,grass,25,
+marsh,icons,deadtree:5:90-120|mangrove:1:100-130|reeds:3:50-70|bush:1:55-75,
 marsh,feature,pools,
+marsh,mud,3,
 hills,variants,1,
 hills,patterns,deadend|corner|straight|tee|cross,
 hills,seed_offset,0,
@@ -365,10 +400,10 @@ deepwood,deck,woodland,
 deepwood,densities,1-3,
 deepwood,clearing,95,
 deepwood,clearing_style,plain,
-deepwood,spacing,120,
+deepwood,spacing,105,
 deepwood,fields,0,
 deepwood,grass,12,
-deepwood,icons,gnarled:6:150-200|oak:2:120-150|pine:2:110-140|mushroom:1:40-55|bush:1:60-80,
+deepwood,icons,gnarled:6:150-200|oak:2:120-150|pine:1:110-140|fern:3:85-115|berrybush:2:60-80|bush:1:60-80|fallenlog:2:125-160|mossrock:2:55-75|mushroom:1:40-55|stump:1:40-55,
 heath,variants,1,
 heath,patterns,deadend|corner|straight|tee|cross,
 heath,seed_offset,0,
@@ -392,7 +427,7 @@ ashland,clearing_style,plain,
 ashland,spacing,105,
 ashland,fields,0,
 ashland,grass,4,
-ashland,icons,charred:4:90-130|stump:4:40-60|rock:1:45-70,
+ashland,icons,charred:4:90-130|stump:3:40-60|ashpile:3:60-90|rock:1:45-70,
 ashland,speckle,#5a524c:220|#d9733a:35,
 ruins,variants,1,
 ruins,patterns,deadend|corner|straight|tee|cross,
@@ -525,8 +560,9 @@ briarthicket,clearing,95,
 briarthicket,clearing_style,plain,
 briarthicket,spacing,88,
 briarthicket,fields,0,
-briarthicket,grass,30,
-briarthicket,icons,briar:7:70-110|tree:1:80-100|deadtree:1:80-100,
+briarthicket,grass,45,
+briarthicket,icons,briar:6:70-110|thorn:3:120-160|deadtree:2:80-100,
+briarthicket,grass_style,spiky,
 wildflowermeadow,variants,1,
 wildflowermeadow,patterns,deadend|corner|straight|tee|cross,
 wildflowermeadow,seed_offset,0,
@@ -669,7 +705,7 @@ lilypond,clearing_style,plain,
 lilypond,spacing,95,
 lilypond,fields,0,
 lilypond,grass,30,
-lilypond,icons,reeds:4:50-70|flowers:2:40-60|bush:2:55-70|tent:1:70-90,
+lilypond,icons,reeds:3:50-70|flowers:2:40-60|bush:1:55-70|tent:0.4:70-90|reedsheaf:2:60-80|crate:1:35-45,
 lilypond,feature,ponds,
 otterwharf,variants,1,
 otterwharf,patterns,deadend|corner|straight|tee|cross,
@@ -698,19 +734,6 @@ drownedwood,fields,0,
 drownedwood,grass,0,
 drownedwood,icons,mangrove:6:100-135|reeds:2:50-70|deadtree:1:90-120,
 drownedwood,feature,flood,
-watermill,variants,1,
-watermill,patterns,deadend|corner|straight|tee|cross,
-watermill,seed_offset,0,
-watermill,ground,#bdb67a,
-watermill,deck,waterside,
-watermill,densities,1-3,
-watermill,clearing,95,
-watermill,clearing_style,plain,
-watermill,spacing,110,
-watermill,fields,0,
-watermill,grass,30,
-watermill,icons,tree:3:80-100|bush:2:55-75|logpile:1:50-70,
-watermill,feature,millrace,
 beaverdam,variants,1,
 beaverdam,patterns,deadend|corner|straight|tee|cross,
 beaverdam,seed_offset,0,
@@ -735,8 +758,9 @@ barrows,clearing_style,plain,
 barrows,spacing,110,
 barrows,fields,0,
 barrows,grass,25,
-barrows,icons,barrow:4:130-170|cave:2:90-120|deadtree:2:90-120|menhir:1:70-90|rock:1:40-60,
+barrows,icons,barrow:4:130-170|cave:2:90-120|deadtree:2:90-120|menhir:1:70-90|bones:2:75-95|bonepost:1:80-100|rock:1:40-60,
 barrows,speckle,#6b6c5c:80,
+barrows,fog,#e9e6da:6,pale mist banks
 slagworks,variants,1,
 slagworks,patterns,deadend|corner|straight|tee|cross,
 slagworks,seed_offset,0,
@@ -765,6 +789,7 @@ blightwood,grass,8,
 blightwood,icons,blighttree:6:110-145|blightcap:3:40-60|deadtree:1:90-120,
 blightwood,feature,blight,
 blightwood,speckle,#d9f08a:70,
+blightwood,fog,#b9cf86:7,green mist banks: #colour:count
 cliffside,variants,1,
 cliffside,patterns,deadend|corner|straight|tee|cross,
 cliffside,seed_offset,0,
@@ -782,7 +807,7 @@ coldmountain,variants,1,
 coldmountain,patterns,deadend|corner|straight|tee|cross,
 coldmountain,seed_offset,0,
 coldmountain,ground,#a7ab9c,
-coldmountain,deck,opencountry,
+coldmountain,deck,woodland,
 coldmountain,densities,1-3,
 coldmountain,clearing,95,
 coldmountain,clearing_style,plain,
@@ -791,19 +816,20 @@ coldmountain,fields,0,
 coldmountain,grass,20,
 coldmountain,icons,coldpeak:6:140-200|coldpine:3:80-105|rock:1:45-70,
 coldmountain,speckle,#dde7ea:30,
-hillcentral,variants,1,
-hillcentral,patterns,deadend|corner|straight|tee|cross,
-hillcentral,seed_offset,0,
-hillcentral,ground,#bcb87e,
-hillcentral,deck,opencountry,
-hillcentral,densities,1-3,
-hillcentral,clearing,95,
-hillcentral,clearing_style,plain,
-hillcentral,spacing,95,
-hillcentral,fields,0,
-hillcentral,grass,30,
-hillcentral,icons,bush:6:55-80|rock:1:40-60|tree:1:75-95,
-hillcentral,feature,bighill,
+coldmountain,feature,ice,
+dome,variants,1,
+dome,patterns,deadend|corner|straight|tee|cross,
+dome,seed_offset,0,
+dome,ground,#bcb87e,
+dome,deck,opencountry,
+dome,densities,1-3,
+dome,clearing,95,
+dome,clearing_style,plain,
+dome,spacing,95,
+dome,fields,0,
+dome,grass,30,
+dome,icons,bush:6:55-80|rock:1:40-60|tree:1:75-95,
+dome,feature,bighill,
 battlefieldmountain,variants,1,
 battlefieldmountain,patterns,deadend|corner|straight|tee|cross,
 battlefieldmountain,seed_offset,0,
@@ -1040,3 +1066,62 @@ meeple_skin,enemies/enemy_mantis,body=insect,
 meeple_skin,enemies/enemy_antlion,body=insect,
 meeple_skin,enemies/enemy_wasp,body=insect,
 meeple_skin,enemies/enemy_mosquito,body=insect,
+fogmere,variants,1,
+fogmere,patterns,deadend|corner|straight|tee|cross,
+fogmere,seed_offset,0,
+fogmere,ground,#959884,
+fogmere,deck,waterside,
+fogmere,densities,1-3,
+fogmere,clearing,95,
+fogmere,clearing_style,plain,
+fogmere,spacing,105,
+fogmere,fields,0,
+fogmere,grass,14,
+fogmere,icons,willow:4:110-140|deadtree:3:90-120|lanternpost:2:70-85|rock:1:45-65|reeds:2:50-70|fishbones:2:60-80|insecteggs:1:110-140,
+fogmere,feature,lake,
+fogmere,water,#6e8784|#4f6563|#9cb0a8,murky water instead of the shared colours
+fogmere,lily_bloom,0.67,share of lake lilies in flower (pale + smaller)
+fogmere,water_props,steeple:1:140-160|eyes:1:85-95|sunkboat:1:110-120|fin:1:90-100|drownedtree:2:95-115,painter:COUNT:lo-hi placed in order on open water
+fogmere,wisps,12,will-o'-wisps over open water
+fogmere,fog,#e3e3d8:9,mist banks
+webwoods,variants,1,
+webwoods,patterns,deadend|corner|straight|tee|cross,
+webwoods,seed_offset,0,
+webwoods,ground,#7b7d66,
+webwoods,deck,scarred,
+webwoods,densities,1-3,
+webwoods,clearing,95,
+webwoods,clearing_style,plain,
+webwoods,spacing,95,
+webwoods,fields,0,
+webwoods,grass,10,
+webwoods,icons,silktree:7:115-150|webbush:2:55-80|eggsacs:2:45-60|cocoon:1:50-65|pack:1:45-55|helmet:1:38-50|sword:1:45-60|deadtree:1:90-115,
+webwoods,speckle,#d9d3c1:40,
+webwoods,ground_webs,7,orb webs flat on the ground
+rockglade,variants,1,
+rockglade,patterns,deadend|corner|straight|tee|cross,
+rockglade,seed_offset,0,
+rockglade,ground,#9a9480,
+rockglade,deck,scarred,
+rockglade,densities,1-3,
+rockglade,clearing,95,
+rockglade,clearing_style,plain,
+rockglade,spacing,100,
+rockglade,fields,0,
+rockglade,grass,6,
+rockglade,icons,spikerock:7:110-150|eggsacs:2:45-60|cocoon:1:50-65|pack:1:45-55|helmet:1:38-50|sword:1:45-60|rock:2:40-60|deadtree:1:85-110,
+rockglade,speckle,#d9d3c1:40|#6f6a5e:60,
+rockglade,ground_webs,7,orb webs flat on the ground
+fernbrake,variants,1,
+fernbrake,patterns,deadend|corner|straight|tee|cross,
+fernbrake,seed_offset,0,
+fernbrake,ground,#8d9a5c,
+fernbrake,deck,woodland,
+fernbrake,densities,1-3,
+fernbrake,clearing,95,
+fernbrake,clearing_style,plain,
+fernbrake,spacing,92,
+fernbrake,fields,0,
+fernbrake,grass,30,
+fernbrake,icons,tallfern:7:115-150|fern:4:60-85|fiddleheads:2:40-55|stump:1:45-60|rock:1:40-55,
+fernbrake,speckle,#a07a45:60|#7d8a48:40,

@@ -9,20 +9,13 @@ biomes, patterns or densities in asset_variables.csv just add rows.
   sheet                 one row per                       key
   settlement .. scarred map image of that deck            biome > pattern > orientation > density
   backs                 deck back image                   deck
-  biome_descriptions    biome: effect + flavor            biome (= tile GMNotes)
-  maptile_table         biome: what Render spawns         gmnotes
-  explore_outcomes      Explore outcome: what it does     outcome (hand-filled)
-  exploration           biome: weight per outcome         biome (resource + poi columns)
-  explore_special       biome: its fifth Explore choice   biome (hand-filled)
-  density               density stage                     density -> explorations
-  weights               draw roll                         param -> pool ("a|b|b" = b twice as likely)
-  tiers                 tier of a tiered biome            biome + tier -> gmnotes, tileset (hand-filled)
-  landmark_table        landmark kind: what Global attaches  gmnotes (hand-filled; sync_landmark_data.py)
+  biome_explore         biome: effect + flavor, explore   biome (= tile GMNotes)
+                        resources + landmarks pools, extra_info, special choice
+  biome_render          biome: what Render spawns         gmnotes
+  maptile_weights       draw roll                         param -> pool ("a|b|b" = b twice as likely)
 
-A tileset named on the tiers sheet that is not a biome (none today) keeps its
-deck-sheet image rows but gets no biome_descriptions / maptile_table /
-exploration row. A tier's gmnotes (settlement, town) gets those rows but stays
-out of the biome pools: it is only reached through the tier roll.
+A biome named in a maptile_weights tier:<biome> pool (settlement, town) gets its rows
+but stays out of the biome:<deck> pools: it is only reached through that roll.
 
 Rows the generator no longer describes are reported, never deleted.
 Within each biome, deck-sheet rows are in FILE-NAME order (as a file browser
@@ -47,25 +40,18 @@ except ImportError:
 DECK_COLUMNS = ["biome", "pattern", "orientation", "density", "image", "file", "url"]
 SHEETS = {
   "backs": ["deck", "name", "image", "file", "url"],
-  "biome_descriptions": ["biome", "deck", "name", "effect", "flavor"],
+  # resources / landmarks: Explore's pools of exact landmark names ("none" = nothing found);
+  # special_*: the biome's fifth Explore choice (hand-filled; most biomes have none)
+  "biome_explore": ["biome", "region", "name", "effect", "flavor", "extra_info", "resources", "landmarks",
+                    "special_label", "special_tooltip"],
   # spawn-cell grammar (tools/spawn_cells.py); any spawnN / spawnmeepleN column may be added
   # <spawncol>_gmnotes / _memo: stamped onto that slot's copy (blank = keep the object's own)
-  "maptile_table": ["gmnotes", "spawnmeeple1", "spawnmeeple2", "spawn1", "spawn2", "spawngold", "spawnlandmark1",
+  "biome_render": ["gmnotes", "extra_info", "spawnmeeple1", "spawnmeeple2", "spawn1", "spawn2", "spawngold", "spawnlandmark1",
                     "spawnlandmark2", "spawnlandmark3", "notes",
                     "spawnmeeple1_gmnotes", "spawnmeeple1_memo", "spawnmeeple2_gmnotes", "spawnmeeple2_memo",
                     "spawnlandmark1_gmnotes", "spawnlandmark1_memo", "spawnlandmark2_gmnotes", "spawnlandmark2_memo",
                     "spawnlandmark3_gmnotes", "spawnlandmark3_memo"],
-  "explore_outcomes": ["outcome", "category", "kind", "name", "landmarks", "gmnotes", "memo", "flavor", "notes"],
-  # one weight column per resource / poi row on explore_outcomes; add a column when an outcome is added
-  "exploration": ["biome", "fishing", "mining", "forestry", "hunting", "herbalism", "resource_none",
-                  "camp", "cave", "caravan", "beehive", "shrine", "warehouse", "bank", "poi_none", "notes"],
-  # a biome's fifth Explore choice (hand-filled; most biomes have none)
-  "explore_special": ["biome", "label", "tooltip", "flavor", "notes"],
-  "density": ["density", "explorations", "notes"],
-  "weights": ["param", "pool", "notes"],
-  "tiers": ["biome", "tier", "gmnotes", "tileset", "notes"],
-  # gmnotes = a landmark kind; actions = "a|b", keys of LANDMARK_ACTIONS in src/global.lua
-  "landmark_table": ["gmnotes", "actions", "notes"],
+  "maptile_weights": ["param", "pool"],
 }
 # Display names that .title() would get wrong.
 BIOME_NAMES = {
@@ -73,13 +59,13 @@ BIOME_NAMES = {
   "wildflowermeadow": "Wildflower Meadow", "waterfallcliffs": "Waterfall Cliffs",
   "standingstones": "Standing Stones", "hotsprings": "Hot Springs", "lumbercamp": "Lumber Camp",
   "lilypond": "Lily Pond", "otterwharf": "Otter Wharf", "drownedwood": "Drowned Wood", "beaverdam": "Beaver Dam",
-  "coldmountain": "Cold Mountain", "hillcentral": "Great Hill", "battlefieldmountain": "Mountain Battlefield",
+  "coldmountain": "Cold Mountain", "dome": "Dome", "battlefieldmountain": "Mountain Battlefield",
   "battlefieldwaterside": "River Battlefield",
 }
 HEADER_FONT = Font(bold=True, color="FFFFFF")
 HEADER_FILL = PatternFill("solid", fgColor="3B2B20")
 GUILDHALL = "guildhall"  # starter tile: kept out of the Draw pools, rolled from guildhall:* instead
-WIDTHS = {"landmarks": 40, "url": 60, "effect": 45, "flavor": 90, "file": 42, "image": 30, "pool": 70, "notes": 50}
+WIDTHS = {"resources": 60, "landmarks": 60, "extra_info": 30, "url": 60, "effect": 45, "flavor": 90, "special_tooltip": 40, "file": 42, "image": 30, "pool": 70, "notes": 50}
 
 
 def sheet(wb, title, headers):
@@ -140,19 +126,15 @@ def main():
 
   report = []
   deck_of = {r["name"]: r["deck"] for r in regions}
-  sheet(wb, "tiers", SHEETS["tiers"])
-  tiers = {}  # biome -> [tier]
-  gmnotes, tileset_names = {}, set()  # tier gmnotes -> deck; every tileset a tier names
-  for row in wb["tiers"].iter_rows(min_row=2, values_only=True):
-    if row[0] and row[1] is not None:
-      tiers.setdefault(row[0], []).append(str(row[1]))
-      if row[2]:
-        gmnotes[row[2]] = deck_of.get(row[0], "")
-      if row[3]:
-        tileset_names.add(row[3])
-  tier_only = set(gmnotes) - set(tiers)  # settlement, town: never in a biome pool
-  biomes = [r for r in regions if r["name"] not in tileset_names - set(gmnotes) - set(tiers)]
-  biomes += [{"name": g, "deck": d} for g, d in gmnotes.items() if g not in deck_of]
+  # tier:<biome> pools (hand-filled on maptile_weights): what they name is never in a biome pool
+  tiered, tier_targets = set(), set()
+  if "maptile_weights" in wb.sheetnames:
+    for row in wb["maptile_weights"].iter_rows(min_row=2, values_only=True):
+      if row[0] and str(row[0]).startswith("tier:") and row[1]:
+        tiered.add(str(row[0])[len("tier:"):])
+        tier_targets |= {v.strip() for v in str(row[1]).split("|") if v.strip()}
+  tier_only = tier_targets - tiered  # settlement, town
+  biomes = regions
   for did in decks:
     ws = sheet(wb, did, DECK_COLUMNS)
     rows = [{"biome": t["region"], "pattern": t["pattern"], "orientation": t["edges"].replace("|", ""),
@@ -167,22 +149,14 @@ def main():
   report.append(("backs", sheet(wb, "backs", SHEETS["backs"]), "deck",
                  [{"deck": d["id"], "name": d["name"], "image": "%s_back" % d["id"],
                    "file": "backs/%s_back.png" % d["id"], "url": ""} for d in decks.values()]))
-  report.append(("biome_descriptions", sheet(wb, "biome_descriptions", SHEETS["biome_descriptions"]), "biome",
-                 [{"biome": r["name"], "deck": r["deck"], "name": BIOME_NAMES.get(r["name"], r["name"].title())}
+  report.append(("biome_explore", sheet(wb, "biome_explore", SHEETS["biome_explore"]), "biome",
+                 [{"biome": r["name"], "region": r["deck"], "name": BIOME_NAMES.get(r["name"], r["name"].title())}
                   for r in biomes]))
-  report.append(("maptile_table", sheet(wb, "maptile_table", SHEETS["maptile_table"]), "gmnotes",
+  report.append(("biome_render", sheet(wb, "biome_render", SHEETS["biome_render"]), "gmnotes",
                  [{"gmnotes": r["name"]} for r in biomes]))
-  sheet(wb, "explore_outcomes", SHEETS["explore_outcomes"])
-  sheet(wb, "explore_special", SHEETS["explore_special"])
-  sheet(wb, "landmark_table", SHEETS["landmark_table"])
-  report.append(("exploration", sheet(wb, "exploration", SHEETS["exploration"]), "biome",
-                 [{"biome": r["name"]} for r in biomes]))
   densities = sorted({d for r in regions for d in r["densities"]})
-  report.append(("density", sheet(wb, "density", SHEETS["density"]), "density",
-                 [{"density": d, "explorations": d, "notes": "placeholder: explorations = density"}
-                  for d in densities]))
   patterns = list(dict.fromkeys(p for r in regions for p in r["patterns"]))
-  pools = [{"param": "deck", "pool": "|".join(decks), "notes": "repeat an entry to make it likelier"}]
+  pools = [{"param": "deck", "pool": "|".join(decks)}]
   pools += [{"param": "biome:%s" % d,
              "pool": "|".join(r["name"] for r in biomes
                               if r["deck"] == d and r["name"] != GUILDHALL and r["name"] not in tier_only)}
@@ -190,16 +164,13 @@ def main():
   pools.append({"param": "pattern", "pool": "|".join(patterns)})
   pools += [{"param": "orientation:%s" % p, "pool": "|".join("".join(o) for o in bm.orientations(p))}
             for p in patterns]
-  pools.append({"param": "density", "pool": "|".join(str(d) for d in densities),
-                "notes": "e.g. 1|1|2|2|3 makes density 3 half as likely"})
+  pools.append({"param": "density", "pool": "|".join(str(d) for d in densities)})
   guildhall = [r for r in regions if r["name"] == GUILDHALL]
   if guildhall:
-    pools.append({"param": "guildhall:pattern", "pool": "|".join(guildhall[0]["patterns"]),
-                  "notes": "Spawn guildhall; optional guildhall:orientation:<pattern> rows, else orientation:<pattern>"})
-    pools.append({"param": "guildhall:density", "pool": "|".join(str(d) for d in guildhall[0]["densities"]),
-                  "notes": "Spawn guildhall"})
-  pools += [{"param": "tier:%s" % b, "pool": "|".join(t)} for b, t in tiers.items()]
-  report.append(("weights", sheet(wb, "weights", SHEETS["weights"]), "param", pools))
+    pools.append({"param": "guildhall:pattern", "pool": "|".join(guildhall[0]["patterns"])})
+    pools.append({"param": "guildhall:density", "pool": "|".join(str(d) for d in guildhall[0]["densities"])})
+  pools += [{"param": "tier:%s" % b} for b in sorted(tiered)]  # hand-filled: kept as is
+  report.append(("maptile_weights", sheet(wb, "maptile_weights", SHEETS["maptile_weights"]), "param", pools))
 
   order = list(decks) + list(SHEETS)
   wb._sheets.sort(key=lambda ws: order.index(ws.title) if ws.title in order else len(order))
@@ -209,7 +180,9 @@ def main():
     if added:
       msg += ", %d added" % added
     if stale:
-      msg += ", %d no longer generated (kept; delete by hand): %s" % (len(stale), ", ".join(stale[:5]))
+      # a biome with no art config yet (planned, image-less) lands here too, so this is not a delete order
+      msg += ", %d not in asset_variables.csv (kept: no art yet, or delete by hand if retired): %s" % (
+        len(stale), ", ".join(stale[:5]))
     print(msg)
   wb.save(MAPTILES)
   print("wrote %s" % os.path.relpath(MAPTILES, os.path.dirname(MAPTILES)))

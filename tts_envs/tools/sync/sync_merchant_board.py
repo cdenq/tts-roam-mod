@@ -185,17 +185,17 @@ def main():
   for f in factions_rows:
     fid = text(f.get("faction_id"))
     if not fid:
-      raise SystemExit("tokens.xlsx factions: a row has no faction_id")
+      raise SystemExit("tokens.xlsx faction_table: a row has no faction_id")
     if fid in factions:
-      raise SystemExit("tokens.xlsx factions: duplicate faction_id %r" % fid)
+      raise SystemExit("tokens.xlsx faction_table: duplicate faction_id %r" % fid)
     try:
       rep = int(f.get("default_rep") or 0)
     except (TypeError, ValueError):
-      raise SystemExit("tokens.xlsx factions: %s default_rep %r is not a "
+      raise SystemExit("tokens.xlsx faction_table: %s default_rep %r is not a "
                        "number" % (fid, f.get("default_rep")))
     factions[fid] = {"name": text(f.get("name")) or fid, "rep": rep}
   if "none" not in factions:
-    raise SystemExit("tokens.xlsx factions: need a 'none' row for the "
+    raise SystemExit("tokens.xlsx faction_table: need a 'none' row for the "
                      "Woodland's unaligned traders")
 
   # ---- shop tokens -------------------------------------------------------
@@ -231,7 +231,7 @@ def main():
     where = "%s (%s)" % (token["_where"], token["name"])
     faction = token.get("faction") or "none"
     if faction not in factions:
-      raise SystemExit("%s: faction %r is not on the factions sheet"
+      raise SystemExit("%s: faction %r is not on the faction_table sheet"
                        % (where, faction))
     try:
       tier = int(token.get("tier"))

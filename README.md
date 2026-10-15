@@ -38,7 +38,7 @@ ROAM/
     ├── data/                 # every authored dataset
     │   ├── cards.xlsx        # generic, origins, event_intro, event_options, event_outcomes, _values
     │   ├── tiles.xlsx        # items, skills, statuses, lootbox_table, _values
-    │   ├── tokens.xlsx       # tokens, landmarks, factions, loot_table, stats_table, _values
+    │   ├── tokens.xlsx       # tokens, loot_table, stats_table, landmarks, landmark_table, faction_table, _values
     │   ├── shops.xlsx        # shops, stock
     │   ├── asset_variables.csv # art knobs for build_map_tiles.py + build_gems.py + build_cards.py + build_landmarks.py + meeple colours
     │   └── gold_variables.csv # every hand-authored gold number
@@ -363,7 +363,7 @@ data (so names must not clash with tiles).
 | `role` | shop, quest, flavor, combat |
 | `subtype` | from `sub_<role>` on `_values`; blank for shop/flavor |
 | `affiliation` | neutral, enemy, friendly |
-| `faction` | `faction_id` from `factions`; blank = none |
+| `faction` | `faction_id` from `faction_table`; blank = none |
 | `tier` | 0–3; on shops = settlement size |
 | `exp` | exp worth |
 | `loot_table` | `loot_id`; blank on friendly (cannot be killed) |
@@ -373,7 +373,7 @@ data (so names must not clash with tiles).
 - description generated: affiliation/role/subtype, faction, tier/exp,
   effect, flavor
 - new role with subtypes = new `sub_<role>` column + matching named range
-- `factions`: `faction_id`, `name`, `default_rep` (starting rep), `short` (name used in effect text: `Party gains 1 Dynasty reputation`)
+- `faction_table`: `faction_id`, `name`, `default_rep` (starting rep), `short` (name used in effect text: `Party gains 1 Dynasty reputation`)
 - `loot_table`: same columns/grammar as `lootbox_table`
 
 ### Landmarks
@@ -392,7 +392,7 @@ the two sheets.
 | `faction` | `faction_id`; blank = `none` |
 | `tier` | 0–3 |
 | `effect` | composed into the description |
-| `gmnotes` | -> GMNotes. The landmark's KIND (`cave`, `fishing_node`), shared by landmarks that behave alike; keys `maptile.xlsx` `landmark_table` |
+| `gmnotes` | -> GMNotes. The landmark's KIND (`cave`, `fishing_node`), shared by landmarks that behave alike; keys `tokens.xlsx` `landmark_table` |
 | `image_front` | the token's face |
 
 - imports as role `landmark`; description: `Landmark` / faction / `Tier N` / effect
@@ -463,12 +463,12 @@ Panel:
   what unlocks / overrides it
 - Draw = everything Random. Draw specific = rolls only what is still Random
 - roll order deck -> biome -> pattern -> orientation -> density, each from its
-  `weights` pool, so a deck with more biomes is not drawn more. Free rolls:
+  `maptile_weights` pool, so a deck with more biomes is not drawn more. Free rolls:
   the same tile can come twice
 - settings survive save/load
-- a biome on the `tiers` sheet (`city`) rolls a hidden tier after it is drawn (`tier:<biome>`
-  weights). The tier only picks the tile's GMNotes biome (`settlement` / `town` / `city`) and the
-  tileset whose images it uses (same names: `settlement` / `town` / `city`); it is stored and shown nowhere
+- a biome with a `maptile_weights` `tier:<biome>` row (`city`) rolls that pool after it is drawn
+  (`settlement|settlement|settlement|town|town|city`) and becomes the result: its GMNotes, description,
+  render row and images. The roll is stored and shown nowhere; biomes in a tier pool stay out of `biome:<deck>`
 - the guildhall (starter tile) is never drawn and never offered by Biome. Spawn guildhall rolls a
   random guildhall image from `guildhall:pattern`, `guildhall:density` and optional
   `guildhall:orientation:<pattern>` (else `orientation:<pattern>`)
@@ -478,28 +478,29 @@ A drawn tile is a copy of the bag's template (Custom Tile, GMNotes
 
 | field | value |
 | --- | --- |
-| name | the biome name from `biome_descriptions`, e.g. `Deepwood` |
-| description | `[effect]`, blank line, `"flavor"` from `biome_descriptions` |
+| name | the biome name from `biome_explore`, e.g. `Deepwood` |
+| description | `[chances]` computed from the `resources` pool (`[Mining 67%, None 33%]`), `[effect]` if any, blank line, `"flavor"` from `biome_explore` |
 | GMNotes | biome id, e.g. `forest` -- every lookup keys on it |
 | memo | `d=<density>\|explore=<left>\|rendered=<0/1>` |
 | images | front = rolled image url, back = its deck's back url. Spawns face down (`SPAWN.ROTATION` z = 180) |
 | tags | `Maptile`, `Region:<deck>`, `Biome:<biome>` (ids, e.g. `Region:woodland`, `Biome:forest`; a tiered city is tagged by its GMNotes, `Biome:town`) |
 
 Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + memo):
-- `Explore: N` -- N from the `density` sheet. Click = swap it for four choices (spends nothing); picking one
+- `Explore: N` -- N = the tile's density. Click = swap it for four choices (spends nothing); picking one
   spends 1 and brings `Explore: N-1` back (gone at 0). Each choice broadcasts one short line: the spawned landmark's name, `Event!`, or `Nothing...` (`EXPLORE_SAYS` in `src/maptile_manager.lua`; the reason for a data miss goes to `log`):
-  - `Resources` / `Landmarks` -- roll the biome's `exploration` weights for that category; a `landmark`
-    outcome clones one from its pool out of bag `6a6425` onto the tile's centre, memo stamped from
-    `explore_outcomes` (GMNotes left as the landmark's own kind)
+  - `Resources` / `Landmarks` -- pick one entry of the biome's `resources` / `landmarks` pool on `biome_explore`
+    and clone that landmark out of bag `6a6425` onto the tile's centre. Its memo = the biome's `extra_info`
+    (exactly; blank = untouched); GMNotes stays the landmark's own. `none` / a blank entry = `Nothing...`
   - `Experiences` -- takes the top card of the tile's region bag (`EVENT_BAGS` in `src/maptile_manager.lua`:
     woodland `9b1bd8`, waterside `7abfaf`, opencountry `12d32e`, settlement `3d7a98`, scarred `3e737b`) face up
     onto the tile. Bags hold single cards, never decks; never shuffled by script; a drawn card leaves its bag
-  - `Wander` -- one of the other three at random
-  - a fifth choice on biomes listed on `explore_special` (guildhall: `Eat`) -- spends an explore and broadcasts `Maptile special action used.`; Wander never picks it
+  - `Wander` -- one of the other three at random (never Resources on a barren biome)
+  - a biome whose `resources` pool is only `none` gets no `Resources` button; its grid slot stays empty
+  - a fifth choice on biomes with a `special_label` on `biome_explore` (guildhall: `Eat`) -- spends an explore and broadcasts `Maptile special action used.`; Wander never picks it
   - untouched for 5 s (`EXPLORE.CHOICE_TIMEOUT`), the choices close and `Explore: N` returns. Not saved: a reload shows `Explore: N` again
 - `?` -- toggles the tile's hover tooltip (name + description). Tiles spawn with it off; grey text =
   off, black = on. State is the object's own `tooltip`, saved by TTS, not the memo
-- `Render` -- "Lock-in this maptile as the explored part of the world." Once (memo `rendered=1` removes the button); locks the tile (`setLock(true)`, saved with it); takes the region's top event card (as Experiences) and spawns the biome's `maptile_table` row onto the tile's centre, each slot's copy stamped from its `_gmnotes` / `_memo` columns, through Global
+- `Render` -- "Lock-in this maptile as the explored part of the world." Once (memo `rendered=1` removes the button); locks the tile (`setLock(true)`, saved with it); takes the region's top event card (as Experiences) and spawns the biome's `biome_render` row onto the tile's centre, each slot's copy stamped from its `_gmnotes` / `_memo` columns, through Global Silent: nothing in chat (`spawnFromFor` `quiet = true`); an empty/missing event bag or a missing spawn name goes to `log`
   (`Global.call("spawnFromFor", {guid, spawn})` -> `spawnFrom`, same bags as every other spawn)
 
 ### `data/maptile.xlsx`
@@ -508,15 +509,15 @@ Buttons on the tile (owned by the manager; re-rendered on load from GMNotes + me
 | --- | --- | --- |
 | `settlement` `woodland` `opencountry` `waterside` `scarred` | image of that deck | `biome` `pattern` `orientation` `density` `image` `file` **`url`** |
 | `backs` | deck | `deck` `name` `image` `file` **`url`** |
-| `biome_descriptions` | biome | `biome` `deck` `name` `effect` `flavor` |
-| `maptile_table` | biome (GMNotes) | `gmnotes` + spawn cells (`spawnN`, `spawnmeepleN`, `spawnlandmark1..3`, `spawngold`); names checked against tiles/tokens. Landmarks go in `spawnlandmarkN` (bag `6a6425`), not `spawnmeepleN` -- the sync fails on a landmark in a meeple cell | `<spawncol>_gmnotes` / `<spawncol>_memo` (e.g. `spawnlandmark1_memo`) stamp that slot's copy; blank = keep its own, `{biome}` = the row's biome. A stamp on an empty spawn column fails the sync |
-| `explore_outcomes` | Explore outcome | `outcome` `category` (`resource` / `poi` / `event`) `kind` (`landmark` / `nothing`) `name` `landmarks` (pool, `a\|b\|b`; checked against tokens.xlsx `landmarks`) `gmnotes` `memo` (stamped on the spawned landmark, blank = leave; `{biome}` = the tile's biome). `flavor` is no longer read (explores broadcast short fixed lines) |
-| `exploration` | biome | `biome` + one weight column per resource / poi outcome (`fishing` ... `resource_none`, `camp` ... `poi_none`); relative odds within each category, blank/0 = never. A new outcome = a new row there + a new column here; weight on a landmark outcome with no landmarks fails the sync |
-| `explore_special` | biome with a fifth Explore choice | `biome` `label` (button text) `tooltip` -- hand-filled; most biomes have no row. `flavor` is no longer read |
-| `landmark_table` | landmark kind (GMNotes) | `gmnotes` (lowercase snake_case) `actions` (`inspect\|enter`: keys of `LANDMARK_ACTIONS` in `src/global.lua`, which hold each action's label + click function) `notes`. `sync_landmark_data.py` -> `LANDMARK_DATA` in Global; warns on a kind no landmark carries, or one carried with no row. New kind = a row; new action = code |
-| `tiers` | biome + tier | `biome` `tier` `gmnotes` `tileset` -- gmnotes = the biome the tile becomes (needs its own `biome_descriptions` row, kept out of the pools); tileset = whose images it uses; a tileset that is not a biome has image rows only |
-| `density` | density stage | `density` `explorations` |
-| `weights` | roll | `param` `pool` -- `deck`, `biome:<deck>`, `pattern`, `orientation:<pattern>`, `density`, `guildhall:*`, `tier:<biome>`; repeat an entry to make it likelier (`1\|1\|2\|2\|3`) |
+| `biome_explore` | biome | what Explore can find + the tooltip text: `biome` `region` (a deck on `backs`) `name` `effect` `flavor`; `extra_info` = the memo of every landmark Explore spawns on this biome (`{biome}` = the biome); `resources` / `landmarks` = pools of exact landmark names from tokens.xlsx (`Mining Node\|Mining Node\|none`: repeats raise the odds, `none` or a blank entry = nothing found; an unknown name fails the sync); `special_label` (button text) `special_tooltip` = the fifth Explore choice (most biomes blank). Any other column fails the sync |
+| `biome_render` | biome (GMNotes) | what Render spawns: `gmnotes` + spawn cells (`spawnN`, `spawnmeepleN`, `spawnlandmark1..3`, `spawngold`); names checked against tiles/tokens. Landmarks go in `spawnlandmarkN` (bag `6a6425`), not `spawnmeepleN` -- the sync fails on a landmark in a meeple cell | `<spawncol>_gmnotes` / `<spawncol>_memo` (e.g. `spawnlandmark1_memo`) stamp that slot's copy; blank = keep its own, `{biome}` = the row's biome. A stamp on an empty spawn column fails the sync. `extra_info`: added to the memo of every landmark + meeple Render spawns (after the slot `_memo`, joined by `\|`); not items, cards or coins, whose memo is cooldown / branch state |
+| `maptile_weights` | roll | `param` `pool` -- `deck`, `biome:<deck>`, `pattern`, `orientation:<pattern>`, `density`, `guildhall:*`, `tier:<biome>` (pool of biomes a drawn `<biome>` becomes; each needs a `biome_explore` row + images); repeat an entry to make it likelier (`1\|1\|2\|2\|3`) |
+
+`tokens.xlsx` `landmark_table`: one row per landmark kind (GMNotes). `gmnotes` (lowercase snake_case)
+`actions` (`inspect|enter`: keys of `LANDMARK_ACTIONS` in `src/global.lua`, which hold each action's
+label + click function) `notes`. `sync_landmark_data.py` -> `LANDMARK_DATA` in Global; warns on a kind no
+landmark carries, or one carried with no row. New kind = a row; new action = code. Not drops: those are
+`loot_table`
 
 - rows come from `python tools/build/scaffold_maptile_xlsx.py` (one per generated
   image). Re-run after generating new art: adds rows, never overwrites a filled cell
@@ -551,7 +552,7 @@ Code-drawn storybook tiles. Manual step, not part of `master_sync.cmd`.
     `back_font` (path from repo root, `internal/asset_generation/Luminari-Regular.ttf`), `back_gem_size`, `density_scale`,
     and feature/wall tuning: `river_anchor`, `river_width`, `canyon_width`, `lake_land`, `wharf_land`, `pond_size`,
     `falls_size`, `pit_size`, `pool_count`/`pool_size`, `mud_count`/`mud_size`,
-    `spring_count`/`spring_size`, `reed_size`, `field_width`/`field_height`,
+    `spring_count`/`spring_size`, `ice_count`/`ice_size`, `fog_alpha`, `web_alpha`, `halo_alpha`, `reed_size`, `field_width`/`field_height`,
     `menhir_spacing`/`menhir_size`, `stake_spacing`/`stake_size` (sizes are
     `lo-hi` in design units; a tile is 1024 wide)
   - one block per region: `variants`, `patterns`, `densities`, `ground`,
@@ -569,16 +570,18 @@ Code-drawn storybook tiles. Manual step, not part of `master_sync.cmd`.
   blossomgrove, mushroomhollow, deepwood, heath, ashland, ruins, quarry,
   lumbercamp, farmstead, orchard, settlement, town, lakeshore, briarthicket,
   wildflowermeadow, canyon, waterfallcliffs, standingstones, battlefield, hotsprings, lilypond,
-  otterwharf, drownedwood, watermill, beaverdam, barrows, slagworks, blightwood, cliffside,
-  coldmountain, hillcentral, battlefieldmountain, battlefieldwaterside
+  otterwharf, drownedwood, beaverdam, barrows, slagworks, blightwood, cliffside,
+  coldmountain, dome, battlefieldmountain, battlefieldwaterside, fogmere, webwoods, rockglade, fernbrake
 - `icons` = `painter:weight:lo-hi` joined by `|`. Painters: tree, pine, bush,
   mountain, house, tent, blossom, fruit, oak, heather, deadtree, charred,
   stump, rock, hill, reeds, mushroom, ruinwall, column, crane, logpile,
   haystack, gnarled, briar, flowers, menhir, cart, spears, warbanner, townhouse, coldpeak, coldpine,
   blightcap, blighttree, mangrove, barrow, cave, furnace, slagheap, barrel, crate, sword, helmet,
-  catapult (also: stake = palisade;
+  catapult, thorn, ashpile, bones, bonepost, fern, fallenlog, mossrock, berrybush, reedsheaf, silktree, webbush,
+  eggsacs, cocoon, pack, spikerock, willow, lanternpost, fishbones, insecteggs, tallfern, fiddleheads (also: stake = palisade;
   wallblock + tower = stone wall; guildhall, windmill, statue =
-  centrepieces; barge, raft, lodge, watermill = placed by a feature, afloat, no shadow)
+  centrepieces; barge, raft, lodge, watermill = placed by a feature, afloat, no shadow; steeple, sunkboat, eyes,
+  fin, drownedtree = `water_props` only)
 - optional walled-town keys (settlement, town, city use them; leave out elsewhere):
   - `town_radius` — `icons` stay inside this circle (0 = off)
   - `wall` — `palisade` = ring of stakes at `town_radius`, gates where roads
@@ -601,8 +604,17 @@ Code-drawn storybook tiles. Manual step, not part of `master_sync.cmd`.
     bank), `dam` (river + stick dam, pond and lodge upstream), `holes` (dug pits with spoil rims),
     `blight` (diseased and rotten ground blotches), `cliffs` (roads on ledges, rock faces dropping
     to a valley; `cliff_width`, `cliff_height`), `bighill` (one hill under the clearing,
-    `bighill_size`), `none`. Grass never draws on a feature
+    `bighill_size`), `ice` (cracked frozen puddles; `ice_count`, `ice_size`), `none`. Grass never draws on a feature
   - `mud` — count of battlefield mud patches drawn on top of any feature (e.g. a battlefield on a river)
+  - `mill_chance` — `river` only: odds (0-1) a tile also gets a watermill on its bank (riverside 0.25)
+  - `fog` — `#colour:count` banks of see-through mist over everything (`global.fog_alpha`); blightwood, barrows
+  - `grass_style` — `plain` (default) or `spiky` (fans of sharp blades; briarthicket)
+  - `ground_webs` — count of orb webs laid flat on the ground under the roads (webwoods, rockglade)
+  - `lake` / `wharf` only (fogmere):
+    - `water` — `#base|#shade|#light` replaces the shared water colours on this region's tiles
+    - `lily_bloom` — share (0-1) of lake lilies in flower
+    - `water_props` — `painter:COUNT:lo-hi|...` placed in order on open water, well apart; runs out when the lake does
+    - `wisps` — count of will-o'-wisps over open water
   - `speckle` — ground flecks `#colour:count|#colour:count` (petals, ash, spores)
   - `layout` — `scatter` (default) or `rows` (orchard grid)
   - `required` — `painter:COUNT:lo-hi`, always placed first at every density

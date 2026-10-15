@@ -6,10 +6,11 @@ is one edit here instead of a hunt through every tool.
   data/tiles.xlsx           items, skills, statuses  one row per tile/token
                             lootbox_table          what each lootbox drops
   data/tokens.xlsx          tokens                   one row per meeple token
-                            factions                 every faction, and its starting rep
+                            faction_table            every faction, and its starting rep
                             loot_table               what a token drops when killed
                             stats_table              a token's combat numbers
                             landmarks                places on the map: caves, shrines, camps
+                            landmark_table           landmark kind (gmnotes) -> its buttons
   data/cards.xlsx           generic                  one row per art-only card; the templates
                             origins                  one row per origin card
                             event_intro              one row per event card
@@ -20,9 +21,9 @@ is one edit here instead of a hunt through every tool.
   data/shops.xlsx
   data/asset_variables.csv  art knobs for tools/build/build_map_tiles.py + build_gems.py + build_landmarks.py + build_meeples.py
   data/maptile.xlsx         <deck> x5, backs       image URLs for the Maptile Manager
-                            biome_descriptions     tile description per biome
-                            maptile_table          what Render spawns, per biome (GMNotes)
-                            density, weights       explorations per density; draw odds
+                            biome_explore          per biome: description, explore pools, extra_info, special choice
+                            biome_render           what Render spawns, per biome (GMNotes)
+                            maptile_weights        draw odds, incl. tier:<biome> pools
 """
 import os, re, sys
 
@@ -52,7 +53,8 @@ TOKEN_SHEET = "tokens"
 # "landmark" so ITEM_DATA and the description builder need nothing new.
 LANDMARK_SHEET = "landmarks"
 LANDMARK_ROLE = "landmark"
-FACTIONS_SHEET = "factions"
+LANDMARK_TABLE_SHEET = "landmark_table"
+FACTIONS_SHEET = "faction_table"
 LOOT_TABLE_SHEET = "loot_table"
 STATS_TABLE_SHEET = "stats_table"
 SHOP_ROLE = "shop"

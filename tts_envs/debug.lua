@@ -3540,6 +3540,12 @@ everything is out, which is where a lootbox destroys itself.
 ]]
 function finishSpawn(obj, plan, placed, report)
   local id = obj.getGMNotes() or "card"
+  -- report.quiet (maptile Render): nothing in chat, a shortfall goes to the log
+  if report.quiet then
+    if #report.missing > 0 then log(id..": MISSING from bag -- "..table.concat(report.missing, ", ")) end
+    if report.onDone then report.onDone() end
+    return
+  end
   local said = {}
   for _, n in ipairs(report.spawned) do table.insert(said, n) end
   if (report.gold or 0) > 0 then table.insert(said, report.gold.." gold") end
@@ -3673,9 +3679,9 @@ Objects appear above `obj` and climb so they do not clip. `obj` only supplies
 a position -- it does not have to be a card.
 ]]
 -- `onDone(report)` is optional and fires once everything is out.
-function spawnFrom(obj, spawn, onDone)
+function spawnFrom(obj, spawn, onDone, quiet)
   local plan = rollSpawn(spawn)
-  local report = {spawned = {}, missing = {}, gold = 0}
+  local report = {spawned = {}, missing = {}, gold = 0, quiet = quiet}
   if onDone then report.onDone = function() onDone(report) end end
   spawnPlanStep(obj, plan, 1, 0, report)
 end
@@ -3788,7 +3794,7 @@ REP = REP or {}
 
 --[[ Where a faction starts before anything has happened.
 
-FACTIONS is generated from the factions sheet of data/tokens.xlsx by
+FACTIONS is generated from the faction_table sheet of data/tokens.xlsx by
 tools/sync/sync_merchant_board.py: the two great powers tolerate vagabonds,
 everyone else assumes you work for one of them.
 ]]
@@ -3987,7 +3993,7 @@ end
 function spawnFromFor(args)
   local obj = getObjectFromGUID(args.guid)
   if obj == nil or obj.isDestroyed() then return end
-  spawnFrom(obj, args.spawn)
+  spawnFrom(obj, args.spawn, nil, args.quiet)
 end
 
 -- Same as above, but from the meeple bag: tokens live there, not with items.

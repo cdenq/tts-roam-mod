@@ -5,26 +5,29 @@
 
 Sheets read (tools/build/scaffold_maptile_xlsx.py creates and tops them up):
 
-  <deck> x5            biome, pattern, orientation, density, image, file, url
-  backs                deck, name, image, file, url
-  biome_descriptions   biome, deck, name, effect, flavor  -> [effect], blank line, "flavor"
-  maptile_table        gmnotes + spawn cells (spawnN, spawnmeepleN, spawnlandmarkN, spawngold); optional
-                       <spawncol>_gmnotes / <spawncol>_memo stamp that slot's copy ("{biome}" = the row's biome)
-  explore_outcomes     outcome, category (resource / poi / event), kind (landmark / nothing), name,
-                       landmarks ("a|b|b"), gmnotes + memo (stamped on the spawned landmark; "{biome}" =
-                       the tile's biome). flavor is not read: explores broadcast short fixed lines
-  exploration          biome + one weight column per resource / poi outcome  (blank / 0 = never)
-  explore_special      biome, label, tooltip: that biome's fifth Explore choice (guildhall: Eat)
-  density              density, explorations
-  weights              param, pool        ("a|b|b": b is twice as likely)
-  tiers                biome, tier, gmnotes, tileset
+  <deck> x5          biome, pattern, orientation, density, image, file, url
+  backs              deck, name, image, file, url
+  biome_explore      one row per biome:
+                       region (a deck on backs), name, effect, flavor -> description: [effect], blank line, "flavor"
+                       resources, landmarks: what Explore's Resources / Landmarks choice can find, as a pool
+                         of exact landmark names ("Mining Node|Mining Node|none"); "none" or a blank entry
+                         = nothing found. Repeats raise the odds
+                       special_label, special_tooltip: its fifth Explore choice (guildhall: Eat)
+                       extra_info: the memo of every landmark Explore spawns on this biome (exactly this)
+                       the tile description opens with the resources chances, computed here:
+                         [Mining 33%, Hunting 33%, None 33%], then [effect] if any, then "flavor"
+  biome_render       gmnotes + spawn cells (spawnN, spawnmeepleN, spawnlandmarkN, spawngold); optional
+                     <spawncol>_gmnotes / <spawncol>_memo stamp that slot's copy ("{biome}" = the row's biome)
+                     extra_info: added to the memo of every landmark + meeple Render spawns (not items,
+                     cards or coins: their memo is cooldown / branch state)
+  maptile_weights    param, pool        ("a|b|b": b is twice as likely)
 
-A biome on the tiers sheet rolls a tier (weights tier:<biome>) after it is
-drawn. The tier is never shown: it only picks GMNOTES -- the biome the tile
-becomes (settlement / town / city), with its own description and render row --
-and the TILESET whose images it uses. A gmnotes biome reached only through a
-tier is never drawn on its own; a tileset that is not a biome (none today) has
-image rows and nothing else.
+A tile gets as many explorations as its density (no table: always equal).
+
+A biome with a maptile_weights tier:<biome> row rolls that pool after it is drawn
+("settlement|settlement|town|city") and BECOMES the result: its GMNotes,
+description, render row and images. A biome reached only through a tier pool
+is never drawn on its own.
 
 The guildhall is the starter tile: it is never drawn, only spawned by its own
 button, so it is left out of every biome pool and rolls from guildhall:* pools.
@@ -48,8 +51,18 @@ SRC = os.path.join(ROOT, "src", "maptile_manager.lua")
 BEGIN = "--[[ BEGIN GENERATED MAPTILE DATA -- do not edit ]]"
 END = "--[[ END GENERATED MAPTILE DATA ]]"
 GUILDHALL = "guildhall"
-EXPLORE_KINDS = ("landmark", "nothing")
-EXPLORE_CATEGORIES = ("resource", "poi", "event")  # event = the Experiences choice: no weights
+EXPLORE_POOLS = ("resources", "landmarks")  # biome_explore columns, one per Explore choice that spawns
+NOTHING = "none"  # a pool entry that finds nothing (a blank entry does too)
+BIOME_COLUMNS = {"biome", "region", "name", "effect", "flavor", "extra_info", "special_label",
+                 "special_tooltip"} | set(EXPLORE_POOLS)
+# Render's extra_info reaches these slots only: an item's memo is its cooldown, a card's its branch state
+EXTRA_INFO_KEYS = ("landmark", "meeple")
+MEMO_JOIN = "|"
+
+
+def join_memo(*parts):
+  """Memo pieces in order, blanks dropped: slot / outcome memo first, then extra_info."""
+  return MEMO_JOIN.join(p for p in parts if p)
 DRIVE_PAGE = re.compile(r"https?://drive\.google\.com/(?:file/d/([\w-]+)|open\?id=([\w-]+))")
 
 
@@ -80,11 +93,25 @@ def lua_spawn(spawn):
   return "{" + ", ".join(parts) + "}"
 
 
-def describe(effect, flavor):
-  """The tile description: '[effect]', a blank line, then the quoted flavor."""
+def resource_chances(pool):
+  """'Mining 33%, Hunting 33%, None 33%' from a resources pool: each entry's share,
+  names without ' Node', in first-appearance order with None last. '' = no pool."""
+  entries = [v.strip() for v in (pool or "").split("|")] if (pool or "").strip() else []
+  if not entries:
+    return ""
+  names = ["None" if e == "" or e.lower() == NOTHING else e[:-len(" Node")] if e.endswith(" Node") else e
+           for e in entries]
+  order = [n for n in dict.fromkeys(names) if n != "None"] + (["None"] if "None" in names else [])
+  return ", ".join("%s %d%%" % (n, round(100.0 * names.count(n) / len(names))) for n in order)
+
+
+def describe(chances, effect, flavor):
+  """The tile description: '[chances]' and '[effect]' (each if any), a blank line, then the quoted flavor.
+  chances is derived from the resources pool by the sync, never authored."""
   parts = []
-  if effect:
-    parts.append("[%s]" % effect)
+  head = "\n".join("[%s]" % t for t in (chances, effect) if t)
+  if head:
+    parts.append(head)
   if flavor:
     parts.append('"%s"' % flavor)
   return "\n\n".join(parts)
@@ -117,39 +144,40 @@ def main():
     decks.append({"id": r["deck"], "name": r.get("name") or r["deck"], "back": url, "biomes": []})
   deck_ids = {d["id"]: d for d in decks}
 
+  biome_rows = read_rows(MAPTILES, "biome_explore", "biome", wb)
   biomes = {}
-  for r in read_rows(MAPTILES, "biome_descriptions", "biome", wb):
-    if r.get("deck") not in deck_ids:
-      sys.exit("%s: deck %r is not on the backs sheet" % (r["_where"], r.get("deck")))
-    biomes[r["biome"]] = {"deck": r["deck"], "name": r.get("name") or r["biome"].title(),
-                          "description": describe(r.get("effect", ""), r.get("flavor", ""))}
+  for r in biome_rows:
+    if r.get("region") not in deck_ids:
+      sys.exit("%s: region %r is not a deck on the backs sheet" % (r["_where"], r.get("region")))
+    biomes[r["biome"]] = {"deck": r["region"], "name": r.get("name") or r["biome"].title(),
+                          "description": describe(resource_chances(r.get("resources")), r.get("effect", ""),
+                                                 r.get("flavor", ""))}
     if r["biome"] != GUILDHALL:  # the cycling list Draw specific offers
-      deck_ids[r["deck"]]["biomes"].append(r["biome"])
+      deck_ids[r["region"]]["biomes"].append(r["biome"])
   if GUILDHALL not in biomes:
-    sys.exit("biome_descriptions has no %r row -- the Spawn guildhall button needs it" % GUILDHALL)
+    sys.exit("biome_explore has no %r row -- the Spawn guildhall button needs it" % GUILDHALL)
   blank = sorted(b for b, v in biomes.items() if not v["description"])
   if blank:
     warn("%d biomes have no effect or flavor: %s" % (len(blank), ", ".join(blank)))
 
-  # tiers: biome -> tier -> {gmnotes, tileset}
-  tiers, tilesets, tier_only = {}, {}, set()
-  for r in read_rows(MAPTILES, "tiers", "biome", wb):
-    where = r["_where"]
-    if r["biome"] not in biomes:
-      sys.exit("%s: biome %r is not on biome_descriptions" % (where, r["biome"]))
-    if not (r.get("tier") and r.get("gmnotes") and r.get("tileset")):
-      sys.exit("%s: needs a tier, gmnotes and tileset" % where)
-    if r["tier"] in tiers.get(r["biome"], {}):
-      sys.exit("%s: %s tier %s is listed twice" % (where, r["biome"], r["tier"]))
-    deck = biomes[r["biome"]]["deck"]
-    if biomes.get(r["gmnotes"], {}).get("deck") != deck:
-      sys.exit("%s: gmnotes %r needs a %s row on biome_descriptions (its description and render row)"
-               % (where, r["gmnotes"], deck))
-    tiers.setdefault(r["biome"], {})[r["tier"]] = {"gmnotes": r["gmnotes"], "tileset": r["tileset"]}
-    if r["gmnotes"] != r["biome"]:
-      tier_only.add(r["gmnotes"])
-    if r["tileset"] not in biomes:
-      tilesets[r["tileset"]] = deck
+  # tiers: maptile_weights tier:<biome> -> the biomes a drawn <biome> can become
+  weight_rows = read_rows(MAPTILES, "maptile_weights", "param", wb)
+  tiers, tier_only = {}, set()
+  for r in weight_rows:
+    if not r["param"].startswith("tier:"):
+      continue
+    where, b = r["_where"], r["param"][len("tier:"):]
+    if b not in biomes:
+      sys.exit("%s: %r is not on biome_explore" % (where, b))
+    into = [v.strip() for v in r.get("pool", "").split("|") if v.strip()]
+    if not into:
+      sys.exit("%s: pool is empty" % where)
+    for v in into:
+      if biomes.get(v, {}).get("deck") != biomes[b]["deck"]:
+        sys.exit("%s: %r needs a %s row on biome_explore (its description, render row and images)"
+                 % (where, v, biomes[b]["deck"]))
+    tiers[b] = list(dict.fromkeys(into))
+    tier_only |= set(into) - {b}
   tier_only -= set(tiers)
   for d in decks:  # reached only through a tier: Draw specific cannot pick it either
     d["biomes"] = [b for b in d["biomes"] if b not in tier_only]
@@ -164,9 +192,8 @@ def main():
     for r in read_rows(MAPTILES, d["id"], "image", wb):
       where = r["_where"]
       biome, pattern, orient, dens = r.get("biome"), r.get("pattern"), r.get("orientation"), r.get("density")
-      if biomes.get(biome, {}).get("deck", tilesets.get(biome)) != d["id"]:
-        sys.exit("%s: biome %r is not a %s biome on biome_descriptions or a tileset on tiers"
-                 % (where, biome, d["id"]))
+      if biomes.get(biome, {}).get("deck") != d["id"]:
+        sys.exit("%s: biome %r is not a %s biome on biome_explore" % (where, biome, d["id"]))
       drawn.add(biome)
       if not (pattern and orient and dens):
         sys.exit("%s: needs pattern, orientation and density" % where)
@@ -187,21 +214,10 @@ def main():
         continue
       images["|".join((biome, pattern, orient, dens))] = url
   densities = sorted(densities, key=int)
-  for b, by_tier in tiers.items():
-    for tier, v in by_tier.items():
-      if v["tileset"] not in drawn:
-        warn("%s tier %s uses tileset %r, which has no images yet -- that tier cannot be drawn"
-             % (b, tier, v["tileset"]))
-
-  explore = {}
-  for r in read_rows(MAPTILES, "density", "density", wb):
-    try:
-      explore[r["density"]] = int(r.get("explorations") or 0)
-    except ValueError:
-      sys.exit("%s: explorations must be a whole number" % r["_where"])
-  for dens in densities:
-    if dens not in explore:
-      sys.exit("maptile.xlsx density sheet has no row for density %s" % dens)
+  for b, into in tiers.items():
+    for v in into:
+      if v not in drawn:
+        warn("tier:%s can become %r, which has no images yet -- that result cannot be drawn" % (b, v))
 
   # weights: every pool checked against what it may contain; a missing pool = everything, evenly
   allowed = {"deck": [d["id"] for d in decks], "pattern": patterns, "density": densities}
@@ -212,18 +228,18 @@ def main():
   # optional: a pattern without its own guildhall rotation pool uses orientation:<pattern>
   optional = {"guildhall:orientation:" + p for p in guildhall_patterns}
   allowed.update({"guildhall:orientation:" + p: orientations[p] for p in guildhall_patterns})
-  allowed.update({"tier:" + b: sorted(t, key=int) for b, t in tiers.items()})
+  allowed.update({"tier:" + b: into for b, into in tiers.items()})
   weights = {}
-  for r in read_rows(MAPTILES, "weights", "param", wb):
+  for r in weight_rows:
     if r["param"] not in allowed:
       sys.exit("%s: unknown param %r (use: %s)" % (r["_where"], r["param"], ", ".join(allowed)))
     pool = [v.strip() for v in r.get("pool", "").split("|") if v.strip()]
     if r["param"].startswith("biome:") and GUILDHALL in pool:
       sys.exit("%s: %s is the starter tile, spawned by its own button -- take it out of %s"
                % (r["_where"], GUILDHALL, r["param"]))
-    tiered = set(pool) & (set(tilesets) | tier_only)
+    tiered = set(pool) & tier_only
     if r["param"].startswith("biome:") and tiered:
-      sys.exit("%s: %s is only reached through a tier (tiers sheet) -- take it out of %s"
+      sys.exit("%s: %s is only reached through a tier pool -- take it out of %s"
                % (r["_where"], ", ".join(sorted(tiered)), r["param"]))
     bad = [v for v in pool if v not in allowed[r["param"]]]
     if bad or not pool:
@@ -232,15 +248,15 @@ def main():
     weights[r["param"]] = pool
   for param, values in allowed.items():
     if param not in weights and param not in optional:
-      warn("weights sheet has no %r row -- rolling it evenly" % param)
+      warn("maptile_weights has no %r row -- rolling it evenly" % param)
       weights[param] = list(values)
 
-  # maptile_table: what Render spawns, in the shared spawn-cell grammar
+  # biome_render: what Render spawns, in the shared spawn-cell grammar
   # landmarks now come from their own bag, so a meeple cell may only name a meeple
   items, landmarks = item_names(), landmark_names()
   meeples = token_names() - landmarks
   table = {}
-  for r in read_rows(MAPTILES, "maptile_table", "gmnotes", wb):
+  for r in read_rows(MAPTILES, "biome_render", "gmnotes", wb):
     if r["gmnotes"] not in biomes:
       warn("%s: gmnotes %r is not a biome -- no tile will ever read it" % (r["_where"], r["gmnotes"]))
     for ref in referenced_names(r, keys=("items",)):
@@ -255,64 +271,53 @@ def main():
       if ref not in landmarks:
         sys.exit("%s: %r is not a landmark in tokens.xlsx (landmarks sheet)" % (r["_where"], ref))
     spawn = read_spawn(r)
-    stamps = read_stamps(r, fill=lambda text, b=r["gmnotes"]: text.replace("{biome}", b))
+    fill = lambda text, b=r["gmnotes"]: text.replace("{biome}", b)
+    stamps = read_stamps(r, fill=fill)
+    extra = fill(r.get("extra_info", ""))
+    if extra:
+      for key in EXTRA_INFO_KEYS:
+        for i in range(1, len(spawn.get(key, [])) + 1):
+          slot = stamps.setdefault(key, {}).setdefault(i, {})
+          slot["memo"] = join_memo(slot.get("memo", ""), extra)
+      if not any(spawn.get(k) for k in EXTRA_INFO_KEYS):
+        warn("%s: extra_info but no landmark or meeple to carry it" % r["_where"])
     if stamps:
       spawn["stamps"] = stamps
     if spawn:
       table[r["gmnotes"]] = spawn
 
-  # explore_outcomes: what each outcome does; exploration: per-biome weight per resource / poi outcome
-  outcomes = {}
-  for r in read_rows(MAPTILES, "explore_outcomes", "outcome", wb):
-    where, category = r["_where"], r.get("category", "")
-    if category not in EXPLORE_CATEGORIES:
-      sys.exit("%s: category %r (use: %s)" % (where, category, ", ".join(EXPLORE_CATEGORIES)))
-    kind = r.get("kind") or "nothing"
-    if kind not in EXPLORE_KINDS:
-      sys.exit("%s: kind %r (use: %s)" % (where, kind, ", ".join(EXPLORE_KINDS)))
-    pool = [v.strip() for v in r.get("landmarks", "").split("|") if v.strip()]
-    for name in pool:
-      if name not in landmarks:
-        sys.exit("%s: %r is not a landmark in tokens.xlsx (landmarks sheet)" % (where, name))
-    if kind == "landmark" and not pool:
-      warn("%s: %s has no landmarks yet -- give it weight only once it does" % (where, r["outcome"]))
-    outcomes[r["outcome"]] = {"category": category, "kind": kind, "name": r.get("name") or r["outcome"].title(),
-                              "landmarks": pool, "gmnotes": r.get("gmnotes", ""), "memo": r.get("memo", "")}
-  exploration = {}
-  for r in read_rows(MAPTILES, "exploration", "biome", wb):
-    if r["biome"] not in biomes:
-      sys.exit("%s: biome %r is not on biome_descriptions" % (r["_where"], r["biome"]))
-    rows = {}
-    for col, v in r.items():
-      if col in ("biome", "notes") or col.startswith("_") or v == "":
+  # biome_explore: Explore's pools (exact landmark names, "none" / blank = nothing) and extra_info
+  exploration, special, extra_info = {}, {}, {}
+  for r in biome_rows:
+    unknown = [c for c in r if not c.startswith("_") and c not in BIOME_COLUMNS]
+    if unknown:
+      sys.exit("%s: unknown biome_explore column %s (use: %s)"
+               % (r["_where"], ", ".join(unknown), ", ".join(sorted(BIOME_COLUMNS))))
+    if r.get("extra_info"):
+      extra_info[r["biome"]] = r["extra_info"].replace("{biome}", r["biome"])
+    pools = {}
+    for col in EXPLORE_POOLS:
+      if not r.get(col):
         continue
-      o = outcomes.get(col)
-      if o is None or o["category"] == "event":
-        sys.exit("%s: column %r is not a resource / poi outcome on explore_outcomes" % (r["_where"], col))
-      try:
-        weight = int(float(v))
-      except ValueError:
-        sys.exit("%s: %s weight %r must be a whole number" % (r["_where"], col, v))
-      if weight < 0:
-        sys.exit("%s: %s weight must not be negative" % (r["_where"], col))
-      if weight and o["kind"] == "landmark" and not o["landmarks"]:
-        sys.exit("%s: %s has weight but no landmarks on explore_outcomes" % (r["_where"], col))
-      if weight:
-        rows.setdefault(o["category"], []).append((col, weight))
-    if rows:
-      exploration[r["biome"]] = rows
-  # explore_special: a biome's own fifth Explore choice
-  special = {}
-  for r in read_rows(MAPTILES, "explore_special", "biome", wb):
-    if r["biome"] not in biomes:
-      sys.exit("%s: biome %r is not on biome_descriptions" % (r["_where"], r["biome"]))
-    if not r.get("label"):
-      sys.exit("%s: needs a label (the button text)" % r["_where"])
-    special[r["biome"]] = {"label": r["label"], "tooltip": r.get("tooltip", "")}
+      pool = []
+      for entry in (v.strip() for v in r[col].split("|")):
+        if entry.lower() == NOTHING:
+          entry = ""
+        if entry and entry not in landmarks:
+          sys.exit("%s: %s %r is not a landmark in tokens.xlsx (landmarks sheet)" % (r["_where"], col, entry))
+        pool.append(entry)
+      pools[col] = pool
+    if pools:
+      exploration[r["biome"]] = pools
+    # a biome's own fifth Explore choice
+    if r.get("special_tooltip") and not r.get("special_label"):
+      sys.exit("%s: special_tooltip without a special_label (the button text)" % r["_where"])
+    if r.get("special_label"):
+      special[r["biome"]] = {"label": r["special_label"], "tooltip": r.get("special_tooltip", "")}
 
   unexplorable = sorted(set(biomes) - set(exploration))
   if unexplorable:
-    warn("%d biomes have no exploration weights (Explore finds nothing): %s"
+    warn("%d biomes have no resources / landmarks pool (Explore finds nothing): %s"
          % (len(unexplorable), ", ".join(unexplorable)))
 
   # ---- Lua
@@ -327,17 +332,10 @@ def main():
     L.append("    [%s] = {deck = %s, name = %s, description = %s}," % (
       lua_str(b), lua_str(v["deck"]), lua_str(v["name"]), lua_str(v["description"])))
   L.append("  },")
-  L.append("  tiers = {")
-  for b, by_tier in tiers.items():
-    L.append("    [%s] = {%s}," % (lua_str(b), ", ".join(
-      "[%s] = {gmnotes = %s, tileset = %s}" % (lua_str(t), lua_str(v["gmnotes"]), lua_str(v["tileset"]))
-      for t, v in by_tier.items())))
-  L.append("  },")
   L.append("  patterns = %s," % lua_list(patterns))
   L.append("  orientations = {%s}," % ", ".join("[%s] = %s" % (lua_str(p), lua_list(o))
                                                  for p, o in orientations.items()))
   L.append("  densities = %s," % lua_list(densities))
-  L.append("  explore = {%s}," % ", ".join("[%s] = %d" % (lua_str(k), v) for k, v in explore.items()))
   L.append("  weights = {")
   for param, pool in weights.items():
     L.append("    [%s] = %s," % (lua_str(param), lua_list(pool)))
@@ -346,16 +344,10 @@ def main():
   for gm, row in table.items():
     L.append("    [%s] = %s," % (lua_str(gm), lua_spawn(row)))
   L.append("  },")
-  L.append("  outcomes = {")
-  for o, v in outcomes.items():
-    L.append("    [%s] = {category = %s, kind = %s, name = %s, landmarks = %s, gmnotes = %s, memo = %s}," % (
-      lua_str(o), lua_str(v["category"]), lua_str(v["kind"]), lua_str(v["name"]), lua_list(v["landmarks"]),
-      lua_str(v["gmnotes"]), lua_str(v["memo"])))
-  L.append("  },")
+  L.append("  extra_info = {%s}," % ", ".join("[%s] = %s" % (lua_str(b), lua_str(v)) for b, v in extra_info.items()))
   L.append("  exploration = {")
-  for b, rows in exploration.items():
-    L.append("    [%s] = {%s}," % (lua_str(b), ", ".join(
-      "%s = {%s}" % (cat, ", ".join("{%s, %d}" % (lua_str(o), w) for o, w in row)) for cat, row in rows.items())))
+  for b, pools in exploration.items():
+    L.append("    [%s] = {%s}," % (lua_str(b), ", ".join("%s = %s" % (col, lua_list(pool)) for col, pool in pools.items())))
   L.append("  },")
   L.append("  special = {")
   for b, v in special.items():

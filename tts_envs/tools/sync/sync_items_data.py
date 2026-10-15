@@ -467,7 +467,7 @@ def read_tokens(seen_names, template_types):
                % (where, name, role or "role-less"))
 
     if faction not in factions:
-      sys.exit("%s (%s): faction %r is not on the factions sheet"
+      sys.exit("%s (%s): faction %r is not on the faction_table sheet"
                % (where, name, faction))
     tier = int_cell(r.get("tier"), where, "tier")
     if tier is not None and tier > 3:
@@ -588,7 +588,7 @@ def read_landmarks(wb, factions, seen_ids, token_names, seen_names, template_typ
     if tts_type != "token":
       sys.exit("%s (%s): tts_type must be 'token', got %r" % (where, name, tts_type))
     if faction not in factions:
-      sys.exit("%s (%s): faction %r is not on the factions sheet" % (where, name, faction))
+      sys.exit("%s (%s): faction %r is not on the faction_table sheet" % (where, name, faction))
     tier = int_cell(r.get("tier"), where, "tier")
     if tier is not None and tier > 3:
       sys.exit("%s (%s): tier must be 0-3, got %d" % (where, name, tier))
@@ -811,7 +811,7 @@ def main():
       tags.append("Contraband")
       if gmnotes not in faction_ids:
         sys.exit("%s (%s): contraband gmnotes must be the faction_id that "
-                 "buys it (tokens.xlsx factions), got %r"
+                 "buys it (tokens.xlsx faction_table), got %r"
                  % (where, name, gmnotes))
 
     items.append({

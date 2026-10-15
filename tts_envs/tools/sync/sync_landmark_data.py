@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert maptile.xlsx!landmark_table into the LANDMARK_DATA table in Global.
+"""Convert tokens.xlsx!landmark_table into the LANDMARK_DATA table in Global.
 
 A landmark's GMNotes (tokens.xlsx landmarks sheet) is its KIND -- "cave",
 "fishing_node" -- shared by every landmark that behaves alike. landmark_table
@@ -14,7 +14,7 @@ has one row per kind, saying what Global attaches to it:
 The landmark's own data (name, faction, tier, image) stays on tokens.xlsx;
 only behaviour lives here, so nothing is written twice. A kind reaches an
 object from its tokens.xlsx gmnotes, or from a stamp Explore or Render puts on
-what it spawns (explore_outcomes gmnotes, maptile_table <spawncol>_gmnotes);
+what it spawns (biome_render <spawncol>_gmnotes; Explore stamps memo only);
 all are cross-checked.
 
 Run: python tools/sync/sync_landmark_data.py
@@ -24,9 +24,9 @@ import os, re, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/: datasets, spawn_cells, lua_inline
-from datasets import ROOT, MAPTILES, TOKENS, LANDMARK_SHEET, load, read_rows
+from datasets import ROOT, MAPTILES, TOKENS, LANDMARK_SHEET, LANDMARK_TABLE_SHEET, load, read_rows
 
-SHEET = "landmark_table"
+SHEET = LANDMARK_TABLE_SHEET
 SRC = os.path.join(ROOT, "src", "global.lua")
 OUT = os.path.join(ROOT, "generated", "landmark_data.lua")
 WORKSPACE = os.path.dirname(ROOT)
@@ -59,32 +59,29 @@ def known_actions():
 
 def main():
   wb = load(MAPTILES)
-  if SHEET not in wb.sheetnames:
-    sys.exit("maptile.xlsx has no %r sheet" % SHEET)
+  tokens = load(TOKENS)
+  if SHEET not in tokens.sheetnames:
+    sys.exit("tokens.xlsx has no %r sheet" % SHEET)
   actions = known_actions()
 
-  #[[ Which kinds landmarks can carry, for the unused/unknown checks. Three
-  # sources: the landmark's own gmnotes (tokens.xlsx), and the gmnotes Explore
-  # (explore_outcomes) and Render (maptile_table) stamp on what they spawn --
-  # a stamp wins in game.
+  #[[ Which kinds landmarks can carry, for the unused/unknown checks. Two
+  # sources: the landmark's own gmnotes (tokens.xlsx), and the gmnotes Render
+  # (biome_render) stamps on what it spawns -- a stamp wins in game. Explore
+  # never stamps GMNotes, only memo.
   used = {}
-  for r in read_rows(TOKENS, LANDMARK_SHEET, "name"):
+  for r in read_rows(TOKENS, LANDMARK_SHEET, "name", tokens):
     gm = (r.get("gmnotes") or "").strip()
     if gm:
       used.setdefault(gm, []).append(r["name"])
-  for r in read_rows(MAPTILES, "explore_outcomes", "outcome", wb):
-    gm = (r.get("gmnotes") or "").strip()
-    if gm:
-      used.setdefault(gm, []).append("Explore " + r["outcome"])
-  # Render stamps: maptile_table <spawncol>_gmnotes (spawn_cells.read_stamps).
-  for r in read_rows(MAPTILES, "maptile_table", "gmnotes", wb):
+  # Render stamps: biome_render <spawncol>_gmnotes (spawn_cells.read_stamps).
+  for r in read_rows(MAPTILES, "biome_render", "gmnotes", wb):
     for col, value in r.items():
       gm = (value or "").strip() if col.endswith("_gmnotes") else ""
       if gm:
         used.setdefault(gm, []).append("Render %s %s" % (r["gmnotes"], col))
 
   table = []
-  for r in read_rows(MAPTILES, SHEET, "gmnotes", wb):
+  for r in read_rows(TOKENS, SHEET, "gmnotes", tokens):
     where, kind = r["_where"], r["gmnotes"].strip()
     if not KIND.match(kind):
       sys.exit("%s: gmnotes %r -- want lowercase snake_case (cave, fishing_node)"

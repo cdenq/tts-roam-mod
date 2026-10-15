@@ -479,6 +479,23 @@ check(byName["Eyrie Roost"].gm_notes == "roost" and byName["Eyrie Roost"].memo =
 check(byName["Cave"].gm_notes == nil and byName["Cave"].memo == "", "an unstamped slot keeps its own GMNotes and memo")
 check(byName["Squirrel"].gm_notes == nil, "stamps are per category: the meeple is untouched")
 
+print("\n== quiet spawn says nothing ==")
+objects = {}
+CLONED = {}
+makeBag("6a6425", {"Cave"})
+local printed = 0
+local realPrint = printToAll
+printToAll = function(...) printed = printed + 1 end
+local quietLogs = {}
+local realLog = log
+log = function(m) table.insert(quietLogs, m) end
+spawnFrom(stampHost, {landmark = {{"Cave"}, {"Nope"}}}, nil, true)
+printToAll = realPrint
+log = realLog
+check(#CLONED == 1, "a quiet spawn still spawns")
+check(printed == 1, "only the bag's own not-found line prints; no spawned / MISSING summary")
+check(quietLogs[1] and quietLogs[1]:find("MISSING from bag %-%- Nope"), "the shortfall goes to the log")
+
 print("\n== gold: fewest coins ==")
 -- the split itself, independent of any bag
 local counts, short = splitGold(17, {5, 1})
@@ -880,7 +897,7 @@ check(repScore("riverfolk") == FACTIONS.riverfolk.default_rep,
       "an untouched faction uses its default, not 0")
 check(factionName("riverfolk") == FACTIONS.riverfolk.name,
       "a faction id resolves to its display name")
--- Starting reps are tuned by hand on the factions sheet, so check only that
+-- Starting reps are tuned by hand on the faction_table sheet, so check only that
 -- each one lands in the band its own default_rep falls in, whatever it is.
 local misplaced = {}
 for id, f in pairs(FACTIONS) do
